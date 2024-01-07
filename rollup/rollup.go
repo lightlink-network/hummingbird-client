@@ -3,6 +3,7 @@ package rollup
 import (
 	"hummingbird/node"
 	"hummingbird/node/contracts"
+	"hummingbird/utils"
 	"log/slog"
 	"time"
 
@@ -13,6 +14,9 @@ type Opts struct {
 	BundleSize uint64        // BundleSize is the number of blocks to include in each bundle.
 	PollDelay  time.Duration // PollDelay is the time to wait between polling for new blocks.
 	Logger     *slog.Logger
+
+	StoreCelestiaPointers bool // StoreCelestiaPointers indicates whether or not to store the Celestia pointers in the local database.
+	StoreHeaders          bool // StoreHeaders indicates whether or not to store the rollup headers in the local database.
 }
 
 type Rollup struct {
@@ -23,6 +27,13 @@ type Rollup struct {
 func NewRollup(n *node.Node, opts *Opts) *Rollup {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
+	}
+	log := opts.Logger.With("func", "NewRollup")
+
+	if n.Store == nil && opts.StoreCelestiaPointers || opts.StoreHeaders {
+		log.Warn("A Store was not set on the Node, disabling local storage", "store_celestia_pointers", opts.StoreCelestiaPointers, "store_headers", opts.StoreHeaders)
+		opts.StoreCelestiaPointers = false
+		opts.StoreHeaders = false
 	}
 
 	return &Rollup{Node: n, Opts: opts}
@@ -88,6 +99,27 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 		StateRoot:        bundle.StateRoot(),
 		CelestiaHeight:   pointer.Height,
 		CelestiaDataRoot: pointer.DataRoot,
+	}
+
+	// 8. calculate the hash of the header
+	hash, err := contracts.HashCanonicalStateChainHeader(header)
+	if err != nil {
+		return nil, err
+	}
+
+	// 9. Optionally store the header in the local database
+	if r.Opts.StoreHeaders {
+		if err := r.Node.Store.Put(hash[:], utils.MustJsonMarshal(header)); err != nil {
+			return nil, err
+		}
+	}
+
+	// 10. Optionally store the Celestia pointer in the local database
+	// Required for the Celestia proof.
+	if r.Opts.StoreCelestiaPointers {
+		if err := r.Node.Store.Put(pointer.TxHash[:], utils.MustJsonMarshal(pointer)); err != nil {
+			return nil, err
+		}
 	}
 
 	return &Block{header, bundle, pointer}, nil

@@ -1,0 +1,21 @@
+{
+  "celestia": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdfQ.oD-NCdMlElJU4SwZhKjFhoVpJm-WB_g1RNMua1IxUto",
+    "endpoint": "http://164.92.75.29:26658",
+    "namespace": "lightlink",
+    "tendermint_rpc": "http://full.consensus.mocha-4.celestia-mocha.com:26657",
+    "grpc": "full.consensus.mocha-4.celestia-mocha.com:9090"
+  },
+  "ethereum": {
+    "endpoint": "http://138.68.156.191:8545",
+    "canonicalStateChain": "0xE7E417366b5f11CFe4f21F3bc3D05e1c43cB33ad"
+  },
+  "lightlink": {
+    "endpoint": "https://replicator.pegasus.lightlink.io/rpc/v1",
+    "queryDelay": 500
+  },
+  "rollup": {
+    "bundleSize": 10,
+    "pollDelay": 1000
+  }
+}

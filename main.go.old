@@ -1,0 +1,129 @@
+package main
+
+import (
+	"hummingbird/node"
+	"hummingbird/rollup"
+	"math/big"
+	"os"
+	"time"
+
+	"log/slog"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/spf13/viper"
+)
+
+func genRandomBlocks(genesis *types.Header, n uint64) []*types.Block {
+	blocks := make([]*types.Block, n)
+	for i := uint64(0); i < n; i++ {
+
+		blocks[i] = types.NewBlockWithHeader(&types.Header{
+			Number:     big.NewInt(int64(genesis.Number.Uint64() + i)),
+			ParentHash: genesis.Hash(),
+			Time:       genesis.Time + i,
+		})
+
+		blocks[i] = blocks[i].WithBody(types.Transactions{
+			types.NewTransaction(0, blocks[i].Coinbase(), big.NewInt(0), 100000, big.NewInt(0), nil),
+		}, nil)
+	}
+
+	return blocks
+}
+
+func main() {
+	viper.SetConfigName("config")
+	viper.AddConfigPath(".")
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level:     slog.LevelDebug,
+		AddSource: true,
+	})
+
+	log := slog.New(handler).With("app", "hummingbird")
+	log.Info("Starting hummingbird")
+
+	// key
+	publisherSigner, err := crypto.ToECDSA(hexutil.MustDecode("0xec9a1d0c5cdc025927957c97112bfdc08de59fcd994d558495653056bc874de4"))
+	if err != nil {
+		log.Error("Failed to create publisher key", "error", err)
+		panic(err)
+	}
+
+	// create ethereum client
+	eth, err := node.NewEthereumRPC(node.EthereumRPCOpts{
+		Signer:                     publisherSigner,
+		Endpoint:                   viper.GetString("ethereum.endpoint"),
+		CanonicalStateChainAddress: common.HexToAddress(viper.GetString("ethereum.canonicalStateChain")),
+		Logger:                     log,
+	})
+	if err != nil {
+		log.Error("Failed to create ethereum client", "error", err)
+		panic(err)
+	}
+	log.Info("Connected to Ethereum!")
+
+	// create a lightlink mock
+	llMock := node.NewLightLinkMock()
+	llGenesis := types.NewBlockWithHeader(&types.Header{
+		Number:     big.NewInt(0),
+		ParentHash: [32]byte{},
+		Time:       0,
+	})
+
+	llBlocks := genRandomBlocks(llGenesis.Header(), 10)
+	for _, block := range llBlocks {
+		llMock.SimulateAddBlock(block)
+	}
+
+	// create a celestia mock
+	celestia, err := node.NewCelestiaAPI(node.CelestiaAPIOpts{
+		Endpoint:      viper.GetString("celestia.endpoint"),
+		Token:         viper.GetString("celestia.token"),
+		GRPC:          viper.GetString("celestia.grpc"),
+		TendermintRPC: viper.GetString("celestia.tendermint_rpc"),
+		Namespace:     viper.GetString("celestia.namespace"),
+	})
+	if err != nil {
+		log.Error("Failed to create celestia client", "error", err)
+		panic(err)
+	}
+	log.Info("Connected to Celestia!")
+
+	// create a node
+	n := node.Node{
+		Ethereum:  eth,
+		Celestia:  celestia,
+		LightLink: llMock,
+	}
+
+	// create a rollup client
+	r := rollup.NewRollup(&n, &rollup.Opts{
+		PollDelay:  time.Second * 5,
+		BundleSize: 5,
+		Logger:     log.With("ctx", "Rollup"),
+	})
+
+	// // create and submit the next block
+	block, _, err := r.CreateAndSubmitNextBlock()
+	if err != nil {
+		log.Error("Failed to create and submit next block", "error", err)
+		panic(err)
+	}
+
+	log.Info("Created rollup block", "bundle size", len(block.Bundle.Blocks))
+
+	// log.Info("Created rollup block", "bundle size", len(block.Bundle.Blocks))
+	// err := r.Run()
+	// if err != nil {
+	// 	log.Error("Failed to run rollup", "error", err)
+	// 	panic(err)
+	// }
+}

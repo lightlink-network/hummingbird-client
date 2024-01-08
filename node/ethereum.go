@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"hummingbird/node/contracts"
+	"hummingbird/utils"
 	"log/slog"
 	"math/big"
 	"time"
@@ -80,6 +81,14 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 
 	log.Info("Connected to Ethereum", "chainId", chainId)
 
+	// Warn user if the contracts are not found at the given addresses.
+	if ok, _ := utils.IsContract(client, opts.CanonicalStateChainAddress); !ok {
+		log.Warn("contract not found for CanonicalStateChain at given Address", "address", opts.CanonicalStateChainAddress.Hex(), "endpoint", opts.Endpoint)
+	}
+	if ok, _ := utils.IsContract(client, opts.DAOracleAddress); !ok {
+		log.Warn("contract not found for DAOracle at given Address", "address", opts.DAOracleAddress.Hex(), "endpoint", opts.Endpoint)
+	}
+
 	return &EthereumClient{
 		signer:              opts.Signer,
 		client:              client,
@@ -91,7 +100,20 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 }
 
 func (e *EthereumClient) transactor() (*bind.TransactOpts, error) {
-	return bind.NewKeyedTransactorWithChainID(e.signer, e.chainId)
+	opts, err := bind.NewKeyedTransactorWithChainID(e.signer, e.chainId)
+	if err != nil {
+		e.logger.Error("Failed to create transactor", "error", err)
+		return nil, err
+	}
+
+	gasPrice, err := e.client.SuggestGasPrice(context.Background())
+	if err != nil {
+		e.logger.Error("Failed to get gas price", "error", err)
+		return nil, err
+	}
+
+	opts.GasPrice = gasPrice
+	return opts, nil
 }
 
 // GetRollupHead returns the latest rollup block header.

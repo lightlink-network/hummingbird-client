@@ -25,6 +25,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		CanonicalStateChainAddress: common.HexToAddress(cfg.Ethereum.CanonicalStateChain),
 		DAOracleAddress:            common.HexToAddress(cfg.Ethereum.DaOracle),
 		Signer:                     ethKey,
+		Logger:                     logger.With("ctx", "ethereum"),
 	})
 	if err != nil {
 		return nil, err
@@ -37,6 +38,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		GRPC:          cfg.Celestia.GRPC,
 		TendermintRPC: cfg.Celestia.TendermintRPC,
 		Namespace:     cfg.Celestia.Namespace,
+		Logger:        logger.With("ctx", "celestia"),
 	})
 	if err != nil {
 		return nil, err
@@ -46,6 +48,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	ll, err := NewLightLinkClient(&LightLinkClientOpts{
 		Endpoint: cfg.LightLink.Endpoint,
 		Delay:    time.Duration(cfg.LightLink.Delay) * time.Millisecond,
+		Logger:   logger.With("ctx", "lightlink"),
 	})
 	if err != nil {
 		return nil, err

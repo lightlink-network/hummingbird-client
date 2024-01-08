@@ -121,16 +121,18 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 
 	// 9. Optionally store the header in the local database
 	if r.Opts.StoreHeaders {
-		if err := r.Node.Store.Put(hash[:], utils.MustJsonMarshal(header)); err != nil {
-			return nil, err
+		key := append([]byte("rheader_"), hash[:]...)
+		if err := r.Node.Store.Put(key, utils.MustJsonMarshal(header)); err != nil {
+			return nil, fmt.Errorf("createNextBlock: Failed to store header: %w", err)
 		}
 	}
 
 	// 10. Optionally store the Celestia pointer in the local database
 	// Required for the Celestia proof.
 	if r.Opts.StoreCelestiaPointers {
-		if err := r.Node.Store.Put(pointer.TxHash[:], utils.MustJsonMarshal(pointer)); err != nil {
-			return nil, err
+		key := append([]byte("pointer_"), hash[:]...)
+		if err := r.Node.Store.Put(key, utils.MustJsonMarshal(pointer)); err != nil {
+			return nil, fmt.Errorf("createNextBlock: Failed to store Celestia pointer: %w", err)
 		}
 	}
 

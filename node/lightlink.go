@@ -34,12 +34,10 @@ func NewLightLinkClient(opts *LightLinkClientOpts) (*LightLinkClient, error) {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
-	log := opts.Logger.With("func", "NewLightLinkClient")
 
 	client, err := jsonrpc.NewClient(opts.Endpoint)
 	if err != nil {
-		log.Error("Failed to connect to LightLink", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to LightLink: %w", err)
 	}
 
 	ll := &LightLinkClient{client: client, opts: opts}
@@ -47,11 +45,10 @@ func NewLightLinkClient(opts *LightLinkClientOpts) (*LightLinkClient, error) {
 	// check connection
 	chainId, err := ll.GetChainId()
 	if err != nil {
-		log.Error("Failed to get chain id", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get chain id: %w", err)
 	}
 
-	log.Info("Connected to LightLink", "chainId", chainId)
+	opts.Logger.Info("Connected to LightLink", "chainId", chainId)
 	return ll, nil
 }
 
@@ -104,14 +101,12 @@ func (l *LightLinkClient) GetBlock(height uint64) (*types.Block, error) {
 }
 
 func (l *LightLinkClient) GetBlocks(start, end uint64) ([]*types.Block, error) {
-	log := slog.Default().With("func", "GetBlocks")
 
 	var blocks []*types.Block
 	for i := start; i <= end; i++ {
 		block, err := l.GetBlock(i)
 		if err != nil {
-			log.Error("Failed to get block", "height", i, "error", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to get block at height %d: %w", i, err)
 		}
 		blocks = append(blocks, block)
 
@@ -123,15 +118,6 @@ func (l *LightLinkClient) GetBlocks(start, end uint64) ([]*types.Block, error) {
 
 	return blocks, nil
 }
-
-// func bindJsonTx(from any, target *types.Transaction) error {
-// 	b, err := json.Marshal(from)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	return target.UnmarshalJSON(b)
-// }
 
 func unmarshalJsonTx(from any) (*types.Transaction, error) {
 	b, err := json.Marshal(from)

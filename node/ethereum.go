@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"hummingbird/node/contracts"
 	"hummingbird/utils"
 	"log/slog"
@@ -55,40 +56,35 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
-	log := opts.Logger.With("func", "NewEthereumRPC")
 
 	client, err := ethclient.Dial(opts.Endpoint)
 	if err != nil {
-		log.Error("Failed to connect to Ethereum", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to Ethereum: %w", err)
 	}
 
 	canonicalStateChain, err := contracts.NewCanonicalStateChainContract(opts.CanonicalStateChainAddress, client)
 	if err != nil {
-		log.Error("Failed to connect to CanonicalStateChain", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to CanonicalStateChain: %w", err)
 	}
 
 	daOracle, err := contracts.NewDAOracleContract(opts.DAOracleAddress, client)
 	if err != nil {
-		log.Warn("Failed to connect to DAOracle", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to DAOracle: %w", err)
 	}
 
 	chainId, err := client.ChainID(context.TODO())
 	if err != nil {
-		log.Error("Failed to get chainId", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get chainId: %w", err)
 	}
 
-	log.Info("Connected to Ethereum", "chainId", chainId)
+	opts.Logger.Info("Connected to Ethereum", "chainId", chainId)
 
 	// Warn user if the contracts are not found at the given addresses.
 	if ok, _ := utils.IsContract(client, opts.CanonicalStateChainAddress); !ok {
-		log.Warn("contract not found for CanonicalStateChain at given Address", "address", opts.CanonicalStateChainAddress.Hex(), "endpoint", opts.Endpoint)
+		opts.Logger.Warn("contract not found for CanonicalStateChain at given Address", "address", opts.CanonicalStateChainAddress.Hex(), "endpoint", opts.Endpoint)
 	}
 	if ok, _ := utils.IsContract(client, opts.DAOracleAddress); !ok {
-		log.Warn("contract not found for DAOracle at given Address", "address", opts.DAOracleAddress.Hex(), "endpoint", opts.Endpoint)
+		opts.Logger.Warn("contract not found for DAOracle at given Address", "address", opts.DAOracleAddress.Hex(), "endpoint", opts.Endpoint)
 	}
 
 	return &EthereumClient{
@@ -105,14 +101,12 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 func (e *EthereumClient) transactor() (*bind.TransactOpts, error) {
 	opts, err := bind.NewKeyedTransactorWithChainID(e.signer, e.chainId)
 	if err != nil {
-		e.logger.Error("Failed to create transactor", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 
 	gasPrice, err := e.client.SuggestGasPrice(context.Background())
 	if err != nil {
-		e.logger.Error("Failed to get gas price", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get gas price: %w", err)
 	}
 	opts.GasPrice = gasPrice
 
@@ -132,12 +126,10 @@ func (e *EthereumClient) GetRollupHead() (contracts.CanonicalStateChainHeader, e
 
 // PushRollupHead pushes a new rollup block header.
 func (e *EthereumClient) PushRollupHead(header *contracts.CanonicalStateChainHeader) (*types.Transaction, error) {
-	log := e.logger.With("func", "PushRollupHead")
 
 	transactor, err := e.transactor()
 	if err != nil {
-		log.Error("Failed to create transactor", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("Failed to create transactor: %w", err)
 	}
 
 	return e.canonicalStateChain.PushBlock(transactor, *header)
@@ -168,13 +160,11 @@ func (e *EthereumClient) GetHeight() (uint64, error) {
 }
 
 func (e *EthereumClient) Wait(txHash common.Hash) (*types.Receipt, error) {
-	log := e.logger.With("func", "Wait")
 
 	// 1. try to get the the tx, see if it is pending
 	_, isPending, err := e.client.TransactionByHash(context.TODO(), txHash)
 	if err != nil {
-		log.Error("Failed to get transaction", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get transaction: %w", err)
 	}
 
 	// 2. if it is pending, wait for it to be mined

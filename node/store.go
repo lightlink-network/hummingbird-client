@@ -1,6 +1,10 @@
 package node
 
-import "github.com/syndtr/goleveldb/leveldb"
+import (
+	"fmt"
+
+	"github.com/syndtr/goleveldb/leveldb"
+)
 
 type KVStore interface {
 	Get(key []byte) ([]byte, error)
@@ -15,7 +19,7 @@ type LDBStore struct {
 func NewLDBStore(path string) (*LDBStore, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open leveldb: %w", err)
 	}
 
 	return &LDBStore{db: db}, nil

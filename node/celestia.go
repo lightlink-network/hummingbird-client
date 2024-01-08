@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"hummingbird/node/contracts"
 	"log/slog"
 	"math/big"
@@ -63,31 +64,27 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
-	log := opts.Logger.With("func", "NewCelestiaAPI")
 
 	c, err := client.NewClient(context.Background(), opts.Endpoint, opts.Token)
 	if err != nil {
-		log.Error("Failed to connect to Celestia", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to Celestia: %w", err)
 	}
+
 	trpc, err := http.New(opts.TendermintRPC, "/websocket")
 	if err != nil {
-		log.Error("Failed to connect to Tendermint RPC", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to Tendermint RPC: %w", err)
 	}
 
 	if err := trpc.Start(); err != nil {
-		log.Error("Failed to start Tendermint RPC", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to start Tendermint RPC: %w", err)
 	}
 
 	grcp, err := grpc.Dial(opts.GRPC, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Error("Failed to connect to Celestia GRPC", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to Celestia GRPC: %w", err)
 	}
 
-	log.Info("Connected to Celestia")
+	opts.Logger.Info("Connected to Celestia")
 	return &CelestiaClient{
 		namespace: opts.Namespace,
 		client:    c,

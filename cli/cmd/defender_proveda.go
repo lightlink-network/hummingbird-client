@@ -17,6 +17,7 @@ import (
 func init() {
 	DefenderProveDaCmd.PersistentFlags().String("tx", "", "celestia tx hash in which data was submitted")
 	DefenderProveDaCmd.Flags().Bool("json", false, "output proof in json format")
+	DefenderProveDaCmd.Flags().Bool("verify", false, "verify the proof against the L1 rollup contract")
 }
 
 var DefenderProveDaCmd = &cobra.Command{
@@ -57,10 +58,27 @@ var DefenderProveDaCmd = &cobra.Command{
 		wrappedProof, err := rlp.EncodeToBytes(proof.WrappedProof)
 		utils.NoErr(err)
 
+		fmt.Println(" ")
 		fmt.Println("Proof:")
 		fmt.Println("	Nonce:", proof.Nonce)
 		fmt.Println("	Tuple.Height:", proof.Tuple.Height)
 		fmt.Println("	Tuple.DataRoot:", common.Hash(proof.Tuple.DataRoot).Hex())
 		fmt.Println("	WrappedProof:", hexutil.Encode(wrappedProof))
+		fmt.Println(" ")
+
+		if verify, _ := cmd.Flags().GetBool("verify"); !verify {
+			return
+		}
+
+		// Verify the proof against the L1 rollup contract.
+		verified, err := n.Ethereum.DAVerify(proof)
+		if err != nil {
+			logger.Error("Failed to verify proof", "err", err)
+			panic(err)
+		}
+
+		fmt.Println(" ")
+		fmt.Println("Verified:", verified)
+
 	},
 }

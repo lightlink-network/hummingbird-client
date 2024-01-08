@@ -8,8 +8,10 @@
     "grpc": "full.consensus.mocha-4.celestia-mocha.com:9090"
   },
   "ethereum": {
-    "endpoint": "http://138.68.156.191:8545",
-    "canonicalStateChain": "0xE7E417366b5f11CFe4f21F3bc3D05e1c43cB33ad"
+    "endpoint": "https://ethereum-sepolia.publicnode.com",
+    "endpoint_old": "http://138.68.156.191:8545",
+    "canonicalStateChain": "0xE7E417366b5f11CFe4f21F3bc3D05e1c43cB33ad",
+    "daOracle": "0x3a5cbB6EF4756DA0b3f6DAE7aB6430fD8c46d247"
   },
   "lightlink": {
     "endpoint": "https://replicator.pegasus.lightlink.io/rpc/v1",

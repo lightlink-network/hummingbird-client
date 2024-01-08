@@ -40,7 +40,6 @@ type EthereumClient struct {
 }
 
 type EthereumClientOpts struct {
-	Strict                     bool
 	Signer                     *ecdsa.PrivateKey
 	Endpoint                   string
 	CanonicalStateChainAddress common.Address
@@ -69,7 +68,7 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 
 	daOracle, err := contracts.NewDAOracleContract(opts.DAOracleAddress, client)
 	if err != nil {
-		log.Error("Failed to connect to DAOracle", "error", err)
+		log.Warn("Failed to connect to DAOracle", "error", err)
 		return nil, err
 	}
 

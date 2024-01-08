@@ -61,23 +61,19 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	// 0. fetch the current epoch = eth height
 	epoch, err := r.Ethereum.GetHeight()
 	if err != nil {
-		r.Opts.Logger.Error("Failed to get current epoch", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("createNextBlock: Failed to get current epoch: %w", err)
 	}
 
 	// 1. fetch ll height
 	llHeight, err := r.LightLink.GetHeight()
 	if err != nil {
-		r.Opts.Logger.Error("Failed to get current llheight", "error", err)
-
-		return nil, err
+		return nil, fmt.Errorf("createNextBlock: Failed to get current llheight: %w", err)
 	}
 
 	// 2. fetch the last rollup header
 	head, err := r.Ethereum.GetRollupHead()
 	if err != nil {
-		r.Opts.Logger.Error("Failed to get current head", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("createNextBlock: Failed to get current head: %w", err)
 	}
 
 	// 3. calculate bundle size
@@ -89,23 +85,20 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	// 4. calc prevHash from the last rollup header
 	prevHash, err := contracts.HashCanonicalStateChainHeader(&head)
 	if err != nil {
-		r.Opts.Logger.Error("Failed to get current prevHash", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("createNextBlock: Failed to get current prevHash: %w", err)
 	}
 
 	// 5. fetch the next bundle of blocks from ll
 	l2blocks, err := r.LightLink.GetBlocks(head.L2Height+1, head.L2Height+1+bundleSize)
 	if err != nil {
-		r.Opts.Logger.Error("Failed to get l2blocks", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("createNextBlock: Failed to get l2blocks: %w", err)
 	}
 	bundle := &node.Bundle{l2blocks}
 
 	// 6. upload the bundle to celestia
 	pointer, err := r.Celestia.PublishBundle(*bundle)
 	if err != nil {
-		r.Opts.Logger.Error("Failed to publish bundle", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("createNextBlock: Failed to publish bundle: %w", err)
 	}
 
 	// 7. create the rollup header
@@ -123,7 +116,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	// 8. calculate the hash of the header
 	hash, err := contracts.HashCanonicalStateChainHeader(header)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("createNextBlock: Failed to hash header: %w", err)
 	}
 
 	// 9. Optionally store the header in the local database

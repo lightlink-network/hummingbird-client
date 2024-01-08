@@ -8,3 +8,5 @@ store
 
 # Sensitive Data
 .env
+config.ganache.json
+config.hardhat.json

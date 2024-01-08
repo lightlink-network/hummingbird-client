@@ -17,7 +17,7 @@ var RollupInfoCmd = &cobra.Command{
 	Short: "info will print information about the current rollup state",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
-		logger := DefaultLogger()
+		logger := ConsoleLogger()
 		ethKey := getEthKey()
 
 		n, err := node.NewFromConfig(cfg, logger, ethKey)

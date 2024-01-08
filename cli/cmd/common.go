@@ -2,20 +2,32 @@ package cmd
 
 import (
 	"crypto/ecdsa"
+	"io"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/lmittmann/tint"
 )
 
-func DefaultLogger() *slog.Logger {
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level:     slog.LevelDebug,
-		AddSource: false,
-	})
+func ConsoleLogger() *slog.Logger {
+	w := os.Stderr
+	logger := slog.New(tint.NewHandler(w, &tint.Options{
+		Level:      slog.LevelDebug,
+		TimeFormat: time.Kitchen,
+	}))
 
-	logger := slog.New(handler).With("app", "hummingbird")
+	return logger
+}
+
+func JSONLogger(w io.Writer) *slog.Logger {
+	logger := slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
+		Level:     slog.LevelDebug,
+		AddSource: true,
+	}))
+
 	return logger
 }
 

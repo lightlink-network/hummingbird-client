@@ -25,7 +25,7 @@ var DefenderProveDaCmd = &cobra.Command{
 	Short: "prove-da will prove a data availability batch",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
-		logger := DefaultLogger()
+		logger := ConsoleLogger()
 		ethKey := getEthKey()
 
 		n, err := node.NewFromConfig(cfg, logger, ethKey)

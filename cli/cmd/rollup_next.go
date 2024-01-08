@@ -22,7 +22,7 @@ var RollupNextCmd = &cobra.Command{
 	Short: "next will rollup the next batch of L2 blocks",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
-		logger := DefaultLogger()
+		logger := ConsoleLogger()
 		ethKey := getEthKey()
 		dryRun, _ := cmd.Flags().GetBool("dry")
 

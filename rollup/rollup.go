@@ -1,6 +1,7 @@
 package rollup
 
 import (
+	"fmt"
 	"hummingbird/node"
 	"hummingbird/node/contracts"
 	"hummingbird/utils"
@@ -49,18 +50,22 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	// 0. fetch the current epoch = eth height
 	epoch, err := r.Ethereum.GetHeight()
 	if err != nil {
+		r.Opts.Logger.Error("Failed to get current epoch", "error", err)
 		return nil, err
 	}
 
 	// 1. fetch ll height
 	llHeight, err := r.LightLink.GetHeight()
 	if err != nil {
+		r.Opts.Logger.Error("Failed to get current llheight", "error", err)
+
 		return nil, err
 	}
 
 	// 2. fetch the last rollup header
 	head, err := r.Ethereum.GetRollupHead()
 	if err != nil {
+		r.Opts.Logger.Error("Failed to get current head", "error", err)
 		return nil, err
 	}
 
@@ -73,12 +78,14 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	// 4. calc prevHash from the last rollup header
 	prevHash, err := contracts.HashCanonicalStateChainHeader(&head)
 	if err != nil {
+		r.Opts.Logger.Error("Failed to get current prevHash", "error", err)
 		return nil, err
 	}
 
 	// 5. fetch the next bundle of blocks from ll
 	l2blocks, err := r.LightLink.GetBlocks(head.L2Height+1, head.L2Height+1+bundleSize)
 	if err != nil {
+		r.Opts.Logger.Error("Failed to get l2blocks", "error", err)
 		return nil, err
 	}
 	bundle := &node.Bundle{l2blocks}
@@ -86,6 +93,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	// 6. upload the bundle to celestia
 	pointer, err := r.Celestia.PublishBundle(*bundle)
 	if err != nil {
+		r.Opts.Logger.Error("Failed to publish bundle", "error", err)
 		return nil, err
 	}
 
@@ -174,7 +182,7 @@ func (r *Rollup) CreateAndSubmitNextBlock() (*Block, uint64, error) {
 		return nil, 0, err
 	}
 
-	log.Info("Rollup chain updated", "rollup_l2height", block.L2Height, "bundle_size", len(block.Blocks), "rollup_height", h, "epoch", block.Epoch, "tx", receipt.TxHash.Hex(), "gas_used", receipt.GasUsed, "")
+	log.Info("Rollup chain updated", "rollup_l2height", block.L2Height, "bundle_size", len(block.Blocks), "rollup_height", h, "epoch", block.Epoch, "tx", receipt.TxHash.Hex(), "gas_used", receipt.GasUsed)
 	return block, h, nil
 }
 
@@ -182,7 +190,6 @@ func (r *Rollup) Run() error {
 	log := r.Opts.Logger.With("func", "Run")
 
 	// get last rollup height
-
 	head, err := r.Ethereum.GetRollupHead()
 	if err != nil {
 		log.Error("Failed to get rollup height", "error", err)
@@ -191,27 +198,74 @@ func (r *Rollup) Run() error {
 	log.Info("Starting rollup", "rollup_ll_height", head.L2Height, "rollup_ll_epoch", head.Epoch)
 
 	for {
-		// 1. wait for new blocks
-		height, err := r.LightLink.GetHeight()
+		// 1. get next rollup target height
+		target, err := r.nextRollupTarget()
 		if err != nil {
-			log.Error("Failed to get lightlink height", "error", err)
+			log.Error("Failed to get next rollup target", "error", err)
 			return err
 		}
 
-		// 2. Check If bundle size not reached, continue waiting
-		if height-head.L2Height < r.Opts.BundleSize {
-			log.Debug("Waiting: bundle size not reached", "ll_height", height, "bundle_size", r.Opts.BundleSize, "sleeping_for", r.Opts.PollDelay, "rollup_ll_height", head.L2Height)
-			time.Sleep(r.Opts.PollDelay)
-			continue
-		}
-
-		// 3. create and submit a new block
-		b, _, err := r.CreateAndSubmitNextBlock()
+		// 2. wait for the target height to be reached
+		err = r.awaitL2Height(target)
 		if err != nil {
-			log.Error("Failed to create and submit next block", "error", err)
+			log.Error("Failed to await L2 height", "error", err)
 			return err
 		}
 
-		head = *b.CanonicalStateChainHeader
+		// 3. create the next rollup block
+		block, err := r.CreateNextBlock()
+		if err != nil {
+			log.Error("Failed to create next block", "error", err)
+			return err
+		}
+
+		// 4. submit the block to the rollup contract
+		tx, err := r.SubmitBlock(block)
+		if err != nil {
+			log.Error("Failed to submit block", "error", err)
+			return err
+		}
+
+		hash, _ := contracts.HashCanonicalStateChainHeader(block.CanonicalStateChainHeader)
+		log.Info("Submitted rollup block",
+			"tx", tx.Hash().Hex(),
+			"hash", hash,
+			"epoch", block.Epoch,
+			"l2Height", block.L2Height,
+			"celestiaHeight", block.CelestiaHeight,
+			"daTx", block.CelestiaPointer.TxHash.Hex(),
+		)
+
+	}
+
+}
+
+// returns the layer2 block height that will trigger the next rollup
+func (r *Rollup) nextRollupTarget() (uint64, error) {
+	log := r.Opts.Logger.With("func", "nextRollupTarget")
+
+	head, err := r.Ethereum.GetRollupHead()
+	if err != nil {
+		log.Error("Failed to get rollup height", "error", err)
+		return 0, err
+	}
+
+	// get the next rollup target
+	return head.L2Height + r.Opts.BundleSize, nil
+}
+
+func (r *Rollup) awaitL2Height(h uint64) error {
+
+	for {
+		llHeight, err := r.LightLink.GetHeight()
+		if err != nil {
+			return fmt.Errorf("failed to get layer 2 height: %w", err)
+		}
+
+		if llHeight > h {
+			return nil
+		}
+
+		time.Sleep(r.Opts.PollDelay)
 	}
 }

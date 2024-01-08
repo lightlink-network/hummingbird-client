@@ -1,0 +1,10 @@
+TODO.md
+.DS_Store
+.idea
+.vscode
+
+# Database
+store
+
+# Sensitive Data
+.env

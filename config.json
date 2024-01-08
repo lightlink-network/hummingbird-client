@@ -1,4 +1,5 @@
 {
+  "storePath": "./store",
   "celestia": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdfQ.oD-NCdMlElJU4SwZhKjFhoVpJm-WB_g1RNMua1IxUto",
     "endpoint": "http://164.92.75.29:26658",
@@ -16,6 +17,8 @@
   },
   "rollup": {
     "bundleSize": 10,
-    "pollDelay": 1000
+    "pollDelay": 1000,
+    "storeCelestiaPointers": true,
+    "storeHeaders": true
   }
 }

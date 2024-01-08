@@ -1,2 +1,0 @@
-{"time":"2023-12-29T15:06:31.889507Z","level":"INFO","source":{"function":"main.main","file":"/Users/kassiusbarker/dev/work/rollup/main.go","line":25},"msg":"Config loaded successfully","config_file":"/Users/kassiusbarker/dev/work/rollup"}
-{"time":"2023-12-29T15:06:31.889728Z","level":"INFO","source":{"function":"main.main","file":"/Users/kassiusbarker/dev/work/rollup/main.go","line":26},"msg":"Starting rollup service","version":"v0.0.1"}

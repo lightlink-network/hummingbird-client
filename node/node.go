@@ -23,6 +23,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	eth, err := NewEthereumRPC(EthereumClientOpts{
 		Endpoint:                   cfg.Ethereum.Endpoint,
 		CanonicalStateChainAddress: common.HexToAddress(cfg.Ethereum.CanonicalStateChain),
+		DAOracleAddress:            common.HexToAddress(cfg.Ethereum.DaOracle),
 		Signer:                     ethKey,
 	})
 	if err != nil {

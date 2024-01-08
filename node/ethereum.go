@@ -26,6 +26,7 @@ type Ethereum interface {
 	PushRollupHead(header *contracts.CanonicalStateChainHeader) (*types.Transaction, error) // Push a new rollup block header to the CanonicalStateChain.sol contract.
 	GetRollupHeader(index uint64) (contracts.CanonicalStateChainHeader, error)              // Get the rollup block header at the given index from the CanonicalStateChain.sol contract.
 	GetRollupHeaderByHash(hash common.Hash) (contracts.CanonicalStateChainHeader, error)    // Get the rollup block header with the given hash from the CanonicalStateChain.sol contract.
+	DAVerify(*CelestiaProof) (bool, error)                                                  // Check if the data availability layer is verified.
 	Wait(txHash common.Hash) (*types.Receipt, error)                                        // Wait for the given transaction to be mined.
 }
 
@@ -34,13 +35,16 @@ type EthereumClient struct {
 	client              *ethclient.Client
 	chainId             *big.Int
 	canonicalStateChain *contracts.CanonicalStateChainContract
+	daOracle            *contracts.DAOracleContract
 	logger              *slog.Logger
 }
 
 type EthereumClientOpts struct {
+	Strict                     bool
 	Signer                     *ecdsa.PrivateKey
 	Endpoint                   string
 	CanonicalStateChainAddress common.Address
+	DAOracleAddress            common.Address
 	Logger                     *slog.Logger
 }
 
@@ -63,6 +67,12 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 		return nil, err
 	}
 
+	daOracle, err := contracts.NewDAOracleContract(opts.DAOracleAddress, client)
+	if err != nil {
+		log.Error("Failed to connect to DAOracle", "error", err)
+		return nil, err
+	}
+
 	chainId, err := client.ChainID(context.TODO())
 	if err != nil {
 		log.Error("Failed to get chainId", "error", err)
@@ -76,6 +86,7 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 		client:              client,
 		chainId:             chainId,
 		canonicalStateChain: canonicalStateChain,
+		daOracle:            daOracle,
 		logger:              opts.Logger,
 	}, nil
 }
@@ -144,6 +155,10 @@ func (e *EthereumClient) Wait(txHash common.Hash) (*types.Receipt, error) {
 
 	// 3. otherwise, if it is not pending, get the receipt
 	return e.client.TransactionReceipt(context.Background(), txHash)
+}
+
+func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
+	return e.daOracle.VerifyAttestation(nil, proof.Nonce, *proof.Tuple, *proof.WrappedProof)
 }
 
 // MOCK CLIENT FOR TESTING
@@ -216,6 +231,10 @@ func (e *ethereumMock) GetRollupHeight() (uint64, error) {
 
 func (e *ethereumMock) GetHeight() (uint64, error) {
 	return e.height, nil
+}
+
+func (e *ethereumMock) DAVerify(proof *CelestiaProof) (bool, error) {
+	return true, nil
 }
 
 func (e *ethereumMock) SimulateHeight(height uint64) {

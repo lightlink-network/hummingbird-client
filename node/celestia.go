@@ -59,7 +59,7 @@ type CelestiaClient struct {
 	logger    *slog.Logger
 }
 
-func NewCelestiaAPI(opts CelestiaClientOpts) (*CelestiaClient, error) {
+func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
@@ -245,7 +245,7 @@ func (c *celestiaMock) Namespace() string {
 	return c.namespace
 }
 
-func (c *celestiaMock) PushBlocks(blocks Bundle) (*CelestiaPointer, error) {
+func (c *celestiaMock) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
 	c.height++
 
 	// use the first block's hash as the data root

@@ -34,14 +34,20 @@ var DefenderProveDaCmd = &cobra.Command{
 			Logger: logger.With("ctx", "Defender"),
 		})
 
-		txHash := common.HexToHash(cmd.Flag("tx").Value.String())
+		rawTxHash, err := cmd.Flags().GetString("tx")
+		if err != nil {
+			logger.Error("Missing required tx hash from flag", "err", err)
+			panic(err)
+		}
+
+		txHash := common.HexToHash(rawTxHash)
 		proof, err := d.ProveDA(txHash)
 		if err != nil {
 			logger.Error("Failed to prove data availability", "err", err)
 			panic(err)
 		}
 
-		if cmd.Flag("json").Value.String() == "true" {
+		if useJson, _ := cmd.Flags().GetBool("json"); useJson {
 			buf, err := json.MarshalIndent(proof, "", "  ")
 			utils.NoErr(err)
 			fmt.Println(string(buf))

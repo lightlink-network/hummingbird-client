@@ -31,7 +31,6 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	if err != nil {
 		return nil, err
 	}
-	logger.Debug("Ethereum client successfully initialized")
 
 	cel, err := NewCelestiaClient(CelestiaClientOpts{
 		Endpoint:      cfg.Celestia.Endpoint,
@@ -44,7 +43,6 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	if err != nil {
 		return nil, err
 	}
-	logger.Debug("Celestia client successfully initialized")
 
 	ll, err := NewLightLinkClient(&LightLinkClientOpts{
 		Endpoint: cfg.LightLink.Endpoint,
@@ -54,13 +52,13 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	if err != nil {
 		return nil, err
 	}
-	logger.Debug("LightLink client successfully initialized")
 
 	store, err := NewLDBStore(cfg.StorePath)
 	if err != nil {
 		return nil, err
 	}
 
+	logger.Info("Rollup Node created!", "dryRun", cfg.DryRun)
 	return &Node{
 		Ethereum:  eth,
 		Celestia:  cel,

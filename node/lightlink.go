@@ -42,7 +42,27 @@ func NewLightLinkClient(opts *LightLinkClientOpts) (*LightLinkClient, error) {
 		return nil, err
 	}
 
-	return &LightLinkClient{client: client, opts: opts}, nil
+	ll := &LightLinkClient{client: client, opts: opts}
+
+	// check connection
+	chainId, err := ll.GetChainId()
+	if err != nil {
+		log.Error("Failed to get chain id", "error", err)
+		return nil, err
+	}
+
+	log.Info("Connected to LightLink", "chainId", chainId)
+	return ll, nil
+}
+
+func (l *LightLinkClient) GetChainId() (uint64, error) {
+	resp, err := l.client.Call("eth_chainId", nil)
+	if err != nil {
+		return 0, err
+	}
+
+	numHex := resp.Result.(string)
+	return hexutil.DecodeUint64(numHex)
 }
 
 func (l *LightLinkClient) GetHeight() (uint64, error) {

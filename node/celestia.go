@@ -87,6 +87,7 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		return nil, err
 	}
 
+	log.Info("Connected to Celestia")
 	return &CelestiaClient{
 		namespace: opts.Namespace,
 		client:    c,

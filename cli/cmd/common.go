@@ -12,7 +12,7 @@ import (
 func DefaultLogger() *slog.Logger {
 	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level:     slog.LevelDebug,
-		AddSource: true,
+		AddSource: false,
 	})
 
 	logger := slog.New(handler).With("app", "hummingbird")

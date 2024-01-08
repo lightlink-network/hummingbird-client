@@ -26,6 +26,9 @@ type Config struct {
 		StoreCelestiaPointers bool   `mapstructure:"storeCelestiaPointers"`
 		StoreHeaders          bool   `mapstructure:"storeHeaders"`
 	} `mapstructure:"rollup"`
+
+	// Not typically set in config file.
+	DryRun bool `mapstructure:"dryRun,omitempty"`
 }
 
 func Load() *Config {

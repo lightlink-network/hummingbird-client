@@ -38,6 +38,7 @@ type EthereumClient struct {
 	canonicalStateChain *contracts.CanonicalStateChainContract
 	daOracle            *contracts.DAOracleContract
 	logger              *slog.Logger
+	opts                *EthereumClientOpts
 }
 
 type EthereumClientOpts struct {
@@ -46,6 +47,7 @@ type EthereumClientOpts struct {
 	CanonicalStateChainAddress common.Address
 	DAOracleAddress            common.Address
 	Logger                     *slog.Logger
+	DryRun                     bool
 }
 
 // NewEthereumRPC returns a new EthereumRPC client.
@@ -96,6 +98,7 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 		canonicalStateChain: canonicalStateChain,
 		daOracle:            daOracle,
 		logger:              opts.Logger,
+		opts:                &opts,
 	}, nil
 }
 
@@ -111,8 +114,14 @@ func (e *EthereumClient) transactor() (*bind.TransactOpts, error) {
 		e.logger.Error("Failed to get gas price", "error", err)
 		return nil, err
 	}
-
 	opts.GasPrice = gasPrice
+
+	// If dry run is enabled, don't send the transaction.
+	if e.opts.DryRun {
+		e.logger.Warn("DryRun is enabled, not sending transaction")
+		opts.NoSend = true
+	}
+
 	return opts, nil
 }
 

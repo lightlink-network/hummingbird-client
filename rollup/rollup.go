@@ -15,6 +15,7 @@ type Opts struct {
 	BundleSize uint64        // BundleSize is the number of blocks to include in each bundle.
 	PollDelay  time.Duration // PollDelay is the time to wait between polling for new blocks.
 	Logger     *slog.Logger
+	DryRun     bool // DryRun indicates whether or not to actually submit the block to the L1 rollup contract.
 
 	StoreCelestiaPointers bool // StoreCelestiaPointers indicates whether or not to store the Celestia pointers in the local database.
 	StoreHeaders          bool // StoreHeaders indicates whether or not to store the rollup headers in the local database.
@@ -31,8 +32,18 @@ func NewRollup(n *node.Node, opts *Opts) *Rollup {
 	}
 	log := opts.Logger.With("func", "NewRollup")
 
-	if n.Store == nil && opts.StoreCelestiaPointers || opts.StoreHeaders {
-		log.Warn("A Store was not set on the Node, disabling local storage", "store_celestia_pointers", opts.StoreCelestiaPointers, "store_headers", opts.StoreHeaders)
+	// Check if local storage should be disabled
+	// if so warn the user and disable it.
+	disableStorage := false
+	if n.Store == nil {
+		log.Warn("A Store was not set on the Node, disabling local storage")
+		disableStorage = true
+	}
+	if opts.DryRun {
+		log.Warn("DryRun is enabled, disabling local storage")
+		disableStorage = true
+	}
+	if disableStorage {
 		opts.StoreCelestiaPointers = false
 		opts.StoreHeaders = false
 	}

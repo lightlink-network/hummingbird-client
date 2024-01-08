@@ -26,6 +26,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		DAOracleAddress:            common.HexToAddress(cfg.Ethereum.DaOracle),
 		Signer:                     ethKey,
 		Logger:                     logger.With("ctx", "ethereum"),
+		DryRun:                     cfg.DryRun,
 	})
 	if err != nil {
 		return nil, err

@@ -24,6 +24,7 @@ var RollupNextCmd = &cobra.Command{
 		cfg := config.Load()
 		logger := DefaultLogger()
 		ethKey := getEthKey()
+		dryRun, _ := cmd.Flags().GetBool("dry")
 
 		n, err := node.NewFromConfig(cfg, logger, ethKey)
 		utils.NoErr(err)
@@ -34,11 +35,12 @@ var RollupNextCmd = &cobra.Command{
 			StoreCelestiaPointers: cfg.Rollup.StoreCelestiaPointers,
 			StoreHeaders:          cfg.Rollup.StoreHeaders,
 			Logger:                logger.With("ctx", "Rollup"),
+			DryRun:                dryRun,
 		})
 
 		// If dry run is enabled, swap out celestia with a mock celestia client.
-		dryRun, _ := cmd.Flags().GetBool("dry")
 		if dryRun {
+			logger.Warn("DryRun is enabled, using mock celestia client")
 			r.Celestia = node.NewCelestiaMock(cfg.Celestia.Namespace)
 		}
 
@@ -69,10 +71,10 @@ var RollupNextCmd = &cobra.Command{
 		fmt.Println(" ")
 
 		// If dry run is enabled, exit.
-		if dryRun {
-			logger.Warn("Dry run enabled, not submitting rollup block to L1 rollup contract")
-			return
-		}
+		// if dryRun {
+		// 	logger.Warn("Dry run enabled, not submitting rollup block to L1 rollup contract")
+		// 	return
+		// }
 
 		logger.Info(("Submitting rollup block to L1 rollup contract"))
 		tx, err := r.SubmitBlock(b)

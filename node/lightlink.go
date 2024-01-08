@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hummingbird/node/jsonrpc"
+	"hummingbird/node/lightlink"
 	"log/slog"
 	"time"
 
@@ -64,11 +65,12 @@ func (l *LightLinkClient) GetBlock(height uint64) (*types.Block, error) {
 	result := resp.Result.(map[string]interface{})
 	txs := types.Transactions{}
 	for k, v := range result["transactions"].([]interface{}) {
-		tx := &types.Transaction{}
-		err := bindJsonTx(v, tx)
+
+		tx, err := unmarshalJsonTx(v)
 		if err != nil {
 			return nil, fmt.Errorf("failed to bind transaction %d: %w", k, err)
 		}
+
 		txs = append(txs, tx)
 	}
 
@@ -102,12 +104,22 @@ func (l *LightLinkClient) GetBlocks(start, end uint64) ([]*types.Block, error) {
 	return blocks, nil
 }
 
-func bindJsonTx(from any, target *types.Transaction) error {
+// func bindJsonTx(from any, target *types.Transaction) error {
+// 	b, err := json.Marshal(from)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	return target.UnmarshalJSON(b)
+// }
+
+func unmarshalJsonTx(from any) (*types.Transaction, error) {
 	b, err := json.Marshal(from)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return target.UnmarshalJSON(b)
+
+	return lightlink.UnMarshallTx(b)
 }
 
 // LightLinkMock is a mock LightLink client.

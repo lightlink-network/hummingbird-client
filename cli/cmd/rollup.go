@@ -18,7 +18,7 @@ var RollupCmd = &cobra.Command{
 		logger := DefaultLogger()
 		ethKey := getEthKey()
 
-		eth, err := node.NewEthereumRPC(node.EthereumRPCOpts{
+		eth, err := node.NewEthereumRPC(node.EthereumClientOpts{
 			Endpoint:                   cfg.Ethereum.Endpoint,
 			CanonicalStateChainAddress: common.HexToAddress(cfg.Ethereum.CanonicalStateChain),
 			Signer:                     ethKey,
@@ -26,7 +26,7 @@ var RollupCmd = &cobra.Command{
 		must(err)
 		logger.Debug("Ethereum client successfully initialized")
 
-		cel, err := node.NewCelestiaAPI(node.CelestiaAPIOpts{
+		cel, err := node.NewCelestiaAPI(node.CelestiaClientOpts{
 			Endpoint:      cfg.Celestia.Endpoint,
 			Token:         cfg.Celestia.Token,
 			GRPC:          cfg.Celestia.GRPC,
@@ -51,19 +51,27 @@ var RollupCmd = &cobra.Command{
 		must(err)
 		logger.Info("LightLink block", "txs", len(b.Transactions()))
 
+		store, err := node.NewLDBStore(cfg.StorePath)
+		must(err)
+
 		n := node.Node{
 			Ethereum:  eth,
 			Celestia:  cel,
 			LightLink: ll,
+
+			Store: store,
 		}
 
-		_ = rollup.NewRollup(&n, &rollup.Opts{
-			PollDelay:  time.Duration(cfg.Rollup.PollDelay) * time.Millisecond,
-			BundleSize: cfg.Rollup.BundleSize,
-			Logger:     logger.With("ctx", "Rollup"),
+		r := rollup.NewRollup(&n, &rollup.Opts{
+			PollDelay:             time.Duration(cfg.Rollup.PollDelay) * time.Millisecond,
+			BundleSize:            cfg.Rollup.BundleSize,
+			StoreCelestiaPointers: cfg.Rollup.StoreCelestiaPointers,
+			StoreHeaders:          cfg.Rollup.StoreHeaders,
+			Logger:                logger.With("ctx", "Rollup"),
 		})
 
 		logger.Info("Rollup client successfully initialized")
+		r.Run()
 
 	},
 }

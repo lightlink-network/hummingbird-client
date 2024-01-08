@@ -42,7 +42,7 @@ type Celestia interface {
 	GetProof(txHash []byte) (*CelestiaProof, error)
 }
 
-type CelestiaAPIOpts struct {
+type CelestiaClientOpts struct {
 	Endpoint      string
 	Token         string
 	TendermintRPC string
@@ -51,7 +51,7 @@ type CelestiaAPIOpts struct {
 	Logger        *slog.Logger
 }
 
-type CelestiaAPI struct {
+type CelestiaClient struct {
 	namespace string
 	client    *client.Client
 	trpc      *http.HTTP
@@ -59,7 +59,7 @@ type CelestiaAPI struct {
 	logger    *slog.Logger
 }
 
-func NewCelestiaAPI(opts CelestiaAPIOpts) (*CelestiaAPI, error) {
+func NewCelestiaAPI(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
@@ -87,7 +87,7 @@ func NewCelestiaAPI(opts CelestiaAPIOpts) (*CelestiaAPI, error) {
 		return nil, err
 	}
 
-	return &CelestiaAPI{
+	return &CelestiaClient{
 		namespace: opts.Namespace,
 		client:    c,
 		trpc:      trpc,
@@ -96,11 +96,11 @@ func NewCelestiaAPI(opts CelestiaAPIOpts) (*CelestiaAPI, error) {
 	}, nil
 }
 
-func (c *CelestiaAPI) Namespace() string {
+func (c *CelestiaClient) Namespace() string {
 	return c.namespace
 }
 
-func (c *CelestiaAPI) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
+func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
 	// get the namespace
 	ns, err := share.NewBlobNamespaceV0([]byte(c.Namespace()))
 	if err != nil {
@@ -132,7 +132,7 @@ func (c *CelestiaAPI) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
 }
 
 // PostData submits a new transaction with the provided data to the Celestia node.
-func (c *CelestiaAPI) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
+func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
 	response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
 	if err != nil {
 		return nil, err
@@ -152,7 +152,7 @@ func (c *CelestiaAPI) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLim
 	return pointer, err
 }
 
-func (c *CelestiaAPI) GetProof(txHash []byte) (*CelestiaProof, error) {
+func (c *CelestiaClient) GetProof(txHash []byte) (*CelestiaProof, error) {
 	ctx := context.Background()
 
 	// Get the tx

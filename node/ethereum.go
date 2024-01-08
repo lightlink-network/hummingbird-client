@@ -29,7 +29,7 @@ type Ethereum interface {
 	Wait(txHash common.Hash) (*types.Receipt, error)                                        // Wait for the given transaction to be mined.
 }
 
-type EthereumRPC struct {
+type EthereumClient struct {
 	signer              *ecdsa.PrivateKey
 	client              *ethclient.Client
 	chainId             *big.Int
@@ -37,7 +37,7 @@ type EthereumRPC struct {
 	logger              *slog.Logger
 }
 
-type EthereumRPCOpts struct {
+type EthereumClientOpts struct {
 	Signer                     *ecdsa.PrivateKey
 	Endpoint                   string
 	CanonicalStateChainAddress common.Address
@@ -45,7 +45,7 @@ type EthereumRPCOpts struct {
 }
 
 // NewEthereumRPC returns a new EthereumRPC client.
-func NewEthereumRPC(opts EthereumRPCOpts) (*EthereumRPC, error) {
+func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
@@ -71,7 +71,7 @@ func NewEthereumRPC(opts EthereumRPCOpts) (*EthereumRPC, error) {
 
 	log.Info("Connected to Ethereum", "chainId", chainId)
 
-	return &EthereumRPC{
+	return &EthereumClient{
 		signer:              opts.Signer,
 		client:              client,
 		chainId:             chainId,
@@ -80,17 +80,17 @@ func NewEthereumRPC(opts EthereumRPCOpts) (*EthereumRPC, error) {
 	}, nil
 }
 
-func (e *EthereumRPC) transactor() (*bind.TransactOpts, error) {
+func (e *EthereumClient) transactor() (*bind.TransactOpts, error) {
 	return bind.NewKeyedTransactorWithChainID(e.signer, e.chainId)
 }
 
 // GetRollupHead returns the latest rollup block header.
-func (e *EthereumRPC) GetRollupHead() (contracts.CanonicalStateChainHeader, error) {
+func (e *EthereumClient) GetRollupHead() (contracts.CanonicalStateChainHeader, error) {
 	return e.canonicalStateChain.GetHead(nil)
 }
 
 // PushRollupHead pushes a new rollup block header.
-func (e *EthereumRPC) PushRollupHead(header *contracts.CanonicalStateChainHeader) (*types.Transaction, error) {
+func (e *EthereumClient) PushRollupHead(header *contracts.CanonicalStateChainHeader) (*types.Transaction, error) {
 	log := e.logger.With("func", "PushRollupHead")
 
 	transactor, err := e.transactor()
@@ -103,17 +103,17 @@ func (e *EthereumRPC) PushRollupHead(header *contracts.CanonicalStateChainHeader
 }
 
 // GetRollupHeader returns the rollup block header at the given index.
-func (e *EthereumRPC) GetRollupHeader(index uint64) (contracts.CanonicalStateChainHeader, error) {
+func (e *EthereumClient) GetRollupHeader(index uint64) (contracts.CanonicalStateChainHeader, error) {
 	return e.canonicalStateChain.GetBlock(nil, big.NewInt(int64(index)))
 }
 
 // GetRollupHeaderByHash returns the rollup block header with the given hash.
-func (e *EthereumRPC) GetRollupHeaderByHash(hash common.Hash) (contracts.CanonicalStateChainHeader, error) {
+func (e *EthereumClient) GetRollupHeaderByHash(hash common.Hash) (contracts.CanonicalStateChainHeader, error) {
 	return e.canonicalStateChain.Headers(nil, hash)
 }
 
 // GetRollupHeight returns the current rollup block height.
-func (e *EthereumRPC) GetRollupHeight() (uint64, error) {
+func (e *EthereumClient) GetRollupHeight() (uint64, error) {
 	h, err := e.canonicalStateChain.ChainHead(nil)
 	if err != nil {
 		return 0, err
@@ -122,11 +122,11 @@ func (e *EthereumRPC) GetRollupHeight() (uint64, error) {
 	return h.Uint64(), nil
 }
 
-func (e *EthereumRPC) GetHeight() (uint64, error) {
+func (e *EthereumClient) GetHeight() (uint64, error) {
 	return e.client.BlockNumber(context.Background())
 }
 
-func (e *EthereumRPC) Wait(txHash common.Hash) (*types.Receipt, error) {
+func (e *EthereumClient) Wait(txHash common.Hash) (*types.Receipt, error) {
 	log := e.logger.With("func", "Wait")
 
 	// 1. try to get the the tx, see if it is pending

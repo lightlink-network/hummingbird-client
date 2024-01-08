@@ -11,7 +11,8 @@ import (
 )
 
 type Config struct {
-	Celestia struct {
+	StorePath string `mapstructure:"storePath"`
+	Celestia  struct {
 		Token         string `mapstructure:"token"`
 		Endpoint      string `mapstructure:"endpoint"`
 		Namespace     string `mapstructure:"namespace"`
@@ -27,8 +28,10 @@ type Config struct {
 		Delay    int    `mapstructure:"delay"`
 	} `mapstructure:"lightlink"`
 	Rollup struct {
-		PollDelay  int    `mapstructure:"pollDelay"`
-		BundleSize uint64 `mapstructure:"bundleSize"`
+		PollDelay             int    `mapstructure:"pollDelay"`
+		BundleSize            uint64 `mapstructure:"bundleSize"`
+		StoreCelestiaPointers bool   `mapstructure:"storeCelestiaPointers"`
+		StoreHeaders          bool   `mapstructure:"storeHeaders"`
 	} `mapstructure:"rollup"`
 }
 

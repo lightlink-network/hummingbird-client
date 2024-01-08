@@ -54,11 +54,6 @@ func (l *LightLinkClient) GetHeight() (uint64, error) {
 	return hexutil.DecodeUint64(numHex)
 }
 
-type blockResult struct {
-	*types.Header `json:",inline"`
-	Transactions  types.Transactions `json:"transactions"`
-}
-
 func (l *LightLinkClient) GetBlock(height uint64) (*types.Block, error) {
 
 	resp, err := l.client.Call("eth_getBlockByNumber", []any{hexutil.EncodeUint64(height), true})

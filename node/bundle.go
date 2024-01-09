@@ -14,6 +14,14 @@ type Bundle struct {
 	Blocks []*types.Block
 }
 
+func (b *Bundle) Size() uint64 {
+	return uint64(len(b.Blocks))
+}
+
+func (b *Bundle) Height() uint64 {
+	return b.Blocks[len(b.Blocks)-1].Number().Uint64() + 1
+}
+
 func (b *Bundle) EncodeRLP() ([]byte, error) {
 	return rlp.EncodeToBytes(&b.Blocks)
 }

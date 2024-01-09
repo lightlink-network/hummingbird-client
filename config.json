@@ -9,8 +9,7 @@
   },
   "ethereum": {
     "endpoint": "https://ethereum-sepolia.publicnode.com",
-    "endpoint_old": "http://138.68.156.191:8545",
-    "canonicalStateChain": "0xE7E417366b5f11CFe4f21F3bc3D05e1c43cB33ad",
+    "canonicalStateChain": "0x18d00cfb6c7c78CAb803A225F4EE7F6307f22f4C",
     "daOracle": "0x3a5cbB6EF4756DA0b3f6DAE7aB6430fD8c46d247"
   },
   "lightlink": {
@@ -19,7 +18,7 @@
   },
   "rollup": {
     "bundleSize": 10,
-    "pollDelay": 1000,
+    "pollDelay": 10000,
     "storeCelestiaPointers": true,
     "storeHeaders": true
   }

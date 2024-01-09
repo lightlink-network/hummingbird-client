@@ -89,7 +89,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	}
 
 	// 5. fetch the next bundle of blocks from ll
-	l2blocks, err := r.LightLink.GetBlocks(head.L2Height+1, head.L2Height+1+bundleSize)
+	l2blocks, err := r.LightLink.GetBlocks(head.L2Height, head.L2Height+bundleSize)
 	if err != nil {
 		return nil, fmt.Errorf("createNextBlock: Failed to get l2blocks: %w", err)
 	}
@@ -104,7 +104,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	// 7. create the rollup header
 	header := &contracts.CanonicalStateChainHeader{
 		Epoch:            epoch,
-		L2Height:         head.L2Height + bundleSize,
+		L2Height:         bundle.Height(),
 		PrevHash:         prevHash,
 		TxRoot:           bundle.TxRoot(),
 		BlockRoot:        bundle.BlockRoot(),
@@ -211,6 +211,7 @@ func (r *Rollup) Run() error {
 			return err
 		}
 
+		log.Debug("Estimated next rollup target", "target", target)
 		// 2. wait for the target height to be reached
 		err = r.awaitL2Height(target)
 		if err != nil {
@@ -240,8 +241,8 @@ func (r *Rollup) Run() error {
 			"l2Height", block.L2Height,
 			"celestiaHeight", block.CelestiaHeight,
 			"daTx", block.CelestiaPointer.TxHash.Hex(),
+			"l2_blocks", len(block.Blocks),
 		)
-
 	}
 
 }

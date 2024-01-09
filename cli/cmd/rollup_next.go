@@ -24,7 +24,10 @@ var RollupNextCmd = &cobra.Command{
 		cfg := config.Load()
 		logger := ConsoleLogger()
 		ethKey := getEthKey()
+
+		// is dry run enabled?
 		dryRun, _ := cmd.Flags().GetBool("dry")
+		cfg.DryRun = dryRun
 
 		n, err := node.NewFromConfig(cfg, logger, ethKey)
 		utils.NoErr(err)

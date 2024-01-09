@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	DefenderProveDaCmd.PersistentFlags().String("tx", "", "celestia tx hash in which data was submitted")
+	DefenderProveDaCmd.Flags().String("tx", "", "celestia tx hash in which data was submitted")
 	DefenderProveDaCmd.Flags().Bool("json", false, "output proof in json format")
 	DefenderProveDaCmd.Flags().Bool("verify", false, "verify the proof against the L1 rollup contract")
 }

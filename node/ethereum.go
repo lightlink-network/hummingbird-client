@@ -129,7 +129,7 @@ func (e *EthereumClient) PushRollupHead(header *contracts.CanonicalStateChainHea
 
 	transactor, err := e.transactor()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create transactor: %w", err)
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 
 	return e.canonicalStateChain.PushBlock(transactor, *header)

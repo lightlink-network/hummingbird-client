@@ -12,10 +12,11 @@ import (
 )
 
 type Opts struct {
-	BundleSize uint64        // BundleSize is the number of blocks to include in each bundle.
-	PollDelay  time.Duration // PollDelay is the time to wait between polling for new blocks.
-	Logger     *slog.Logger
-	DryRun     bool // DryRun indicates whether or not to actually submit the block to the L1 rollup contract.
+	BundleSize  uint64        // BundleSize is the number of blocks to include in each bundle.
+	L1PollDelay time.Duration // PollDelay is the time to wait between polling for new blocks on the L1 rollup contract.
+	L2PollDelay time.Duration // PollDelay is the time to wait between polling for new blocks on the L2 lightlink network.
+	Logger      *slog.Logger
+	DryRun      bool // DryRun indicates whether or not to actually submit the block to the L1 rollup contract.
 
 	StoreCelestiaPointers bool // StoreCelestiaPointers indicates whether or not to store the Celestia pointers in the local database.
 	StoreHeaders          bool // StoreHeaders indicates whether or not to store the rollup headers in the local database.
@@ -245,6 +246,8 @@ func (r *Rollup) Run() error {
 			"daTx", block.CelestiaPointer.TxHash.Hex(),
 			"l2_blocks", len(block.Blocks),
 		)
+
+		time.Sleep(r.Opts.L1PollDelay)
 	}
 
 }
@@ -275,6 +278,6 @@ func (r *Rollup) awaitL2Height(h uint64) error {
 			return nil
 		}
 
-		time.Sleep(r.Opts.PollDelay)
+		time.Sleep(r.Opts.L2PollDelay)
 	}
 }

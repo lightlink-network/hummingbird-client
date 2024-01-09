@@ -18,7 +18,8 @@
   },
   "rollup": {
     "bundleSize": 10,
-    "pollDelay": 10000,
+    "l1pollDelay": 30000,
+    "l2pollDelay": 10000,
     "storeCelestiaPointers": true,
     "storeHeaders": true
   }

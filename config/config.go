@@ -21,7 +21,8 @@ type Config struct {
 		Delay    int    `mapstructure:"delay"`
 	} `mapstructure:"lightlink"`
 	Rollup struct {
-		PollDelay             int    `mapstructure:"pollDelay"`
+		L1PollDelay           int    `mapstructure:"l1pollDelay"`
+		L2PollDelay           int    `mapstructure:"l2pollDelay"`
 		BundleSize            uint64 `mapstructure:"bundleSize"`
 		StoreCelestiaPointers bool   `mapstructure:"storeCelestiaPointers"`
 		StoreHeaders          bool   `mapstructure:"storeHeaders"`

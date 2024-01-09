@@ -93,7 +93,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("createNextBlock: Failed to get l2blocks: %w", err)
 	}
-	bundle := &node.Bundle{l2blocks}
+	bundle := &node.Bundle{Blocks: l2blocks}
 
 	// 6. upload the bundle to celestia
 	pointer, err := r.Celestia.PublishBundle(*bundle)

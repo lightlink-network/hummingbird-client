@@ -41,13 +41,17 @@ var RollupInfoCmd = &cobra.Command{
 		})
 
 		var useHash bool
+		var useNum bool
+		var num uint64
 
 		// is a hash specified?
 		hash, err := cmd.Flags().GetString("hash")
 		useHash = err == nil && hash != ""
 		// is a number specified?
-		num, err := cmd.Flags().GetUint64("num")
-		useNum := err == nil
+		if cmd.Flags().Changed("num") {
+			num, err = cmd.Flags().GetUint64("num")
+			useNum = err == nil
+		}
 
 		// if a hash is specified, get info for the block with that hash
 		if useHash {

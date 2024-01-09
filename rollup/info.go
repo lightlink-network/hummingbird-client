@@ -1,20 +1,31 @@
 package rollup
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"hummingbird/node"
 	"hummingbird/node/contracts"
 
 	"github.com/ethereum/go-ethereum/common"
 )
 
 type RollupInfo struct {
-	RollupHeight uint64
+	RollupHeight     uint64 `pretty:"Rollup Height"`
+	L2BlocksRolledUp uint64 `pretty:"L2 Blocks Rolled Up"`
+	L2BlocksTodo     uint64 `pretty:"L2 Blocks Todo"`
+
 	LatestRollup struct {
-		Hash common.Hash
-		*contracts.CanonicalStateChainHeader
-		BundleSize uint64
-	}
-	L2BlocksRolledUp uint64
-	L2BlocksTodo     uint64
+		Hash                                 common.Hash `pretty:"Hash"`
+		BundleSize                           uint64      `pretty:"Bundle Size"`
+		*contracts.CanonicalStateChainHeader `pretty:"Header"`
+	} `pretty:"Latest Rollup Block"`
+
+	DataAvailability struct {
+		CelestiaHeight   uint64   `pretty:"Celestia Height"`
+		CelestiaDataRoot [32]byte `pretty:"Celestia Data Root"`
+		CelestiaTx       string   `pretty:"Celestia Tx"`
+	} `pretty:"Data Availability`
 }
 
 func (r *Rollup) GetInfo() (*RollupInfo, error) {
@@ -24,29 +35,25 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	// get rollup height
 	rollupHeight, err := r.Ethereum.GetRollupHeight()
 	if err != nil {
-		log.Error("Failed to get rollup height", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get rollup height: %w", err)
 	}
 
 	// get latest rollup head
 	latestRollupHead, err := r.Ethereum.GetRollupHead()
 	if err != nil {
-		log.Error("Failed to get rollup head", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get rollup head: %w", err)
 	}
 
 	// hash latest rollup head
 	latestRollupHash, err := contracts.HashCanonicalStateChainHeader(&latestRollupHead)
 	if err != nil {
-		log.Error("Failed to hash rollup head", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to hash rollup head: %w", err)
 	}
 
 	// get previous rollup header
 	prevRollupHeader, err := r.Ethereum.GetRollupHeaderByHash(latestRollupHead.PrevHash)
 	if err != nil {
-		log.Error("Failed to get previous rollup header", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get previous rollup header: %w", err)
 	}
 
 	// get bundle size
@@ -55,8 +62,7 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	// get genesis header
 	genesisHeader, err := r.Ethereum.GetRollupHeader(0)
 	if err != nil {
-		log.Error("Failed to get genesis header", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get genesis header: %w", err)
 	}
 
 	// get l2 blocks rolled up
@@ -65,8 +71,7 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	// get layer 2 height
 	l2Height, err := r.LightLink.GetHeight()
 	if err != nil {
-		log.Error("Failed to get layer 2 height", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get layer 2 height: %w", err)
 	}
 
 	// get l2 blocks todo
@@ -79,5 +84,36 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	info.L2BlocksRolledUp = l2BlocksRolledUp
 	info.L2BlocksTodo = l2BlocksTodo
 
+	// get data availability
+	info.DataAvailability.CelestiaHeight = latestRollupHead.CelestiaHeight
+	info.DataAvailability.CelestiaDataRoot = latestRollupHead.CelestiaDataRoot
+	info.DataAvailability.CelestiaTx = "Unknown"
+
+	pointer, err := r.getDAPointer(latestRollupHash)
+	if err != nil && pointer != nil {
+		log.Warn("Failed to get celestia pointer", "error", err)
+		info.DataAvailability.CelestiaTx = pointer.TxHash.Hex()
+	}
+
 	return info, nil
+}
+
+func (r *Rollup) getDAPointer(hash common.Hash) (*node.CelestiaPointer, error) {
+	if r.Store == nil {
+		return nil, errors.New("no store")
+	}
+
+	key := append([]byte("pointer_"), hash[:]...)
+	buf, err := r.Store.Get(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get celestia pointer from store: %w", err)
+	}
+
+	pointer := &node.CelestiaPointer{}
+	err = json.Unmarshal(buf, pointer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal celestia pointer: %w", err)
+	}
+
+	return pointer, nil
 }

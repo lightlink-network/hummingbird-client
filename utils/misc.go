@@ -22,7 +22,7 @@ func MarshalTextIndex(v interface{}, indentChar string) string {
 }
 
 func MarshalText(v interface{}) string {
-	return MarshalTextIndex(v, "	")
+	return MarshalTextIndex(v, "  ")
 }
 
 func formatValueText(v reflect.Value, indent int, indentChar string) string {
@@ -34,8 +34,11 @@ func formatValueText(v reflect.Value, indent int, indentChar string) string {
 			field := v.Type().Field(i)
 			fieldValue := v.Field(i)
 
+			if isStruct(fieldValue) {
+				sb.WriteString("\n")
+			}
 			sb.WriteString(strings.Repeat(indentChar, indent))
-			sb.WriteString(field.Name)
+			sb.WriteString(formatFieldName(field))
 			sb.WriteString(": ")
 
 			if fieldValue.Kind() == reflect.Struct || (fieldValue.Kind() == reflect.Ptr && !fieldValue.IsNil() && fieldValue.Elem().Kind() == reflect.Struct) {
@@ -45,6 +48,7 @@ func formatValueText(v reflect.Value, indent int, indentChar string) string {
 				sb.WriteString(fmt.Sprintf("%v\n", formatIndividualValue(fieldValue)))
 			}
 		}
+
 	case reflect.Ptr:
 		if v.IsNil() {
 			sb.WriteString("nil\n")
@@ -92,4 +96,23 @@ func formatIndividualValue(v reflect.Value) interface{} {
 	}
 
 	return v.Interface()
+}
+
+func formatFieldName(field reflect.StructField) string {
+
+	// if json tag is present, use that
+	if tag, ok := field.Tag.Lookup("json"); ok {
+		return tag
+	}
+
+	// otherwise lookup pretty name
+	if tag, ok := field.Tag.Lookup("pretty"); ok {
+		return tag
+	}
+
+	return field.Name
+}
+
+func isStruct(v reflect.Value) bool {
+	return v.Kind() == reflect.Struct || (v.Kind() == reflect.Ptr && !v.IsNil() && v.Elem().Kind() == reflect.Struct)
 }

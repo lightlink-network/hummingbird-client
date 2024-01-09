@@ -210,14 +210,15 @@ func (r *Rollup) Run() error {
 			log.Error("Failed to get next rollup target", "error", err)
 			return err
 		}
-
 		log.Debug("Estimated next rollup target", "target", target)
+
 		// 2. wait for the target height to be reached
 		err = r.awaitL2Height(target)
 		if err != nil {
 			log.Error("Failed to await L2 height", "error", err)
 			return err
 		}
+		log.Debug("Reached next rollup target", "target", target)
 
 		// 3. create the next rollup block
 		block, err := r.CreateNextBlock()
@@ -225,6 +226,7 @@ func (r *Rollup) Run() error {
 			log.Error("Failed to create next block", "error", err)
 			return err
 		}
+		log.Info("Created candidate rollup block", "epoch", block.Epoch, "l2Height", block.L2Height, "celestiaHeight", block.CelestiaHeight, "daTx", block.CelestiaPointer.TxHash.Hex(), "l2_blocks", len(block.Blocks))
 
 		// 4. submit the block to the rollup contract
 		tx, err := r.SubmitBlock(block)

@@ -28,6 +28,7 @@ func main() {
 	// add subcommands to rollup
 	rollupCmd.AddCommand(cmd.RollupInfoCmd)
 	rollupCmd.AddCommand(cmd.RollupNextCmd)
+	rollupCmd.AddCommand(cmd.RollupStartCmd)
 
 	// add all commands to root
 	rootCmd.AddCommand(rollupCmd)

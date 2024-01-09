@@ -25,7 +25,7 @@ type RollupInfo struct {
 		CelestiaHeight   uint64   `pretty:"Celestia Height"`
 		CelestiaDataRoot [32]byte `pretty:"Celestia Data Root"`
 		CelestiaTx       string   `pretty:"Celestia Tx"`
-	} `pretty:"Data Availability`
+	} `pretty:"Data Availability"`
 }
 
 func (r *Rollup) GetInfo() (*RollupInfo, error) {

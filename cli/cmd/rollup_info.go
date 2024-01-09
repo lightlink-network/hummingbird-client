@@ -1,15 +1,24 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"hummingbird/config"
 	"hummingbird/node"
+	"hummingbird/node/contracts"
 	"hummingbird/rollup"
 	"hummingbird/utils"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	RollupInfoCmd.Flags().Bool("json", false, "output info in json format")
+	RollupInfoCmd.Flags().String("hash", "", "block hash to get info for")
+	RollupInfoCmd.Flags().Uint64("num", 0, "block number to get info for")
+}
 
 var RollupInfoCmd = &cobra.Command{
 	Use:   "info",
@@ -18,6 +27,7 @@ var RollupInfoCmd = &cobra.Command{
 		cfg := config.Load()
 		logger := ConsoleLogger()
 		ethKey := getEthKey()
+		useJson, _ := cmd.Flags().GetBool("json")
 
 		n, err := node.NewFromConfig(cfg, logger, ethKey)
 		utils.NoErr(err)
@@ -30,30 +40,50 @@ var RollupInfoCmd = &cobra.Command{
 			Logger:                logger.With("ctx", "Rollup"),
 		})
 
+		var useHash bool
+
+		// is a hash specified?
+		hash, err := cmd.Flags().GetString("hash")
+		useHash = err == nil && hash != ""
+		// is a number specified?
+		num, err := cmd.Flags().GetUint64("num")
+		useNum := err == nil
+
+		// if a hash is specified, get info for the block with that hash
+		if useHash {
+			info, err := r.GetBlockInfo(common.HexToHash(hash))
+			utils.NoErr(err)
+			printInfo(info, useJson)
+			return
+		}
+
+		if useNum {
+			h, err := r.Ethereum.GetRollupHeader(num)
+			utils.NoErr(err)
+			hash, err := contracts.HashCanonicalStateChainHeader(&h)
+			utils.NoErr(err)
+			info, err := r.GetBlockInfo(hash)
+			utils.NoErr(err)
+			printInfo(info, useJson)
+			return
+		}
+
+		// otherwise get info for the chain
 		info, err := r.GetInfo()
 		utils.NoErr(err)
-
-		// fmt.Println(" ")
-		// fmt.Println("Rollup Height:", info.RollupHeight)
-		// fmt.Println("L2 Blocks Rolled Up:", info.L2BlocksRolledUp)
-		// fmt.Println("L2 Blocks Todo:", info.L2BlocksTodo)
-		// fmt.Println(" ")
-		// fmt.Println("Latest Rollup Block:")
-		// fmt.Println("	Hash:", info.LatestRollup.Hash.Hex())
-		// fmt.Println("	Bundle Size:", info.LatestRollup.BundleSize)
-		// fmt.Println("	Epoch:", info.LatestRollup.Epoch)
-		// fmt.Println("	Height:", info.LatestRollup.L2Height)
-		// fmt.Println("	Prev Hash:", common.Hash(info.LatestRollup.PrevHash).Hex())
-		// fmt.Println("	StateRoot:", common.Hash(info.LatestRollup.StateRoot).Hex())
-		// fmt.Println("	BlockRoot:", common.Hash(info.LatestRollup.BlockRoot).Hex())
-		// fmt.Println("	TxRoot:", common.Hash(info.LatestRollup.TxRoot).Hex())
-		// fmt.Println("	Data Availability:")
-		// fmt.Println("		Celestia Height:", info.LatestRollup.CelestiaHeight)
-		// fmt.Println("		Celestia Data Root:", common.Hash(info.LatestRollup.CelestiaDataRoot).Hex())
-		// fmt.Println(" ")
-
-		fmt.Println(" ")
-		fmt.Println(utils.MarshalText(info))
-		fmt.Println(" ")
+		printInfo(info, useJson)
 	},
+}
+
+func printInfo(info any, useJson bool) {
+	if useJson {
+		buf, _ := json.MarshalIndent(info, "", "  ")
+		fmt.Println(string(buf))
+		return
+	}
+
+	// otherwise print as pretty text
+	fmt.Println(" ")
+	fmt.Println(utils.MarshalText(info))
+	fmt.Println(" ")
 }

@@ -17,6 +17,7 @@ type Config struct {
 		Endpoint            string `mapstructure:"endpoint"`
 		CanonicalStateChain string `mapstructure:"canonicalStateChain"`
 		DaOracle            string `mapstructure:"daOracle"`
+		Challenge           string `mapstructure:"challenge"`
 	} `mapstructure:"ethereum"`
 	LightLink struct {
 		Endpoint string `mapstructure:"endpoint"`

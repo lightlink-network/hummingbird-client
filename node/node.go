@@ -24,6 +24,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		Endpoint:                   cfg.Ethereum.Endpoint,
 		CanonicalStateChainAddress: common.HexToAddress(cfg.Ethereum.CanonicalStateChain),
 		DAOracleAddress:            common.HexToAddress(cfg.Ethereum.DaOracle),
+		ChallengeAddress:           common.HexToAddress(cfg.Ethereum.Challenge),
 		Signer:                     ethKey,
 		Logger:                     logger.With("ctx", "ethereum"),
 		DryRun:                     cfg.DryRun,

@@ -33,7 +33,8 @@ var RollupNextCmd = &cobra.Command{
 		utils.NoErr(err)
 
 		r := rollup.NewRollup(n, &rollup.Opts{
-			PollDelay:             time.Duration(cfg.Rollup.PollDelay) * time.Millisecond,
+			L1PollDelay:           time.Duration(cfg.Rollup.L1PollDelay) * time.Millisecond,
+			L2PollDelay:           time.Duration(cfg.Rollup.L2PollDelay) * time.Millisecond,
 			BundleSize:            cfg.Rollup.BundleSize,
 			StoreCelestiaPointers: cfg.Rollup.StoreCelestiaPointers,
 			StoreHeaders:          cfg.Rollup.StoreHeaders,

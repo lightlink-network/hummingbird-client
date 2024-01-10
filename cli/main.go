@@ -24,14 +24,24 @@ var defenderCmd = &cobra.Command{
 	Short: "defender is a command to generate proofs and respond to challenges",
 }
 
+var challengerCmd = &cobra.Command{
+	Use:   "challenger",
+	Short: "challenger is a command to create challenges",
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".", "config.json file path (default is .)")
 	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
 }
 
 func main() {
+
+	// add subcommands to challenger
+	challengerCmd.AddCommand(cmd.ChallengerChallengedaCmd)
+
 	// add subcommands to defender
 	defenderCmd.AddCommand(cmd.DefenderProveDaCmd)
+	defenderCmd.AddCommand(cmd.DefenderDefendDaCmd)
 
 	// add subcommands to rollup
 	rollupCmd.AddCommand(cmd.RollupInfoCmd)

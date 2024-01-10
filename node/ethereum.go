@@ -54,6 +54,7 @@ type EthereumClientOpts struct {
 	Endpoint                   string
 	CanonicalStateChainAddress common.Address
 	DAOracleAddress            common.Address
+	ChallengeAddress           common.Address
 	Logger                     *slog.Logger
 	DryRun                     bool
 }
@@ -79,6 +80,11 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 		return nil, fmt.Errorf("failed to connect to DAOracle: %w", err)
 	}
 
+	challenge, err := contracts.NewChallengeContract(opts.ChallengeAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to Challenge: %w", err)
+	}
+
 	chainId, err := client.ChainID(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chainId: %w", err)
@@ -93,6 +99,9 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 	if ok, _ := utils.IsContract(client, opts.DAOracleAddress); !ok {
 		opts.Logger.Warn("contract not found for DAOracle at given Address", "address", opts.DAOracleAddress.Hex(), "endpoint", opts.Endpoint)
 	}
+	if ok, _ := utils.IsContract(client, opts.ChallengeAddress); !ok {
+		opts.Logger.Warn("contract not found for Challenge at given Address", "address", opts.ChallengeAddress.Hex(), "endpoint", opts.Endpoint)
+	}
 
 	return &EthereumClient{
 		signer:              opts.Signer,
@@ -100,6 +109,7 @@ func NewEthereumRPC(opts EthereumClientOpts) (*EthereumClient, error) {
 		chainId:             chainId,
 		canonicalStateChain: canonicalStateChain,
 		daOracle:            daOracle,
+		challenge:           challenge,
 		logger:              opts.Logger,
 		opts:                &opts,
 	}, nil

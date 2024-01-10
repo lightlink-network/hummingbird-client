@@ -1,8 +1,8 @@
 package node
 
 import (
+	"bytes"
 	crand "crypto/rand"
-	"encoding/hex"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -86,7 +86,7 @@ func TestBundle_DecodeRLP(t *testing.T) {
 	assert.Equal(t, b.Blocks[4].Hash(), decoded.Blocks[4].Hash())
 }
 
-func TestBundleInclusion(t *testing.T) {
+func TestBundleTxInclusion(t *testing.T) {
 	b := newRandomBundle(2, true)
 	tx := b.Blocks[0].Transactions()[0]
 
@@ -96,5 +96,5 @@ func TestBundleInclusion(t *testing.T) {
 	encB, err := b.EncodeRLP()
 	assert.NoError(t, err)
 	// check if encTx bytes are included in encB bytes
-	assert.Contains(t, hex.EncodeToString(encB), hex.EncodeToString(encTx))
+	assert.True(t, bytes.Contains(encB, encTx))
 }

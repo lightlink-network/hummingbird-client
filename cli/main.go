@@ -4,7 +4,10 @@ import (
 	"hummingbird/cli/cmd"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
+
+var cfgFile string
 
 var rootCmd = &cobra.Command{
 	Use:   "hb",
@@ -19,6 +22,11 @@ var rollupCmd = &cobra.Command{
 var defenderCmd = &cobra.Command{
 	Use:   "defender",
 	Short: "defender is a command to generate proofs and respond to challenges",
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".", "config.json file path (default is .)")
+	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
 }
 
 func main() {

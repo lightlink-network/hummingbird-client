@@ -1,6 +1,8 @@
 package config
 
-import "github.com/spf13/viper"
+import (
+	"github.com/spf13/viper"
+)
 
 type Config struct {
 	StorePath string `mapstructure:"storePath"`
@@ -33,7 +35,7 @@ type Config struct {
 
 func Load() *Config {
 	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
+	viper.AddConfigPath(viper.GetString("config"))
 	err := viper.ReadInConfig()
 	if err != nil {
 		panic(err)

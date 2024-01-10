@@ -28,8 +28,14 @@ type Ethereum interface {
 	PushRollupHead(header *contracts.CanonicalStateChainHeader) (*types.Transaction, error) // Push a new rollup block header to the CanonicalStateChain.sol contract.
 	GetRollupHeader(index uint64) (contracts.CanonicalStateChainHeader, error)              // Get the rollup block header at the given index from the CanonicalStateChain.sol contract.
 	GetRollupHeaderByHash(hash common.Hash) (contracts.CanonicalStateChainHeader, error)    // Get the rollup block header with the given hash from the CanonicalStateChain.sol contract.
-	DAVerify(*CelestiaProof) (bool, error)                                                  // Check if the data availability layer is verified.
 	Wait(txHash common.Hash) (*types.Receipt, error)                                        // Wait for the given transaction to be mined.
+	DAVerify(*CelestiaProof) (bool, error)
+	// Check if the data availability layer is verified.
+	// Challanges
+	GetChallengeFee() (*big.Int, error)
+	ChallengeDataRootInclusion(index uint64) (*types.Transaction, common.Hash, error)
+	DefendDataRootInclusion(common.Hash, *CelestiaProof) (*types.Transaction, error)
+	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
 }
 
 type EthereumClient struct {
@@ -38,6 +44,7 @@ type EthereumClient struct {
 	chainId             *big.Int
 	canonicalStateChain *contracts.CanonicalStateChainContract
 	daOracle            *contracts.DAOracleContract
+	challenge           *contracts.ChallengeContract
 	logger              *slog.Logger
 	opts                *EthereumClientOpts
 }
@@ -179,6 +186,68 @@ func (e *EthereumClient) Wait(txHash common.Hash) (*types.Receipt, error) {
 
 func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
 	return e.daOracle.VerifyAttestation(nil, proof.Nonce, *proof.Tuple, *proof.WrappedProof)
+}
+
+func (e *EthereumClient) GetChallengeFee() (*big.Int, error) {
+	return e.challenge.ChallengeFee(nil)
+}
+
+func (e *EthereumClient) ChallengeDataRootInclusion(index uint64) (*types.Transaction, common.Hash, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, common.Hash{}, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	// set transactions fee
+	fee, err := e.GetChallengeFee()
+	if err != nil {
+		return nil, common.Hash{}, fmt.Errorf("failed to get challenge fee: %w", err)
+	}
+	transactor.Value = fee
+
+	// get index hash
+	blockHash, err := e.canonicalStateChain.Chain(nil, big.NewInt(int64(index)))
+	if err != nil {
+		return nil, common.Hash{}, fmt.Errorf("failed to get hash for block %d: %w", index, err)
+	}
+
+	tx, err := e.challenge.ChallengeDataRootInclusion(transactor, big.NewInt(int64(index)))
+	if err != nil {
+		return nil, common.Hash{}, fmt.Errorf("failed to challenge data root inclusion: %w", err)
+	}
+
+	return tx, blockHash, nil
+}
+
+func (e *EthereumClient) DefendDataRootInclusion(blockHash common.Hash, proof *CelestiaProof) (*types.Transaction, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	tx, err := e.challenge.DefendDataRootInclusion(transactor, blockHash, contracts.ChallengeDataAvailabilityChallengeDAProof{
+		RootNonce: proof.Nonce,
+		Proof:     *proof.WrappedProof,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to defend data root inclusion: %w", err)
+	}
+
+	return tx, nil
+}
+
+func (e *EthereumClient) SettleDataRootInclusion(blockHash common.Hash) (*types.Transaction, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	tx, err := e.challenge.SettleDataRootInclusion(transactor, blockHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to settle data root inclusion: %w", err)
+	}
+
+	return tx, nil
 }
 
 // MOCK CLIENT FOR TESTING

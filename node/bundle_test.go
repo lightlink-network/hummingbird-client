@@ -44,7 +44,7 @@ func newRandomBundle(size int, withTxns bool) *Bundle {
 		})
 
 		if withTxns {
-			randN := rand.Intn(10)
+			randN := 1 + rand.Intn(10)
 			txns := make(types.Transactions, randN)
 			for j := 0; j < randN; j++ {
 				txns[j] = types.NewTransaction(uint64(j), b.Blocks[i].Coinbase(), big.NewInt(0), 100000, big.NewInt(0), nil)

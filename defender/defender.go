@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -33,5 +34,6 @@ func (d *Defender) DefenderDA(block common.Hash, txHash common.Hash) (*types.Tra
 		return nil, fmt.Errorf("failed to prove data availability: %w", err)
 	}
 
+	d.Opts.Logger.Debug("Submitting data availability proof to L1 rollup contract", "block", block.Hex(), "dataroot", hexutil.Encode(proof.Tuple.DataRoot[:]))
 	return d.Ethereum.DefendDataRootInclusion(block, proof)
 }

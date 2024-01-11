@@ -36,7 +36,7 @@ type Config struct {
 
 func Load() *Config {
 	viper.SetConfigName("config")
-	viper.AddConfigPath(viper.GetString("config"))
+	viper.AddConfigPath(viper.GetString("config-path"))
 	err := viper.ReadInConfig()
 	if err != nil {
 		panic(err)

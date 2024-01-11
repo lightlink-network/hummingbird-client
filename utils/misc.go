@@ -34,12 +34,23 @@ func formatValueText(v reflect.Value, indent int, indentChar string) string {
 			field := v.Type().Field(i)
 			fieldValue := v.Field(i)
 
+			// check if field is exported
+			if field.PkgPath != "" {
+				continue
+			}
+
 			if isStruct(fieldValue) {
 				sb.WriteString("\n")
 			}
 			sb.WriteString(strings.Repeat(indentChar, indent))
 			sb.WriteString(formatFieldName(field))
 			sb.WriteString(": ")
+
+			// if *big.Int, print as number
+			if fieldValue.Type().String() == "*big.Int" {
+				sb.WriteString(fmt.Sprintf("%v\n", fieldValue.Interface()))
+				continue
+			}
 
 			if fieldValue.Kind() == reflect.Struct || (fieldValue.Kind() == reflect.Ptr && !fieldValue.IsNil() && fieldValue.Elem().Kind() == reflect.Struct) {
 				sb.WriteString("\n")

@@ -52,7 +52,7 @@ var DefenderInfoDaCmd = &cobra.Command{
 		if info.Status == 0 {
 			fmt.Println("Data Availability Info")
 			fmt.Println(" ")
-			fmt.Println("Verdict → No challenge was found for this block")
+			fmt.Println("→ No challenge was found for this block")
 			fmt.Println(" ")
 			return
 		}
@@ -63,23 +63,23 @@ var DefenderInfoDaCmd = &cobra.Command{
 		fmt.Println(" ")
 
 		if info.Status == 1 {
-			fmt.Println("Verdict → A Challenge has been initiated")
-			fmt.Println(" ⏳ Next: Awaiting a Defender to submit a proof...")
+			fmt.Println("→ The Challenge has been initiated")
+			fmt.Println(" ⏳	Next: Awaiting a Defender to submit a proof...")
 			fmt.Println(" ")
 			return
 		}
 
 		if info.Status == 4 {
-			fmt.Println("→ A Challenge has completed")
-			fmt.Println(" 🏛️ Verdict: The Defender has won the challenge")
+			fmt.Println("→ The Challenge has completed")
+			fmt.Println(" 🏛️	Verdict: The Defender has won the challenge.")
 			fmt.Println(" ")
 			return
 		}
 
 		if info.Status == 3 {
-			fmt.Println("→ A Challenge has been initiated")
-			fmt.Println(" 🏛️ Verdict: The Challenger has won the challenge.")
-			fmt.Println(" The chain was rolled back")
+			fmt.Println("→ The Challenge has completed")
+			fmt.Println(" 🏛️	Verdict: The Challenger has won the challenge.")
+			fmt.Println(" 👮	The chain was rolled back.")
 			fmt.Println(" ")
 			return
 		}

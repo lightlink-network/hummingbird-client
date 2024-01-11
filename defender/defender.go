@@ -28,7 +28,7 @@ func (d *Defender) ProveDA(txHash common.Hash) (*node.CelestiaProof, error) {
 	return d.Celestia.GetProof(txHash[:])
 }
 
-func (d *Defender) DefenderDA(block common.Hash, txHash common.Hash) (*types.Transaction, error) {
+func (d *Defender) DefendDA(block common.Hash, txHash common.Hash) (*types.Transaction, error) {
 	proof, err := d.ProveDA(txHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prove data availability: %w", err)

@@ -224,6 +224,7 @@ func (c *CelestiaClient) GetProof(txHash []byte) (*CelestiaProof, error) {
 // MOCK CLINT FOR TESTING
 
 type celestiaMock struct {
+	fakeProof bool
 	namespace string
 	height    uint64
 	blocks    map[common.Hash]Bundle
@@ -237,6 +238,10 @@ func NewCelestiaMock(namespace string) *celestiaMock {
 		blocks:    make(map[common.Hash]Bundle),
 		pointers:  make(map[common.Hash]*CelestiaPointer),
 	}
+}
+
+func (c *celestiaMock) SetFakeProof(b bool) {
+	c.fakeProof = b
 }
 
 func (c *celestiaMock) Namespace() string {
@@ -261,6 +266,21 @@ func (c *celestiaMock) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
 
 // returns a mock proof, cannot be used for verification
 func (c *celestiaMock) GetProof(hash []byte) (*CelestiaProof, error) {
+	if c.fakeProof {
+		return &CelestiaProof{
+			Nonce: big.NewInt(0),
+			Tuple: &contracts.DataRootTuple{
+				Height:   big.NewInt(0),
+				DataRoot: common.BytesToHash(hash),
+			},
+			WrappedProof: &contracts.BinaryMerkleProof{
+				SideNodes: make([][32]byte, 0),
+				Key:       big.NewInt(0),
+				NumLeaves: big.NewInt(0),
+			},
+		}, nil
+	}
+
 	_, ok := c.blocks[common.BytesToHash(hash)]
 	if !ok {
 		return nil, blob.ErrBlobNotFound

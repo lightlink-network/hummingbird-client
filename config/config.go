@@ -14,9 +14,10 @@ type Config struct {
 		GRPC          string `mapstructure:"grpc"`
 	} `mapstructure:"celestia"`
 	Ethereum struct {
-		Endpoint            string `mapstructure:"endpoint"`
-		CanonicalStateChain string `mapstructure:"canonicalStateChain"`
-		DaOracle            string `mapstructure:"daOracle"`
+		Endpoint                string `mapstructure:"endpoint"`
+		CanonicalStateChain     string `mapstructure:"canonicalStateChain"`
+		DaOracle                string `mapstructure:"daOracle"`
+		GasPriceIncreasePercent int    `mapstructure:"gasPriceIncreasePercent"`
 	} `mapstructure:"ethereum"`
 	LightLink struct {
 		Endpoint string `mapstructure:"endpoint"`

@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var ChallengerChallengedaCmd = &cobra.Command{
@@ -19,7 +20,7 @@ var ChallengerChallengedaCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
-		logger := ConsoleLogger()
+		logger := GetLogger(viper.GetString("log-type"))
 		ethKey := getEthKey()
 
 		// is dry run enabled?

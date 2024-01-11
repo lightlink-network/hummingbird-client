@@ -10,13 +10,15 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/lmittmann/tint"
+	"github.com/spf13/viper"
 )
 
 func ConsoleLogger() *slog.Logger {
 	w := os.Stderr
 	logger := slog.New(tint.NewHandler(w, &tint.Options{
-		Level:      slog.LevelDebug,
+		Level:      parseLogLevel(viper.GetString("log-level")),
 		TimeFormat: time.Kitchen,
+		AddSource:  viper.GetBool("log-source"),
 	}))
 
 	return logger
@@ -24,11 +26,37 @@ func ConsoleLogger() *slog.Logger {
 
 func JSONLogger(w io.Writer) *slog.Logger {
 	logger := slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
-		Level:     slog.LevelDebug,
-		AddSource: true,
+		Level:     parseLogLevel(viper.GetString("log-level")),
+		AddSource: viper.GetBool("log-source"),
 	}))
 
 	return logger
+}
+
+func GetLogger(logType string) *slog.Logger {
+	switch logType {
+	case "console":
+		return ConsoleLogger()
+	case "json":
+		return JSONLogger(os.Stderr)
+	default:
+		panic("log type must be 'console' or 'json' got: " + logType)
+	}
+}
+
+func parseLogLevel(lvl string) slog.Level {
+	switch lvl {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		panic("log level not known: " + lvl)
+	}
 }
 
 func getEthKey() *ecdsa.PrivateKey {

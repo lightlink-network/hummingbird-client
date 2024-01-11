@@ -29,6 +29,13 @@ var (
 	_ = abi.ConvertType
 )
 
+type ChallengeDaInfo struct{
+	BlockIndex *big.Int `pretty:"Block Index"`
+	Challenger string `pretty:"Challenger"`
+	Expiry     *big.Int `pretty:"Expiry"`
+	Status     uint8 	`pretty:"Status"`
+}
+
 // ChallengeDataAvailabilityChallengeDAProof is an auto generated low-level Go binding around an user-defined struct.
 type ChallengeDataAvailabilityChallengeDAProof struct {
 	RootNonce *big.Int

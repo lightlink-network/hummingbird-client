@@ -33,6 +33,7 @@ type Ethereum interface {
 	// Check if the data availability layer is verified.
 	// Challanges
 	GetChallengeFee() (*big.Int, error)
+	GetDataRootInlcusionChallenge(block common.Hash) (contracts.ChallengeDaInfo, error)
 	ChallengeDataRootInclusion(index uint64) (*types.Transaction, common.Hash, error)
 	DefendDataRootInclusion(common.Hash, *CelestiaProof) (*types.Transaction, error)
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
@@ -57,6 +58,7 @@ type EthereumClientOpts struct {
 	ChallengeAddress           common.Address
 	Logger                     *slog.Logger
 	DryRun                     bool
+	GasPriceIncreasePercent    *big.Int
 }
 
 // NewEthereumRPC returns a new EthereumRPC client.
@@ -126,6 +128,11 @@ func (e *EthereumClient) transactor() (*bind.TransactOpts, error) {
 		return nil, fmt.Errorf("failed to get gas price: %w", err)
 	}
 	opts.GasPrice = gasPrice
+
+	// If gas price increase percent is set, increase the gas price by the given percent.
+	if e.opts.GasPriceIncreasePercent != nil && e.opts.GasPriceIncreasePercent.Cmp(big.NewInt(0)) > 0 {
+		opts.GasPrice = gasPrice.Add(gasPrice, new(big.Int).Div(new(big.Int).Mul(gasPrice, e.opts.GasPriceIncreasePercent), big.NewInt(100)))
+	}
 
 	// If dry run is enabled, don't send the transaction.
 	if e.opts.DryRun {
@@ -258,6 +265,20 @@ func (e *EthereumClient) SettleDataRootInclusion(blockHash common.Hash) (*types.
 	}
 
 	return tx, nil
+}
+
+func (e *EthereumClient) GetDataRootInlcusionChallenge(blockHash common.Hash) (contracts.ChallengeDaInfo, error) {
+	res, err := e.challenge.DaChallenges(nil, blockHash)
+	if err != nil {
+		return contracts.ChallengeDaInfo{}, fmt.Errorf("failed to get data root inclusion challenge: %w", err)
+	}
+
+	return contracts.ChallengeDaInfo{
+		BlockIndex: res.BlockIndex,
+		Challenger: res.Challenger.Hex(),
+		Expiry:     res.Expiry,
+		Status:     res.Status,
+	}, nil
 }
 
 // MOCK CLIENT FOR TESTING

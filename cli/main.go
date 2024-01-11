@@ -7,7 +7,12 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var (
+	cfgPath   string
+	logLevel  string
+	logType   string
+	logSource bool
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "hb",
@@ -30,8 +35,15 @@ var challengerCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".", "config.json file path (default is .)")
-	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	rootCmd.PersistentFlags().StringVar(&cfgPath, "config-path", ".", "sets the config file path (default is .)")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "sets the log output level (default is info)")
+	rootCmd.PersistentFlags().StringVar(&logType, "log-type", "console", "sets the log output type [console,json] (default is console)")
+	rootCmd.PersistentFlags().BoolVar(&logSource, "log-source", false, "log output source file (default is false)")
+	// bind flags to viper
+	viper.BindPFlag("config-path", rootCmd.PersistentFlags().Lookup("config-path"))
+	viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level"))
+	viper.BindPFlag("log-type", rootCmd.PersistentFlags().Lookup("log-type"))
+	viper.BindPFlag("log-source", rootCmd.PersistentFlags().Lookup("log-source"))
 }
 
 func main() {
@@ -42,6 +54,7 @@ func main() {
 	// add subcommands to defender
 	defenderCmd.AddCommand(cmd.DefenderProveDaCmd)
 	defenderCmd.AddCommand(cmd.DefenderDefendDaCmd)
+	defenderCmd.AddCommand(cmd.DefenderInfoDaCmd)
 
 	// add subcommands to rollup
 	rollupCmd.AddCommand(cmd.RollupInfoCmd)
@@ -51,6 +64,7 @@ func main() {
 	// add all commands to root
 	rootCmd.AddCommand(rollupCmd)
 	rootCmd.AddCommand(defenderCmd)
+	rootCmd.AddCommand(challengerCmd)
 
 	err := rootCmd.Execute()
 	if err != nil {

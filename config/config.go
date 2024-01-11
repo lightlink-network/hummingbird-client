@@ -14,10 +14,11 @@ type Config struct {
 		GRPC          string `mapstructure:"grpc"`
 	} `mapstructure:"celestia"`
 	Ethereum struct {
-		Endpoint            string `mapstructure:"endpoint"`
-		CanonicalStateChain string `mapstructure:"canonicalStateChain"`
-		DaOracle            string `mapstructure:"daOracle"`
-		Challenge           string `mapstructure:"challenge"`
+		Endpoint                string `mapstructure:"endpoint"`
+		CanonicalStateChain     string `mapstructure:"canonicalStateChain"`
+		DaOracle                string `mapstructure:"daOracle"`
+		GasPriceIncreasePercent int    `mapstructure:"gasPriceIncreasePercent"`
+		Challenge               string `mapstructure:"challenge"`
 	} `mapstructure:"ethereum"`
 	LightLink struct {
 		Endpoint string `mapstructure:"endpoint"`
@@ -37,7 +38,7 @@ type Config struct {
 
 func Load() *Config {
 	viper.SetConfigName("config")
-	viper.AddConfigPath(viper.GetString("config"))
+	viper.AddConfigPath(viper.GetString("config-path"))
 	err := viper.ReadInConfig()
 	if err != nil {
 		panic(err)

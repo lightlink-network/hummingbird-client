@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -22,7 +23,7 @@ var RollupNextCmd = &cobra.Command{
 	Short: "next will rollup the next batch of L2 blocks",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
-		logger := ConsoleLogger()
+		logger := GetLogger(viper.GetString("log-type"))
 		ethKey := getEthKey()
 
 		// is dry run enabled?

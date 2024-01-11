@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -19,7 +20,7 @@ var RollupStartCmd = &cobra.Command{
 	Short: "start will start the rollup node",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
-		logger := ConsoleLogger()
+		logger := GetLogger(viper.GetString("log-type"))
 		ethKey := getEthKey()
 
 		// is dry run enabled?

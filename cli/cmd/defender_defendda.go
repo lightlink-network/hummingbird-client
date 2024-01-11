@@ -35,6 +35,13 @@ var DefenderDefendDaCmd = &cobra.Command{
 		n, err := node.NewFromConfig(cfg, logger, ethKey)
 		utils.NoErr(err)
 
+		if dryRun {
+			logger.Warn("DryRun is enabled, using mock celestia client")
+			celestiaMock := node.NewCelestiaMock(cfg.Celestia.Namespace)
+			celestiaMock.SetFakeProof(true)
+			n.Celestia = celestiaMock
+		}
+
 		d := defender.NewDefender(n, &defender.Opts{
 			Logger: logger.With("ctx", "Defender"),
 			DryRun: dryRun,

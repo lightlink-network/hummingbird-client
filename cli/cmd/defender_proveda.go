@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -25,7 +26,7 @@ var DefenderProveDaCmd = &cobra.Command{
 	Short: "prove-da will prove a data availability batch",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
-		logger := ConsoleLogger()
+		logger := GetLogger(viper.GetString("log-type"))
 		ethKey := getEthKey()
 
 		n, err := node.NewFromConfig(cfg, logger, ethKey)

@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"hummingbird/config"
 	"log/slog"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -28,6 +29,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		Signer:                     ethKey,
 		Logger:                     logger.With("ctx", "ethereum"),
 		DryRun:                     cfg.DryRun,
+		GasPriceIncreasePercent:    big.NewInt(int64(cfg.Ethereum.GasPriceIncreasePercent)),
 	})
 	if err != nil {
 		return nil, err

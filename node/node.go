@@ -41,6 +41,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		TendermintRPC: cfg.Celestia.TendermintRPC,
 		Namespace:     cfg.Celestia.Namespace,
 		Logger:        logger.With("ctx", "celestia"),
+		GasPrice:      cfg.Celestia.GasPrice,
 	})
 	if err != nil {
 		return nil, err

@@ -5,7 +5,8 @@
     "endpoint": "http://164.92.75.29:26658",
     "namespace": "lightlink",
     "tendermint_rpc": "http://full.consensus.mocha-4.celestia-mocha.com:26657",
-    "grpc": "full.consensus.mocha-4.celestia-mocha.com:9090"
+    "grpc": "full.consensus.mocha-4.celestia-mocha.com:9090",
+    "gasPrice": 0.003
   },
   "ethereum": {
     "endpoint": "https://ethereum-sepolia.publicnode.com",

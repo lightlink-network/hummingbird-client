@@ -1,10 +1,7 @@
 package rollup
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"hummingbird/node"
 	"hummingbird/node/contracts"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -88,7 +85,7 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	info.DataAvailability.CelestiaDataRoot = latestRollupHead.CelestiaDataRoot
 	info.DataAvailability.CelestiaTx = "Unknown"
 
-	pointer, err := r.getDAPointer(latestRollupHash)
+	pointer, err := r.Store.GetDAPointer(latestRollupHash)
 	if err != nil || pointer == nil {
 		r.Opts.Logger.Warn("Failed to get celestia pointer", "error", err)
 	} else {
@@ -96,26 +93,6 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	}
 
 	return info, nil
-}
-
-func (r *Rollup) getDAPointer(hash common.Hash) (*node.CelestiaPointer, error) {
-	if r.Store == nil {
-		return nil, errors.New("no store")
-	}
-
-	key := append([]byte("pointer_"), hash[:]...)
-	buf, err := r.Store.Get(key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get celestia pointer from store: %w", err)
-	}
-
-	pointer := &node.CelestiaPointer{}
-	err = json.Unmarshal(buf, pointer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal celestia pointer: %w", err)
-	}
-
-	return pointer, nil
 }
 
 type RollupBlockInfo struct {
@@ -190,7 +167,7 @@ func (r *Rollup) GetBlockInfo(hash common.Hash) (*RollupBlockInfo, error) {
 	rbi.DataAvailability.CelestiaTx = "Unknown"
 
 	// get celestia pointer
-	pointer, err := r.getDAPointer(hash)
+	pointer, err := r.Store.GetDAPointer(hash)
 	if err != nil || pointer == nil {
 		r.Opts.Logger.Warn("Failed to get celestia pointer", "error", err)
 	} else {

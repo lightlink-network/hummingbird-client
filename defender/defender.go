@@ -65,7 +65,7 @@ func (d *Defender) Start() error {
 		}
 
 		if celestiaTx == nil {
-			d.Opts.Logger.Info("no CelestiaTx found for block:", blockHash.Hex())
+			d.Opts.Logger.Info("no CelestiaTx found", "block:", blockHash.Hex())
 			continue
 		}
 

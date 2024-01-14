@@ -5,7 +5,6 @@ import (
 	"hummingbird/defender"
 	"hummingbird/node"
 	"hummingbird/utils"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -26,12 +25,9 @@ var DefenderStartCmd = &cobra.Command{
 			Logger: logger.With("ctx", "Defender"),
 		})
 
-		for {
-			err = d.Start()
-			if err != nil {
-				logger.Error("Defender.Start failed", "err", err, "retry_in", "5s")
-			}
-			time.Sleep(5 * time.Second)
+		err = d.Start()
+		if err != nil {
+			logger.Error("Defender.Start failed", "err", err, "retry_in", "5s")
 		}
 
 	},

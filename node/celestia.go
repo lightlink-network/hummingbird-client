@@ -50,6 +50,7 @@ type CelestiaClientOpts struct {
 	GRPC          string
 	Namespace     string
 	Logger        *slog.Logger
+	GasPrice      float64
 }
 
 type CelestiaClient struct {
@@ -58,6 +59,7 @@ type CelestiaClient struct {
 	trpc      *http.HTTP
 	grcp      *grpc.ClientConn
 	logger    *slog.Logger
+	gasPrice  float64
 }
 
 func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
@@ -91,6 +93,7 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		trpc:      trpc,
 		grcp:      grcp,
 		logger:    opts.Logger,
+		gasPrice:  opts.GasPrice,
 	}, nil
 }
 
@@ -117,11 +120,17 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 		panic(err)
 	}
 
-	// estimate gas
+	// gas price is defined by each node operator. 0.003 is a good default to be accepted
+	gasPrice := c.gasPrice
+
+	// estimate gas limit (maximum gas used by the tx)
 	gasLimit := blobtypes.DefaultEstimateGas([]uint32{uint32(b.Size())})
 
+	// fee is gas price * gas limit. State machine does not refund users for unused gas so all of the fee is used
+	fee := int64(gasPrice * float64(gasLimit))
+
 	// post the blob
-	pointer, err := c.submitBlob(context.Background(), cosmosmath.NewInt(100_000), gasLimit, []*blob.Blob{b})
+	pointer, err := c.submitBlob(context.Background(), cosmosmath.NewInt(fee), gasLimit, []*blob.Blob{b})
 	if err != nil {
 		return nil, err
 	}

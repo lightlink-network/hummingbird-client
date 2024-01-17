@@ -7,11 +7,12 @@ import (
 type Config struct {
 	StorePath string `mapstructure:"storePath"`
 	Celestia  struct {
-		Token         string `mapstructure:"token"`
-		Endpoint      string `mapstructure:"endpoint"`
-		Namespace     string `mapstructure:"namespace"`
-		TendermintRPC string `mapstructure:"tendermint_rpc"`
-		GRPC          string `mapstructure:"grpc"`
+		Token         string  `mapstructure:"token"`
+		Endpoint      string  `mapstructure:"endpoint"`
+		Namespace     string  `mapstructure:"namespace"`
+		TendermintRPC string  `mapstructure:"tendermint_rpc"`
+		GRPC          string  `mapstructure:"grpc"`
+		GasPrice      float64 `mapstructure:"gasPrice"`
 	} `mapstructure:"celestia"`
 	Ethereum struct {
 		Endpoint                string `mapstructure:"endpoint"`

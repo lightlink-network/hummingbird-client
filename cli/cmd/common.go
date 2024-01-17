@@ -17,7 +17,7 @@ func ConsoleLogger() *slog.Logger {
 	w := os.Stderr
 	logger := slog.New(tint.NewHandler(w, &tint.Options{
 		Level:      parseLogLevel(viper.GetString("log-level")),
-		TimeFormat: time.Kitchen,
+		TimeFormat: time.RFC1123Z,
 		AddSource:  viper.GetBool("log-source"),
 	}))
 

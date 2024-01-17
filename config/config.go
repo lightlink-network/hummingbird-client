@@ -14,7 +14,8 @@ type Config struct {
 		GRPC          string `mapstructure:"grpc"`
 	} `mapstructure:"celestia"`
 	Ethereum struct {
-		Endpoint                string `mapstructure:"endpoint"`
+		HTTPEndpoint            string `mapstructure:"httpEndpoint"`
+		WSEndpoint              string `mapstructure:"wsEndpoint"`
 		CanonicalStateChain     string `mapstructure:"canonicalStateChain"`
 		DaOracle                string `mapstructure:"daOracle"`
 		GasPriceIncreasePercent int    `mapstructure:"gasPriceIncreasePercent"`

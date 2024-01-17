@@ -15,10 +15,12 @@ type Config struct {
 		GasPrice      float64 `mapstructure:"gasPrice"`
 	} `mapstructure:"celestia"`
 	Ethereum struct {
-		Endpoint                string `mapstructure:"endpoint"`
+		HTTPEndpoint            string `mapstructure:"httpEndpoint"`
+		WSEndpoint              string `mapstructure:"wsEndpoint"`
 		CanonicalStateChain     string `mapstructure:"canonicalStateChain"`
 		DaOracle                string `mapstructure:"daOracle"`
 		GasPriceIncreasePercent int    `mapstructure:"gasPriceIncreasePercent"`
+		Challenge               string `mapstructure:"challenge"`
 	} `mapstructure:"ethereum"`
 	LightLink struct {
 		Endpoint string `mapstructure:"endpoint"`

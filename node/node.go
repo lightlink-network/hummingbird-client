@@ -21,14 +21,19 @@ type Node struct {
 // NewFromConfig creates a new node from the given config.
 func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.PrivateKey) (*Node, error) {
 
-	eth, err := NewEthereumRPC(EthereumClientOpts{
-		Endpoint:                   cfg.Ethereum.Endpoint,
+	eth, err := NewEthereumRPC(EthereumHTTPClientOpts{
+		Endpoint:                   cfg.Ethereum.HTTPEndpoint,
 		CanonicalStateChainAddress: common.HexToAddress(cfg.Ethereum.CanonicalStateChain),
 		DAOracleAddress:            common.HexToAddress(cfg.Ethereum.DaOracle),
+		ChallengeAddress:           common.HexToAddress(cfg.Ethereum.Challenge),
 		Signer:                     ethKey,
-		Logger:                     logger.With("ctx", "ethereum"),
+		Logger:                     logger.With("ctx", "ethereum-http"),
 		DryRun:                     cfg.DryRun,
 		GasPriceIncreasePercent:    big.NewInt(int64(cfg.Ethereum.GasPriceIncreasePercent)),
+	}, EthereumWSClientOpts{
+		Endpoint:         cfg.Ethereum.WSEndpoint,
+		ChallengeAddress: common.HexToAddress(cfg.Ethereum.Challenge),
+		Logger:           logger.With("ctx", "ethereum-ws"),
 	})
 	if err != nil {
 		return nil, err

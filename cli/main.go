@@ -29,6 +29,11 @@ var defenderCmd = &cobra.Command{
 	Short: "defender is a command to generate proofs and respond to challenges",
 }
 
+var challengerCmd = &cobra.Command{
+	Use:   "challenger",
+	Short: "challenger is a command to create challenges",
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgPath, "config-path", ".", "sets the config file path (default is .)")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "sets the log output level (default is info)")
@@ -42,8 +47,15 @@ func init() {
 }
 
 func main() {
+
+	// add subcommands to challenger
+	challengerCmd.AddCommand(cmd.ChallengerChallengedaCmd)
+
 	// add subcommands to defender
 	defenderCmd.AddCommand(cmd.DefenderProveDaCmd)
+	defenderCmd.AddCommand(cmd.DefenderDefendDaCmd)
+	defenderCmd.AddCommand(cmd.DefenderInfoDaCmd)
+	defenderCmd.AddCommand(cmd.DefenderStartCmd)
 
 	// add subcommands to rollup
 	rollupCmd.AddCommand(cmd.RollupInfoCmd)
@@ -53,6 +65,7 @@ func main() {
 	// add all commands to root
 	rootCmd.AddCommand(rollupCmd)
 	rootCmd.AddCommand(defenderCmd)
+	rootCmd.AddCommand(challengerCmd)
 
 	err := rootCmd.Execute()
 	if err != nil {

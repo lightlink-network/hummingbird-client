@@ -9,7 +9,8 @@
     "gasPrice": 0.003
   },
   "ethereum": {
-    "endpoint": "https://ethereum-sepolia.publicnode.com",
+    "httpEndpoint": "https://ethereum-sepolia.publicnode.com",
+    "wsEndpoint": "wss://ethereum-sepolia.publicnode.com",
     "canonicalStateChain": "0x18d00cfb6c7c78CAb803A225F4EE7F6307f22f4C",
     "daOracle": "0x3a5cbB6EF4756DA0b3f6DAE7aB6430fD8c46d247",
     "gasPriceIncreasePercent": 10

@@ -1,0 +1,554 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_treasury",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_chain",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_daOracle",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_mipsChallenge",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "_blockHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "_blockIndex",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_expiry",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "enum ChallengeDataAvailability.ChallengeDAStatus",
+        "name": "_status",
+        "type": "uint8"
+      }
+    ],
+    "name": "ChallengeDAUpdate",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "_blockIndex",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "_hash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "enum ChallengeHeader.InvalidHeaderReason",
+        "name": "_reason",
+        "type": "uint8"
+      }
+    ],
+    "name": "InvalidHeader",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "chain",
+    "outputs": [
+      {
+        "internalType": "contract ICanonicalStateChain",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_blockIndex",
+        "type": "uint256"
+      }
+    ],
+    "name": "challengeDataRootInclusion",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "challengeFee",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "challengePeriod",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "challengeReward",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "challengeWindow",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "daChallenges",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "blockIndex",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "challenger",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "expiry",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum ChallengeDataAvailability.ChallengeDAStatus",
+        "name": "status",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "daOracle",
+    "outputs": [
+      {
+        "internalType": "contract IDAOracle",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_blockHash",
+        "type": "bytes32"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "rootNonce",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              {
+                "internalType": "bytes32[]",
+                "name": "sideNodes",
+                "type": "bytes32[]"
+              },
+              {
+                "internalType": "uint256",
+                "name": "key",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "numLeaves",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct BinaryMerkleProof",
+            "name": "proof",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct ChallengeDataAvailability.ChallengeDAProof",
+        "name": "_proof",
+        "type": "tuple"
+      }
+    ],
+    "name": "defendDataRootInclusion",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defender",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "execChallenges",
+    "outputs": [
+      {
+        "internalType": "enum ChallengeExecution.ChallengeStatus",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "headerIndex",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "blockIndex",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "mipSteps",
+        "type": "uint64"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "assertionRoot",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "finalSystemState",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "mipsChallengeId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_headerIndex",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_blockIndex",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "_mipSteps",
+        "type": "uint64"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_assertionRoot",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "_finalSystemState",
+        "type": "bytes32"
+      }
+    ],
+    "name": "initiateChallenge",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_blockIndex",
+        "type": "uint256"
+      }
+    ],
+    "name": "invalidateHeader",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "mipsChallenge",
+    "outputs": [
+      {
+        "internalType": "contract IMipsChallenge",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_challengeFee",
+        "type": "uint256"
+      }
+    ],
+    "name": "setChallengeFee",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_challengePeriod",
+        "type": "uint256"
+      }
+    ],
+    "name": "setChallengePeriod",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_challengeReward",
+        "type": "uint256"
+      }
+    ],
+    "name": "setChallengeReward",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_challengeWindow",
+        "type": "uint256"
+      }
+    ],
+    "name": "setChallengeWindow",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_defender",
+        "type": "address"
+      }
+    ],
+    "name": "setDefender",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_blockhash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "settleDataRootInclusion",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "treasury",
+    "outputs": [
+      {
+        "internalType": "contract ITreasury",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

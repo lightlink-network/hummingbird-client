@@ -1,5 +1,9 @@
 # LightLink Hummingbird ![HummingBird](humming.png)
 
+Hummingbird is a command line tool for interacting with the LightLink protocol.
+
+It is designed to work in unison with the [lightlink-hummingbird-contracts](https://github.com/pellartech/lightlink-hummingbird-contracts) repository. 
+
 ## Commands
 
 ```bash

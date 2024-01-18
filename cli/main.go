@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"hummingbird/cli/cmd"
 
 	"github.com/spf13/cobra"
@@ -47,6 +48,7 @@ func init() {
 }
 
 func main() {
+	logo()
 
 	// add subcommands to challenger
 	challengerCmd.AddCommand(cmd.ChallengerChallengedaCmd)
@@ -71,4 +73,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func logo() {
+	logo := `
+				 _    _                           _             _     _         _ 
+				| |  | |                         (_)           | |   (_)       | |
+				| |__| |_   _ _ __ ___  _ __ ___  _ _ __   __ _| |__  _ _ __ __| |
+				|  __  | | | | '_   _ \| '_   _ \| | '_ \ / _  | '_ \| | '__/ _  |
+				| |  | | |_| | | | | | | | | | | | | | | | (_| | |_) | | | | (_| |
+				|_|  |_|\__,_|_| |_| |_|_| |_| |_|_|_| |_|\__, |_.__/|_|_|  \__,_|
+				                                           __/ |
+									  |___/`
+
+	fmt.Println(logo + "\n")
 }

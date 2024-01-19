@@ -96,6 +96,8 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	}
 	bundle := &node.Bundle{Blocks: l2blocks}
 
+	r.Opts.Logger.Info("Publishing bundle to Celestia", "bundle_size", len(bundle.Blocks), "ll_height", llHeight, "ll_epoch", epoch)
+
 	// 6. upload the bundle to celestia
 	pointer, err := r.Celestia.PublishBundle(*bundle)
 	if err != nil {
@@ -220,6 +222,8 @@ func (r *Rollup) Run() error {
 			return err
 		}
 		log.Debug("Reached next rollup target", "target", target)
+
+		log.Info("Building candidate rollup block...")
 
 		// 3. create the next rollup block
 		block, err := r.CreateNextBlock()

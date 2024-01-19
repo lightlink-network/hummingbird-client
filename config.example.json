@@ -1,8 +1,8 @@
 {
   "storePath": "./store",
   "celestia": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdfQ.oD-NCdMlElJU4SwZhKjFhoVpJm-WB_g1RNMua1IxUto",
-    "endpoint": "http://164.92.75.29:26658",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiLCJhZG1pbiJdfQ",
+    "endpoint": "http://127.0.0.1:26658",
     "namespace": "lightlink",
     "tendermint_rpc": "http://full.consensus.mocha-4.celestia-mocha.com:26657",
     "grpc": "full.consensus.mocha-4.celestia-mocha.com:9090",
@@ -13,11 +13,12 @@
     "wsEndpoint": "wss://ethereum-sepolia.publicnode.com",
     "canonicalStateChain": "0x18d00cfb6c7c78CAb803A225F4EE7F6307f22f4C",
     "daOracle": "0x3a5cbB6EF4756DA0b3f6DAE7aB6430fD8c46d247",
+    "challenge": "0x93c4D996C7808682cfa6Ae6D7a2b0A69eEcb5c0C",
     "gasPriceIncreasePercent": 10
   },
   "lightlink": {
     "endpoint": "https://replicator.pegasus.lightlink.io/rpc/v1",
-    "queryDelay": 500
+    "delay": 500
   },
   "rollup": {
     "bundleSize": 10,

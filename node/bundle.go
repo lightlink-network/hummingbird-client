@@ -8,6 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+// TxSizeLimit is the maximum size of a Celestia tx in bytes
+const TxSizeLimit = uint64(1962441)
+
 // Bundle is a collection of layer2 blocks which will be submitted to the
 // data availability layer (Celestia).
 type Bundle struct {
@@ -57,4 +60,19 @@ func (b *Bundle) TxRoot() common.Hash {
 func (b *Bundle) StateRoot() common.Hash {
 	last := b.Blocks[len(b.Blocks)-1]
 	return last.Header().Root
+}
+
+// check if the bundle is under the celestia tx size
+// limit of 1962441 bytes - 20000 bytes for tx overhead
+func (b *Bundle) IsUnderTxLimit() (bool, uint64, uint64, error) {
+	bundleEncoded, err := b.EncodeRLP()
+	if err != nil {
+		return false, 0, 0, err
+	}
+	bundleEncodedSize := uint64(len(bundleEncoded))
+	bundleSizeLimit := TxSizeLimit - 20000
+	if bundleEncodedSize > bundleSizeLimit {
+		return false, bundleSizeLimit, bundleEncodedSize, nil
+	}
+	return true, bundleSizeLimit, bundleEncodedSize, nil
 }

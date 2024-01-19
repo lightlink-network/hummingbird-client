@@ -5,9 +5,11 @@ import (
 	"hummingbird/config"
 	"log/slog"
 	"math/big"
+	"runtime"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/spf13/viper"
 )
 
 type Node struct {
@@ -20,6 +22,17 @@ type Node struct {
 
 // NewFromConfig creates a new node from the given config.
 func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.PrivateKey) (*Node, error) {
+
+	// Version will be set at build time
+	var Version = "development"
+
+	logger.Info("Starting LightLink Hummingbird ("+Version+")",
+		"Go Version", runtime.Version(),
+		"Operating System", runtime.GOOS,
+		"Architecture", runtime.GOARCH)
+
+	// log config file path
+	logger.Info("Using config file", "path", viper.ConfigFileUsed())
 
 	eth, err := NewEthereumRPC(EthereumHTTPClientOpts{
 		Endpoint:                   cfg.Ethereum.HTTPEndpoint,

@@ -104,10 +104,37 @@ func (l *LightLinkClient) GetBlocks(start, end uint64) ([]*types.Block, error) {
 
 	var blocks []*types.Block
 	for i := start; i < end; i++ {
-		block, err := l.GetBlock(i)
+		var block *types.Block
+		var err error
+
+		// retry up to 5 times in case of connreset or timeout errors etc
+		for retry := 0; retry < 5; retry++ {
+			block, err = l.GetBlock(i)
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Second * time.Duration(2<<retry)) // exponential backoff
+		}
+
+		// if after 5 retries we still have an error, return it
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block at height %d: %w", i, err)
 		}
+
+		// check if the block can be added to the bundle or if
+		// the bundle has reached the max celestia tx size limit
+		bundle := &Bundle{Blocks: append(blocks, block)}
+		isUnderLimit, bundleSizeLimit, bundleEncodedSize, err := bundle.IsUnderTxLimit()
+		if err != nil {
+			return nil, fmt.Errorf("failed to check bundle size: %w", err)
+		}
+
+		if !isUnderLimit {
+			l.opts.Logger.Info("Bundle has reached max celestia tx size limit", "blockCount", len(blocks), "bundleSize", bundleEncodedSize, "txSizeLimit", bundleSizeLimit)
+			return blocks, nil
+		}
+
+		// add the block to the bundle
 		blocks = append(blocks, block)
 
 		// delay between requests

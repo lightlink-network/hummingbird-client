@@ -23,10 +23,7 @@ type Node struct {
 // NewFromConfig creates a new node from the given config.
 func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.PrivateKey) (*Node, error) {
 
-	// Version will be set at build time
-	var Version = "development"
-
-	logger.Info("Starting LightLink Hummingbird ("+Version+")",
+	logger.Info("Starting LightLink Hummingbird ("+viper.GetString("version")+")",
 		"Go Version", runtime.Version(),
 		"Operating System", runtime.GOOS,
 		"Architecture", runtime.GOARCH)

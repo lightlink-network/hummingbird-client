@@ -8,6 +8,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Version will be set at build time
+var Version = "development"
+
 var (
 	cfgPath   string
 	logLevel  string
@@ -45,6 +48,8 @@ func init() {
 	viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level"))
 	viper.BindPFlag("log-type", rootCmd.PersistentFlags().Lookup("log-type"))
 	viper.BindPFlag("log-source", rootCmd.PersistentFlags().Lookup("log-source"))
+	// bind version to viper
+	viper.SetDefault("version", Version)
 }
 
 func main() {

@@ -11,3 +11,6 @@ store
 config.ganache.json
 config.hardhat.json
 config.json
+
+store
+storage

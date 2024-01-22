@@ -269,7 +269,7 @@ func (e *EthereumClient) Wait(txHash common.Hash) (*types.Receipt, error) {
 func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
 	// convert proof to daOracle format
 	wrappedProof := daOracleContract.BinaryMerkleProof{
-		SideNodes: make([][32]byte, len(proof.WrappedProof.SideNodes)),
+		SideNodes: proof.WrappedProof.SideNodes,
 		Key:       proof.WrappedProof.Key,
 		NumLeaves: proof.WrappedProof.NumLeaves,
 	}

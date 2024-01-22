@@ -116,6 +116,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 		StateRoot:        bundle.StateRoot(),
 		CelestiaHeight:   pointer.Height,
 		CelestiaDataRoot: pointer.DataRoot,
+		CelestiaTxHash:   pointer.TxHash,
 	}
 
 	// 8. calculate the hash of the header

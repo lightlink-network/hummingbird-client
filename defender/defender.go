@@ -85,7 +85,7 @@ func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChall
 		return nil
 	}
 
-	celestiaTx, err := d.Store.GetDAPointer(challenge.BlockHash)
+	celestiaTx, err := d.GetDAPointer(challenge.BlockHash)
 	if err != nil {
 		return fmt.Errorf("error getting CelestiaTx: %w", err)
 	}

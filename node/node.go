@@ -85,3 +85,32 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		Store: store,
 	}, nil
 }
+
+// GetDAPointer gets the Celestia pointer for the given rollup block hash.
+func (n *Node) GetDAPointer(hash common.Hash) (*CelestiaPointer, error) {
+	pointer, err := n.Store.GetDAPointer(hash)
+	// if err is not found, get pointer from header, any other error return
+	if err != nil && err.Error() != "not found" {
+		return nil, err
+	}
+
+	// if pointer is found, return it
+	if pointer != nil {
+		return pointer, nil
+	}
+
+	// pointer is not found in local store so get rollup header
+	header, err := n.GetRollupHeaderByHash(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	// get pointer from header
+	pointer = &CelestiaPointer{
+		Height:   header.CelestiaHeight,
+		TxHash:   header.CelestiaDataRoot,
+		DataRoot: header.CelestiaDataRoot,
+	}
+
+	return pointer, nil
+}

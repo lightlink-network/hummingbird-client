@@ -87,7 +87,7 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	info.DataAvailability.CelestiaDataRoot = latestRollupHead.CelestiaDataRoot
 	info.DataAvailability.CelestiaTx = "Unknown"
 
-	pointer, err := r.Store.GetDAPointer(latestRollupHash)
+	pointer, err := r.GetDAPointer(latestRollupHash)
 	if err != nil || pointer == nil {
 		r.Opts.Logger.Warn("Failed to get celestia pointer", "error", err)
 	} else {
@@ -169,7 +169,7 @@ func (r *Rollup) GetBlockInfo(hash common.Hash) (*RollupBlockInfo, error) {
 	rbi.DataAvailability.CelestiaTx = "Unknown"
 
 	// get celestia pointer
-	pointer, err := r.Store.GetDAPointer(hash)
+	pointer, err := r.GetDAPointer(hash)
 	if err != nil || pointer == nil {
 		r.Opts.Logger.Warn("Failed to get celestia pointer", "error", err)
 	} else {

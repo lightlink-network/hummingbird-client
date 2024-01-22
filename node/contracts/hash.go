@@ -4,6 +4,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 )
 
 var (
@@ -14,7 +16,7 @@ var (
 	addressType, _ = abi.NewType("address", "address", nil)
 )
 
-func HashCanonicalStateChainHeader(header *CanonicalStateChainHeader) (common.Hash, error) {
+func HashCanonicalStateChainHeader(header *canonicalStateChainContract.CanonicalStateChainHeader) (common.Hash, error) {
 	args := abi.Arguments{
 		{Type: uint64Type},  // epoch
 		{Type: uint64Type},  // l2Height

@@ -2,11 +2,12 @@ package rollup
 
 import (
 	"hummingbird/node"
-	"hummingbird/node/contracts"
+
+	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 )
 
 type Block struct {
-	*contracts.CanonicalStateChainHeader
+	*canonicalStateChainContract.CanonicalStateChainHeader
 	*node.Bundle
 	*node.CelestiaPointer
 }

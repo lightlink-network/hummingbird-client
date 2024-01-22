@@ -5,6 +5,8 @@ import (
 	"hummingbird/node/contracts"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 )
 
 type RollupInfo struct {
@@ -13,9 +15,9 @@ type RollupInfo struct {
 	L2BlocksTodo     uint64 `pretty:"L2 Blocks Todo"`
 
 	LatestRollup struct {
-		Hash                                 common.Hash `pretty:"Hash"`
-		BundleSize                           uint64      `pretty:"Bundle Size"`
-		*contracts.CanonicalStateChainHeader `pretty:"Header"`
+		Hash                                                   common.Hash `pretty:"Hash"`
+		BundleSize                                             uint64      `pretty:"Bundle Size"`
+		*canonicalStateChainContract.CanonicalStateChainHeader `pretty:"Header"`
 	} `pretty:"Latest Rollup Block"`
 
 	DataAvailability struct {
@@ -96,9 +98,9 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 }
 
 type RollupBlockInfo struct {
-	Hash                                 common.Hash `pretty:"Hash"`
-	BundleSize                           uint64      `pretty:"Bundle Size"`
-	*contracts.CanonicalStateChainHeader `pretty:"Header"`
+	Hash                                                   common.Hash `pretty:"Hash"`
+	BundleSize                                             uint64      `pretty:"Bundle Size"`
+	*canonicalStateChainContract.CanonicalStateChainHeader `pretty:"Header"`
 
 	DataAvailability struct {
 		CelestiaHeight   uint64   `pretty:"Celestia Height"`

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"hummingbird/node/contracts"
 	"log/slog"
 	"math/big"
 
@@ -21,6 +20,9 @@ import (
 	"github.com/celestiaorg/celestia-app/pkg/square"
 	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
 	blobstreamtypes "github.com/celestiaorg/celestia-app/x/qgb/types"
+
+	challengeContract "hummingbird/node/contracts/Challenge.sol"
+	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
 )
 
 // CelestiaPointer is a pointer to a Celestia header
@@ -32,8 +34,8 @@ type CelestiaPointer struct {
 
 type CelestiaProof struct {
 	Nonce        *big.Int
-	Tuple        *contracts.DataRootTuple
-	WrappedProof *contracts.BinaryMerkleProof
+	Tuple        *daOracleContract.DataRootTuple
+	WrappedProof *challengeContract.BinaryMerkleProof
 }
 
 // Celestia is the interface for interacting with the Celestia node
@@ -206,7 +208,7 @@ func (c *CelestiaClient) GetProof(txHash []byte) (*CelestiaProof, error) {
 		return nil, err
 	}
 
-	tuple := contracts.DataRootTuple{
+	tuple := daOracleContract.DataRootTuple{
 		Height:   big.NewInt(int64(tx.Height)),
 		DataRoot: *(*[32]byte)(blockRes.Block.DataHash),
 	}
@@ -215,7 +217,7 @@ func (c *CelestiaClient) GetProof(txHash []byte) (*CelestiaProof, error) {
 	for i, aunt := range dcProof.Proof.Aunts {
 		sideNodes[i] = *(*[32]byte)(aunt)
 	}
-	wrappedProof := contracts.BinaryMerkleProof{
+	wrappedProof := challengeContract.BinaryMerkleProof{
 		SideNodes: sideNodes,
 		Key:       big.NewInt(dcProof.Proof.Index),
 		NumLeaves: big.NewInt(dcProof.Proof.Total),
@@ -278,11 +280,11 @@ func (c *celestiaMock) GetProof(hash []byte) (*CelestiaProof, error) {
 	if c.fakeProof {
 		return &CelestiaProof{
 			Nonce: big.NewInt(0),
-			Tuple: &contracts.DataRootTuple{
+			Tuple: &daOracleContract.DataRootTuple{
 				Height:   big.NewInt(0),
 				DataRoot: common.BytesToHash(hash),
 			},
-			WrappedProof: &contracts.BinaryMerkleProof{
+			WrappedProof: &challengeContract.BinaryMerkleProof{
 				SideNodes: make([][32]byte, 0),
 				Key:       big.NewInt(0),
 				NumLeaves: big.NewInt(0),
@@ -302,11 +304,11 @@ func (c *celestiaMock) GetProof(hash []byte) (*CelestiaProof, error) {
 
 	return &CelestiaProof{
 		Nonce: big.NewInt(0),
-		Tuple: &contracts.DataRootTuple{
+		Tuple: &daOracleContract.DataRootTuple{
 			Height:   big.NewInt(int64(p.Height)),
 			DataRoot: p.DataRoot,
 		},
-		WrappedProof: &contracts.BinaryMerkleProof{
+		WrappedProof: &challengeContract.BinaryMerkleProof{
 			SideNodes: make([][32]byte, 0),
 			Key:       big.NewInt(0),
 			NumLeaves: big.NewInt(0),

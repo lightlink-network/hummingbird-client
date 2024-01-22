@@ -90,7 +90,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 func (n *Node) GetDAPointer(hash common.Hash) (*CelestiaPointer, error) {
 	pointer, err := n.Store.GetDAPointer(hash)
 	// if err is not found, get pointer from header, any other error return
-	if err != nil && err.Error() != "not found" {
+	if err != nil && err.Error() != "failed to get celestia pointer from store: leveldb: not found" {
 		return nil, err
 	}
 

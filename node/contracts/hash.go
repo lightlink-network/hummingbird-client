@@ -26,9 +26,10 @@ func HashCanonicalStateChainHeader(header *canonicalStateChainContract.Canonical
 		{Type: bytes32Type}, // stateRoot
 		{Type: uint64Type},  // celestiaHeight
 		{Type: bytes32Type}, // celestiaDataRoot
+		{Type: bytes32Type}, // celestiaTxHash
 	}
 
-	enc, err := args.Pack(header.Epoch, header.L2Height, header.PrevHash, header.TxRoot, header.BlockRoot, header.StateRoot, header.CelestiaHeight, header.CelestiaDataRoot)
+	enc, err := args.Pack(header.Epoch, header.L2Height, header.PrevHash, header.TxRoot, header.BlockRoot, header.StateRoot, header.CelestiaHeight, header.CelestiaDataRoot, header.CelestiaTxHash)
 	if err != nil {
 		return common.Hash{}, err
 	}

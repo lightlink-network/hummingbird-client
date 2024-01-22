@@ -105,7 +105,7 @@ type RollupBlockInfo struct {
 	DataAvailability struct {
 		CelestiaHeight   uint64   `pretty:"Celestia Height"`
 		CelestiaDataRoot [32]byte `pretty:"Celestia Data Root"`
-		CelestiaTx       string   `pretty:"Celestia Tx"`
+		CelestiaTx       [32]byte `pretty:"Celestia Tx"`
 	} `pretty:"Data Availability"`
 
 	Distance struct {
@@ -166,15 +166,7 @@ func (r *Rollup) GetBlockInfo(hash common.Hash) (*RollupBlockInfo, error) {
 	// set data availability
 	rbi.DataAvailability.CelestiaHeight = header.CelestiaHeight
 	rbi.DataAvailability.CelestiaDataRoot = header.CelestiaDataRoot
-	rbi.DataAvailability.CelestiaTx = "Unknown"
-
-	// get celestia pointer
-	pointer, err := r.GetDAPointer(hash)
-	if err != nil || pointer == nil {
-		r.Opts.Logger.Warn("Failed to get celestia pointer", "error", err)
-	} else {
-		rbi.DataAvailability.CelestiaTx = pointer.TxHash.Hex()
-	}
+	rbi.DataAvailability.CelestiaTx = header.CelestiaTxHash
 
 	return rbi, nil
 }

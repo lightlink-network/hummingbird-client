@@ -21,6 +21,7 @@ import (
 	"github.com/celestiaorg/celestia-app/pkg/square"
 	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
 	blobstreamtypes "github.com/celestiaorg/celestia-app/x/qgb/types"
+	tenderTypes "github.com/tendermint/tendermint/types"
 )
 
 // CelestiaPointer is a pointer to a Celestia header
@@ -41,6 +42,8 @@ type Celestia interface {
 	Namespace() string
 	PublishBundle(blocks Bundle) (*CelestiaPointer, error)
 	GetProof(txHash []byte) (*CelestiaProof, error)
+	GetShareProofs(txHash []byte, pointer *SharePointer) (*tenderTypes.ShareProof, error)
+	GetShares(txHash []byte, namespace string) (share.NamespacedShares, error)
 }
 
 type CelestiaClientOpts struct {
@@ -303,4 +306,12 @@ func (c *celestiaMock) GetProof(hash []byte) (*CelestiaProof, error) {
 			NumLeaves: big.NewInt(0),
 		},
 	}, nil
+}
+
+func (c *celestiaMock) GetShareProofs(hash []byte, pointer *SharePointer) (*tenderTypes.ShareProof, error) {
+	return &tenderTypes.ShareProof{}, nil
+}
+
+func (c *celestiaMock) GetShares(hash []byte, namespace string) (share.NamespacedShares, error) {
+	return nil, nil
 }

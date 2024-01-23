@@ -21,10 +21,9 @@ type RollupInfo struct {
 	} `pretty:"Latest Rollup Block"`
 
 	DataAvailability struct {
-		CelestiaHeight     uint64   `pretty:"Celestia Height"`
-		CelestiaShareStart uint64   `pretty:"Shares Start"`
-		CelestiaShareLen   uint64   `pretty:"Shares"`
-		CelestiaTx         [32]byte `pretty:"Celestia Tx"`
+		CelestiaHeight     uint64 `pretty:"Celestia Height"`
+		CelestiaShareStart uint64 `pretty:"Shares Start"`
+		CelestiaShareLen   uint64 `pretty:"Shares"`
 	} `pretty:"Data Availability"`
 }
 

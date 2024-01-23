@@ -11,6 +11,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -34,6 +35,7 @@ func NewDefender(node *node.Node, opts *Opts) *Defender {
 }
 
 func (d *Defender) Start() error {
+	d.retryMissedDAChallenges()
 	go d.retryActiveDAChallengesWorker()
 
 	if err := d.WatchAndDefendDAChallenges(); err != nil {
@@ -44,8 +46,7 @@ func (d *Defender) Start() error {
 
 func (d *Defender) WatchAndDefendDAChallenges() error {
 	challenges := make(chan *challengeContract.ChallengeChallengeDAUpdate)
-	lastScannedBlockNumber, _ := d.Store.GetLastScannedBlockNumber()
-	subscription, err := d.Ethereum.WatchChallengesDA(challenges, lastScannedBlockNumber)
+	subscription, err := d.Ethereum.WatchChallengesDA(challenges)
 	if err != nil {
 		return fmt.Errorf("error starting WatchChallengesDA: %w", err)
 	}
@@ -185,4 +186,49 @@ func (d *Defender) retryActiveDAChallengesWorker() {
 		}
 		d.Opts.Logger.Info("Active DA challenges retry worker finished")
 	}
+}
+
+func (d *Defender) retryMissedDAChallenges() {
+	d.Opts.Logger.Info("Retrying missed DA challenges...")
+	lastScannedBlockNumber, err := d.Store.GetLastScannedBlockNumber()
+	if err != nil {
+		d.Opts.Logger.Error("error getting last scanned block number:", "error", err)
+		return
+	}
+
+	opts := &bind.FilterOpts{
+		Start: lastScannedBlockNumber,
+	}
+
+	status := []uint8{1}
+
+	challenges, err := d.Ethereum.FilterChallengeDAUpdate(opts, nil, nil, status)
+	if err != nil {
+		d.Opts.Logger.Error("error filtering challenges:", "error", err)
+		return
+	}
+
+	// iterate through challenges and retry
+	for challenges.Next() {
+		challenge := challenges.Event // Access the current challenge
+
+		// Check if challenge has already been defended
+		challengeInfo, err := d.Ethereum.GetDataRootInclusionChallenge(challenge.BlockHash)
+		if err != nil {
+			d.Opts.Logger.Error("error getting data root inclusion challenge:", "error", err)
+			continue
+		}
+
+		if challengeInfo.Status != 1 {
+			d.Opts.Logger.Info("DA challenge has already been defended", "blockIndex", challenge.BlockIndex)
+			continue
+		}
+
+		err = d.handleDAChallenge(challenge)
+		if err != nil {
+			d.Opts.Logger.Error("error retrying missed DA challenge:", "blockIndex", challenge.BlockIndex, "error", err)
+			continue
+		}
+	}
+	d.Opts.Logger.Info("Missed DA challenges retry finished")
 }

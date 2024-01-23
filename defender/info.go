@@ -7,5 +7,5 @@ import (
 )
 
 func (d *Defender) InfoDA(block common.Hash) (contracts.ChallengeDaInfo, error) {
-	return d.Ethereum.GetDataRootInlcusionChallenge(block)
+	return d.Ethereum.GetDataRootInclusionChallenge(block)
 }

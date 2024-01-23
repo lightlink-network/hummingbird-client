@@ -36,9 +36,9 @@ type Ethereum interface {
 	Wait(txHash common.Hash) (*types.Receipt, error)                                                          // Wait for the given transaction to be mined.
 	DAVerify(*CelestiaProof) (bool, error)
 	// Check if the data availability layer is verified.
-	// Challanges
+	// Challenges
 	GetChallengeFee() (*big.Int, error)
-	GetDataRootInlcusionChallenge(block common.Hash) (contracts.ChallengeDaInfo, error)
+	GetDataRootInclusionChallenge(block common.Hash) (contracts.ChallengeDaInfo, error)
 	ChallengeDataRootInclusion(index uint64) (*types.Transaction, common.Hash, error)
 	DefendDataRootInclusion(common.Hash, *CelestiaProof) (*types.Transaction, error)
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
@@ -338,7 +338,7 @@ func (e *EthereumClient) SettleDataRootInclusion(blockHash common.Hash) (*types.
 	return tx, nil
 }
 
-func (e *EthereumClient) GetDataRootInlcusionChallenge(blockHash common.Hash) (contracts.ChallengeDaInfo, error) {
+func (e *EthereumClient) GetDataRootInclusionChallenge(blockHash common.Hash) (contracts.ChallengeDaInfo, error) {
 	res, err := e.http.challenge.DaChallenges(nil, blockHash)
 	if err != nil {
 		return contracts.ChallengeDaInfo{}, fmt.Errorf("failed to get data root inclusion challenge: %w", err)
@@ -370,7 +370,7 @@ type ethereumMock struct {
 }
 
 // NewEthereumMock returns a new EthereumMock client. It is used for testing.
-func NewEthereumMock(genisis *canonicalStateChainContract.CanonicalStateChainHeader) *ethereumMock {
+func NewEthereumMock(genesis *canonicalStateChainContract.CanonicalStateChainHeader) *ethereumMock {
 
 	e := &ethereumMock{
 		rollupHeaders: make(map[common.Hash]canonicalStateChainContract.CanonicalStateChainHeader),
@@ -378,7 +378,7 @@ func NewEthereumMock(genisis *canonicalStateChainContract.CanonicalStateChainHea
 		head:          -1,
 	}
 
-	e.PushRollupHead(genisis)
+	e.PushRollupHead(genesis)
 	return e
 }
 

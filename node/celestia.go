@@ -27,9 +27,13 @@ import (
 
 // CelestiaPointer is a pointer to a Celestia header
 type CelestiaPointer struct {
-	Height   uint64
-	DataRoot common.Hash
-	TxHash   common.Hash
+	Height     uint64
+	ShareStart uint64
+	ShareLen   uint64
+
+	// Extra data Only present if the pointer is stored in the local database.
+	Commitment common.Hash
+	TxHash     common.Hash
 }
 
 type CelestiaProof struct {
@@ -152,10 +156,29 @@ func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gas
 		return nil, err
 	}
 
+	tx, err := c.trpc.Tx(ctx, txHash, true)
+	if err != nil {
+		return nil, fmt.Errorf("submitBlob: failed to get celestia tx: %w", err)
+	}
+
+	// Get the block that contains the tx
+	blockRes, err := c.trpc.Block(context.Background(), &tx.Height)
+	if err != nil {
+		return nil, fmt.Errorf("submitBlob: failed to get celestia block: %w", err)
+	}
+
+	// Get the blob share range inside the block
+	shareRange, err := square.BlobShareRange(blockRes.Block.Data.Txs.ToSliceOfBytes(), int(tx.Index), 0, blockRes.Block.Header.Version.App)
+	if err != nil {
+		return nil, fmt.Errorf("submitBlob: failed to get celestia share range: %w", err)
+	}
+
 	pointer := &CelestiaPointer{
-		Height:   uint64(response.Height),
-		DataRoot: common.BytesToHash(blobs[0].Commitment),
-		TxHash:   common.BytesToHash(txHash),
+		Height:     uint64(response.Height),
+		Commitment: common.BytesToHash(blobs[0].Commitment),
+		ShareStart: uint64(shareRange.Start),
+		ShareLen:   uint64(shareRange.End - shareRange.Start),
+		TxHash:     common.BytesToHash(txHash),
 	}
 
 	return pointer, err
@@ -267,9 +290,10 @@ func (c *celestiaMock) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
 	c.blocks[hash] = blocks
 
 	c.pointers[hash] = &CelestiaPointer{
-		Height:   c.height,
-		DataRoot: hash,
-		TxHash:   hash,
+		Height:     c.height,
+		ShareStart: 0,
+		ShareLen:   uint64(len(blocks.Blocks)),
+		TxHash:     hash,
 	}
 
 	return c.pointers[hash], nil
@@ -306,7 +330,7 @@ func (c *celestiaMock) GetProof(hash []byte) (*CelestiaProof, error) {
 		Nonce: big.NewInt(0),
 		Tuple: &daOracleContract.DataRootTuple{
 			Height:   big.NewInt(int64(p.Height)),
-			DataRoot: p.DataRoot,
+			DataRoot: p.Commitment,
 		},
 		WrappedProof: &challengeContract.BinaryMerkleProof{
 			SideNodes: make([][32]byte, 0),

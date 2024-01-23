@@ -71,8 +71,8 @@ var RollupNextCmd = &cobra.Command{
 		fmt.Println("	Hash:", hash.Hex())
 		fmt.Println("	Bundle Size:", len(b.Bundle.Blocks))
 		fmt.Println("	Celestia Height:", b.CelestiaHeight)
-		fmt.Println("	Celestia Data Root:", common.BytesToHash(b.CelestiaDataRoot[:]).Hex())
-		fmt.Println("	Celestia Tx Hash:", b.CelestiaPointer.TxHash.Hex())
+		fmt.Println("	Celestia Share Start:", b.CelestiaShareStart)
+		fmt.Println("	Celestia Share Len:", b.CelestiaShareLen)
 		fmt.Println(" ")
 
 		// If dry run is enabled, exit.

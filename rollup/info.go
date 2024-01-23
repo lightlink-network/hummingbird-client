@@ -21,9 +21,10 @@ type RollupInfo struct {
 	} `pretty:"Latest Rollup Block"`
 
 	DataAvailability struct {
-		CelestiaHeight   uint64   `pretty:"Celestia Height"`
-		CelestiaDataRoot [32]byte `pretty:"Celestia Data Root"`
-		CelestiaTx       [32]byte `pretty:"Celestia Tx"`
+		CelestiaHeight     uint64   `pretty:"Celestia Height"`
+		CelestiaShareStart uint64   `pretty:"Shares Start"`
+		CelestiaShareLen   uint64   `pretty:"Shares"`
+		CelestiaTx         [32]byte `pretty:"Celestia Tx"`
 	} `pretty:"Data Availability"`
 }
 
@@ -84,8 +85,8 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 
 	// get data availability
 	info.DataAvailability.CelestiaHeight = latestRollupHead.CelestiaHeight
-	info.DataAvailability.CelestiaDataRoot = latestRollupHead.CelestiaDataRoot
-	info.DataAvailability.CelestiaTx = latestRollupHead.CelestiaTxHash
+	info.DataAvailability.CelestiaShareStart = latestRollupHead.CelestiaShareStart
+	info.DataAvailability.CelestiaShareLen = latestRollupHead.CelestiaShareLen
 
 	return info, nil
 }
@@ -96,9 +97,9 @@ type RollupBlockInfo struct {
 	*canonicalStateChainContract.CanonicalStateChainHeader `pretty:"Header"`
 
 	DataAvailability struct {
-		CelestiaHeight   uint64   `pretty:"Celestia Height"`
-		CelestiaDataRoot [32]byte `pretty:"Celestia Data Root"`
-		CelestiaTx       [32]byte `pretty:"Celestia Tx"`
+		CelestiaHeight     uint64 `pretty:"Celestia Height"`
+		CelestiaShareStart uint64 `pretty:"Shares Start"`
+		CelestiaShareLen   uint64 `pretty:"Shares"`
 	} `pretty:"Data Availability"`
 
 	Distance struct {
@@ -158,8 +159,8 @@ func (r *Rollup) GetBlockInfo(hash common.Hash) (*RollupBlockInfo, error) {
 
 	// set data availability
 	rbi.DataAvailability.CelestiaHeight = header.CelestiaHeight
-	rbi.DataAvailability.CelestiaDataRoot = header.CelestiaDataRoot
-	rbi.DataAvailability.CelestiaTx = header.CelestiaTxHash
+	rbi.DataAvailability.CelestiaShareStart = header.CelestiaShareStart
+	rbi.DataAvailability.CelestiaShareLen = header.CelestiaShareLen
 
 	return rbi, nil
 }

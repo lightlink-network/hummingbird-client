@@ -315,7 +315,11 @@ func (e *EthereumClient) DefendDataRootInclusion(blockHash common.Hash, proof *C
 
 	tx, err := e.http.challenge.DefendDataRootInclusion(transactor, blockHash, challengeContract.ChallengeDataAvailabilityChallengeDAProof{
 		RootNonce: proof.Nonce,
-		Proof:     *proof.WrappedProof,
+		DataRootTuple: challengeContract.DataRootTuple{
+			Height:   proof.Tuple.Height,
+			DataRoot: proof.Tuple.DataRoot,
+		},
+		Proof: *proof.WrappedProof,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to defend data root inclusion: %w", err)

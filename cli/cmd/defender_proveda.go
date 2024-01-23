@@ -16,7 +16,6 @@ import (
 )
 
 func init() {
-	DefenderProveDaCmd.Flags().String("tx", "", "celestia tx hash in which data was submitted")
 	DefenderProveDaCmd.Flags().Bool("json", false, "output proof in json format")
 	DefenderProveDaCmd.Flags().Bool("verify", false, "verify the proof against the L1 rollup contract")
 }
@@ -24,6 +23,10 @@ func init() {
 var DefenderProveDaCmd = &cobra.Command{
 	Use:   "prove-da",
 	Short: "prove-da will prove a data availability batch",
+	Args:  cobra.MinimumNArgs(1),
+	ArgAliases: []string{
+		"block",
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
 		logger := GetLogger(viper.GetString("log-type"))
@@ -36,14 +39,8 @@ var DefenderProveDaCmd = &cobra.Command{
 			Logger: logger.With("ctx", "Defender"),
 		})
 
-		rawTxHash, err := cmd.Flags().GetString("tx")
-		if err != nil {
-			logger.Error("Missing required tx hash from flag", "err", err)
-			panic(err)
-		}
-
-		txHash := common.HexToHash(rawTxHash)
-		proof, err := d.ProveDA(txHash)
+		blockHash := common.HexToHash(args[0])
+		proof, err := d.ProveDA(blockHash)
 		if err != nil {
 			logger.Error("Failed to prove data availability", "err", err)
 			panic(err)

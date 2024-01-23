@@ -97,7 +97,7 @@ func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChall
 	d.Opts.Logger.Info("DA challenge received", "block", blockHash.Hex(), "block_index", challenge.BlockIndex, "expiry", challenge.Expiry, "status", challenge.Status)
 
 	if challenge.Status != 1 {
-		return fmt.Errorf("challenge status must be 1")
+		return nil
 	}
 
 	celestiaTx, err := d.GetDAPointer(challenge.BlockHash)

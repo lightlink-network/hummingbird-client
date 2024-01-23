@@ -21,13 +21,30 @@ func BytesToBlob(ns string, buf []byte) (*blob.Blob, error) {
 
 func BlobToShares(b *blob.Blob) ([]shares.Share, error) {
 	_b := coretypes.Blob{
-		NamespaceVersion: b.Namespace().Version(),
 		NamespaceID:      b.NamespaceId,
 		Data:             b.Data,
 		ShareVersion:     uint8(b.ShareVersion),
+		NamespaceVersion: uint8(b.NamespaceVersion),
 	}
 
 	return shares.SplitBlobs(_b)
+}
+
+func NSSharesToShares(ns share.NamespacedShares) []shares.Share {
+	s := []shares.Share{}
+
+	for _, row := range ns {
+		for _, _nsShare := range row.Shares {
+			_share, err := shares.NewShare(_nsShare)
+			if err != nil {
+				panic(err)
+			}
+
+			s = append(s, *_share)
+		}
+	}
+
+	return s
 }
 
 // ShareDataStart returns the index of the first byte of the shares raw data.

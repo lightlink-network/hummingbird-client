@@ -98,3 +98,20 @@ func TestBundleTxInclusion(t *testing.T) {
 	// check if encTx bytes are included in encB bytes
 	assert.True(t, bytes.Contains(encB, encTx))
 }
+
+func TestFindHeaderShares(t *testing.T) {
+	b := newRandomBundle(5, true)
+
+	for i := 0; i < len(b.Blocks); i++ {
+
+		pointer, err := b.FindHeaderShares(b.Blocks[i].Hash(), "test")
+		assert.NoError(t, err)
+
+		header := &types.Header{}
+		err = rlp.DecodeBytes(pointer.Bytes(), header)
+
+		assert.NoError(t, err)
+		assert.Equal(t, b.Blocks[i].Hash(), header.Hash())
+	}
+
+}

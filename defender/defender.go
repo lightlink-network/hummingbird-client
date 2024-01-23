@@ -69,7 +69,11 @@ func (d *Defender) WatchAndDefendDAChallenges() error {
 		go func(challenge *challengeContract.ChallengeChallengeDAUpdate) {
 			defer wg.Done()
 
-			err := d.Store.StoreLastScannedBlockNumber(challenge.BlockIndex.Uint64())
+			header, err := d.Ethereum.GetRollupHeaderByHash(challenge.BlockHash)
+			if err != nil {
+				d.Opts.Logger.Error("error getting rollup header by hash:", "error", err)
+			}
+			err = d.Store.StoreLastScannedBlockNumber(header.Epoch)
 			if err != nil {
 				d.Opts.Logger.Error("error storing last scanned block number:", "error", err)
 			}

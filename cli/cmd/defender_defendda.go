@@ -13,8 +13,6 @@ import (
 
 func init() {
 	DefenderDefendDaCmd.Flags().Bool("dry", false, "dry run will not submit the rollup block to the L1 rollup contract, and will not upload real data to celestia")
-	DefenderDefendDaCmd.Flags().String("tx", "", "celestia tx hash in which data was submitted")
-	DefenderDefendDaCmd.MarkFlagRequired("tx")
 }
 
 var DefenderDefendDaCmd = &cobra.Command{

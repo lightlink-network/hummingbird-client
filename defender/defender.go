@@ -3,6 +3,7 @@ package defender
 import (
 	"fmt"
 	"hummingbird/node"
+	"time"
 
 	"log/slog"
 	"os"
@@ -18,8 +19,9 @@ import (
 )
 
 type Opts struct {
-	Logger *slog.Logger
-	DryRun bool // DryRun indicates whether or not to actually submit the block to the L1 rollup contract.
+	Logger      *slog.Logger
+	WorkerDelay time.Duration
+	DryRun      bool // DryRun indicates whether or not to actually submit the block to the L1 rollup contract.
 }
 
 type Defender struct {
@@ -32,6 +34,8 @@ func NewDefender(node *node.Node, opts *Opts) *Defender {
 }
 
 func (d *Defender) Start() error {
+	go d.retryActiveDAChallengesWorker()
+
 	if err := d.WatchAndDefendDAChallenges(); err != nil {
 		return fmt.Errorf("error watching and defending DA challenges: %w", err)
 	}
@@ -63,9 +67,13 @@ func (d *Defender) WatchAndDefendDAChallenges() error {
 		wg.Add(1)
 		go func(challenge *challengeContract.ChallengeChallengeDAUpdate) {
 			defer wg.Done()
-			err := d.handleDAChallenge(challenge)
+			err = d.handleDAChallenge(challenge)
 			if err != nil {
 				d.Opts.Logger.Error("error handling challenge:", "challenge", challenge, "error", err)
+				err := d.Store.StoreActiveDAChallenge(challenge)
+				if err != nil {
+					d.Opts.Logger.Error("error storing active DA challenge:", "challenge", challenge, "error", err)
+				}
 			}
 		}(challenge)
 	}
@@ -82,7 +90,7 @@ func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChall
 	d.Opts.Logger.Info("DA challenge received", "block", blockHash.Hex(), "block_index", challenge.BlockIndex, "expiry", challenge.Expiry, "status", challenge.Status)
 
 	if challenge.Status != 1 {
-		return nil
+		return fmt.Errorf("challenge status must be 1")
 	}
 
 	celestiaTx, err := d.GetDAPointer(challenge.BlockHash)
@@ -118,4 +126,43 @@ func (d *Defender) DefendDA(block common.Hash, txHash common.Hash) (*types.Trans
 
 func (d *Defender) ProveDA(txHash common.Hash) (*node.CelestiaProof, error) {
 	return d.Celestia.GetProof(txHash[:])
+}
+
+func (d *Defender) retryActiveDAChallengesWorker() {
+	ticker := time.NewTicker(d.Opts.WorkerDelay)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		d.Opts.Logger.Info("Retrying active DA challenges...")
+		challenges, err := d.Store.GetActiveDAChallenges()
+		if err != nil {
+			d.Opts.Logger.Error("error getting active DA challenges from store:", "error", err)
+			continue
+		}
+		for _, challenge := range challenges {
+			block := common.BytesToHash(challenge.BlockHash[:])
+
+			// Check if challenge has expired, if so delete from active challenges and continue
+			if challenge.Expiry.Int64() <= time.Now().Unix() {
+				d.Opts.Logger.Info("Active DA challenge has expired, deleting from active challenges", "challengeBlock", block, "expiry", challenge.Expiry)
+				err = d.Store.DeleteActiveDAChallenge(challenge.BlockHash)
+				if err != nil {
+					d.Opts.Logger.Error("error deleting active DA challenge:", "challengeBlock", block, "error", err)
+				}
+				continue
+			}
+
+			err = d.handleDAChallenge(challenge)
+			if err != nil {
+				d.Opts.Logger.Error("error retrying active DA challenge:", "challengeBlock", block, "error", err)
+				continue
+			}
+
+			err = d.Store.DeleteActiveDAChallenge(challenge.BlockHash)
+			if err != nil {
+				d.Opts.Logger.Error("error deleting active DA challenge:", "challengeBlock", block, "error", err)
+			}
+		}
+		d.Opts.Logger.Info("Active DA challenges retry worker finished")
+	}
 }

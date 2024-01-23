@@ -4,6 +4,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 )
 
 var (
@@ -14,7 +16,7 @@ var (
 	addressType, _ = abi.NewType("address", "address", nil)
 )
 
-func HashCanonicalStateChainHeader(header *CanonicalStateChainHeader) (common.Hash, error) {
+func HashCanonicalStateChainHeader(header *canonicalStateChainContract.CanonicalStateChainHeader) (common.Hash, error) {
 	args := abi.Arguments{
 		{Type: uint64Type},  // epoch
 		{Type: uint64Type},  // l2Height
@@ -24,9 +26,10 @@ func HashCanonicalStateChainHeader(header *CanonicalStateChainHeader) (common.Ha
 		{Type: bytes32Type}, // stateRoot
 		{Type: uint64Type},  // celestiaHeight
 		{Type: bytes32Type}, // celestiaDataRoot
+		{Type: bytes32Type}, // celestiaTxHash
 	}
 
-	enc, err := args.Pack(header.Epoch, header.L2Height, header.PrevHash, header.TxRoot, header.BlockRoot, header.StateRoot, header.CelestiaHeight, header.CelestiaDataRoot)
+	enc, err := args.Pack(header.Epoch, header.L2Height, header.PrevHash, header.TxRoot, header.BlockRoot, header.StateRoot, header.CelestiaHeight, header.CelestiaDataRoot, header.CelestiaTxHash)
 	if err != nil {
 		return common.Hash{}, err
 	}

@@ -3,7 +3,7 @@ package defender
 import (
 	"fmt"
 	"hummingbird/node"
-	"hummingbird/node/contracts"
+
 	"log/slog"
 	"os"
 	"os/signal"
@@ -13,6 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+
+	challengeContract "hummingbird/node/contracts/Challenge.sol"
 )
 
 type Opts struct {
@@ -37,7 +39,7 @@ func (d *Defender) Start() error {
 }
 
 func (d *Defender) WatchAndDefendDAChallenges() error {
-	challenges := make(chan *contracts.ChallengeContractChallengeDAUpdate)
+	challenges := make(chan *challengeContract.ChallengeChallengeDAUpdate)
 	subscription, err := d.Ethereum.WatchChallengesDA(challenges)
 	if err != nil {
 		return fmt.Errorf("error starting WatchChallengesDA: %w", err)
@@ -59,7 +61,7 @@ func (d *Defender) WatchAndDefendDAChallenges() error {
 
 	for challenge := range challenges {
 		wg.Add(1)
-		go func(challenge *contracts.ChallengeContractChallengeDAUpdate) {
+		go func(challenge *challengeContract.ChallengeChallengeDAUpdate) {
 			defer wg.Done()
 			err := d.handleDAChallenge(challenge)
 			if err != nil {
@@ -74,7 +76,7 @@ func (d *Defender) WatchAndDefendDAChallenges() error {
 	return nil
 }
 
-func (d *Defender) handleDAChallenge(challenge *contracts.ChallengeContractChallengeDAUpdate) error {
+func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChallengeDAUpdate) error {
 	blockHash := common.BytesToHash(challenge.BlockHash[:])
 
 	d.Opts.Logger.Info("DA challenge received", "block", blockHash.Hex(), "block_index", challenge.BlockIndex, "expiry", challenge.Expiry, "status", challenge.Status)
@@ -83,7 +85,7 @@ func (d *Defender) handleDAChallenge(challenge *contracts.ChallengeContractChall
 		return nil
 	}
 
-	celestiaTx, err := d.Store.GetDAPointer(challenge.BlockHash)
+	celestiaTx, err := d.GetDAPointer(challenge.BlockHash)
 	if err != nil {
 		return fmt.Errorf("error getting CelestiaTx: %w", err)
 	}

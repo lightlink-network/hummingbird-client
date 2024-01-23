@@ -15,6 +15,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
+
+	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
+	challengeContract "hummingbird/node/contracts/Challenge.sol"
+	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
 )
 
 // Ethereum is an ethereum client.
@@ -23,13 +27,13 @@ import (
 // - CanonicalStateChain.sol With with methods for getting and pushing
 // rollup block headers.
 type Ethereum interface {
-	GetRollupHeight() (uint64, error)                                                       // Get the current rollup block height.
-	GetHeight() (uint64, error)                                                             // Get the current block height of the Ethereum network.
-	GetRollupHead() (contracts.CanonicalStateChainHeader, error)                            // Get the latest rollup block header in the CanonicalStateChain.sol contract.
-	PushRollupHead(header *contracts.CanonicalStateChainHeader) (*types.Transaction, error) // Push a new rollup block header to the CanonicalStateChain.sol contract.
-	GetRollupHeader(index uint64) (contracts.CanonicalStateChainHeader, error)              // Get the rollup block header at the given index from the CanonicalStateChain.sol contract.
-	GetRollupHeaderByHash(hash common.Hash) (contracts.CanonicalStateChainHeader, error)    // Get the rollup block header with the given hash from the CanonicalStateChain.sol contract.
-	Wait(txHash common.Hash) (*types.Receipt, error)                                        // Wait for the given transaction to be mined.
+	GetRollupHeight() (uint64, error)                                                                         // Get the current rollup block height.
+	GetHeight() (uint64, error)                                                                               // Get the current block height of the Ethereum network.
+	GetRollupHead() (canonicalStateChainContract.CanonicalStateChainHeader, error)                            // Get the latest rollup block header in the CanonicalStateChain.sol contract.
+	PushRollupHead(header *canonicalStateChainContract.CanonicalStateChainHeader) (*types.Transaction, error) // Push a new rollup block header to the CanonicalStateChain.sol contract.
+	GetRollupHeader(index uint64) (canonicalStateChainContract.CanonicalStateChainHeader, error)              // Get the rollup block header at the given index from the CanonicalStateChain.sol contract.
+	GetRollupHeaderByHash(hash common.Hash) (canonicalStateChainContract.CanonicalStateChainHeader, error)    // Get the rollup block header with the given hash from the CanonicalStateChain.sol contract.
+	Wait(txHash common.Hash) (*types.Receipt, error)                                                          // Wait for the given transaction to be mined.
 	DAVerify(*CelestiaProof) (bool, error)
 	// Check if the data availability layer is verified.
 	// Challanges
@@ -38,7 +42,7 @@ type Ethereum interface {
 	ChallengeDataRootInclusion(index uint64) (*types.Transaction, common.Hash, error)
 	DefendDataRootInclusion(common.Hash, *CelestiaProof) (*types.Transaction, error)
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
-	WatchChallengesDA(c chan<- *contracts.ChallengeContractChallengeDAUpdate) (event.Subscription, error)
+	WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate) (event.Subscription, error)
 }
 
 type EthereumClient struct {
@@ -50,9 +54,9 @@ type EthereumHTTPClient struct {
 	signer              *ecdsa.PrivateKey
 	client              *ethclient.Client
 	chainId             *big.Int
-	canonicalStateChain *contracts.CanonicalStateChainContract
-	daOracle            *contracts.DAOracleContract
-	challenge           *contracts.ChallengeContract
+	canonicalStateChain *canonicalStateChainContract.CanonicalStateChain
+	daOracle            *daOracleContract.DAOracleContract
+	challenge           *challengeContract.Challenge
 	logger              *slog.Logger
 	opts                *EthereumHTTPClientOpts
 }
@@ -70,7 +74,7 @@ type EthereumHTTPClientOpts struct {
 
 type EthereumWSClient struct {
 	client    *ethclient.Client
-	challenge *contracts.ChallengeContract
+	challenge *challengeContract.Challenge
 	logger    *slog.Logger
 	opts      *EthereumWSClientOpts
 }
@@ -109,17 +113,17 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		return nil, fmt.Errorf("failed to connect to Ethereum: %w", err)
 	}
 
-	canonicalStateChain, err := contracts.NewCanonicalStateChainContract(opts.CanonicalStateChainAddress, client)
+	canonicalStateChain, err := canonicalStateChainContract.NewCanonicalStateChain(opts.CanonicalStateChainAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to CanonicalStateChain: %w", err)
 	}
 
-	daOracle, err := contracts.NewDAOracleContract(opts.DAOracleAddress, client)
+	daOracle, err := daOracleContract.NewDAOracleContract(opts.DAOracleAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to DAOracle: %w", err)
 	}
 
-	challenge, err := contracts.NewChallengeContract(opts.ChallengeAddress, client)
+	challenge, err := challengeContract.NewChallenge(opts.ChallengeAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Challenge: %w", err)
 	}
@@ -165,7 +169,7 @@ func NewEthereumWS(opts EthereumWSClientOpts) (*EthereumWSClient, error) {
 		return nil, fmt.Errorf("failed to connect to Ethereum WebSocket: %w", err)
 	}
 
-	challenge, err := contracts.NewChallengeContract(opts.ChallengeAddress, client)
+	challenge, err := challengeContract.NewChallenge(opts.ChallengeAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Challenge contract: %w", err)
 	}
@@ -205,12 +209,12 @@ func (e *EthereumClient) transactor() (*bind.TransactOpts, error) {
 }
 
 // GetRollupHead returns the latest rollup block header.
-func (e *EthereumClient) GetRollupHead() (contracts.CanonicalStateChainHeader, error) {
+func (e *EthereumClient) GetRollupHead() (canonicalStateChainContract.CanonicalStateChainHeader, error) {
 	return e.http.canonicalStateChain.GetHead(nil)
 }
 
 // PushRollupHead pushes a new rollup block header.
-func (e *EthereumClient) PushRollupHead(header *contracts.CanonicalStateChainHeader) (*types.Transaction, error) {
+func (e *EthereumClient) PushRollupHead(header *canonicalStateChainContract.CanonicalStateChainHeader) (*types.Transaction, error) {
 
 	transactor, err := e.transactor()
 	if err != nil {
@@ -221,12 +225,12 @@ func (e *EthereumClient) PushRollupHead(header *contracts.CanonicalStateChainHea
 }
 
 // GetRollupHeader returns the rollup block header at the given index.
-func (e *EthereumClient) GetRollupHeader(index uint64) (contracts.CanonicalStateChainHeader, error) {
+func (e *EthereumClient) GetRollupHeader(index uint64) (canonicalStateChainContract.CanonicalStateChainHeader, error) {
 	return e.http.canonicalStateChain.GetBlock(nil, big.NewInt(int64(index)))
 }
 
 // GetRollupHeaderByHash returns the rollup block header with the given hash.
-func (e *EthereumClient) GetRollupHeaderByHash(hash common.Hash) (contracts.CanonicalStateChainHeader, error) {
+func (e *EthereumClient) GetRollupHeaderByHash(hash common.Hash) (canonicalStateChainContract.CanonicalStateChainHeader, error) {
 	return e.http.canonicalStateChain.Headers(nil, hash)
 }
 
@@ -263,7 +267,13 @@ func (e *EthereumClient) Wait(txHash common.Hash) (*types.Receipt, error) {
 }
 
 func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
-	return e.http.daOracle.VerifyAttestation(nil, proof.Nonce, *proof.Tuple, *proof.WrappedProof)
+	// convert proof to daOracle format
+	wrappedProof := daOracleContract.BinaryMerkleProof{
+		SideNodes: proof.WrappedProof.SideNodes,
+		Key:       proof.WrappedProof.Key,
+		NumLeaves: proof.WrappedProof.NumLeaves,
+	}
+	return e.http.daOracle.VerifyAttestation(nil, proof.Nonce, *proof.Tuple, wrappedProof)
 }
 
 func (e *EthereumClient) GetChallengeFee() (*big.Int, error) {
@@ -303,7 +313,7 @@ func (e *EthereumClient) DefendDataRootInclusion(blockHash common.Hash, proof *C
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 
-	tx, err := e.http.challenge.DefendDataRootInclusion(transactor, blockHash, contracts.ChallengeDataAvailabilityChallengeDAProof{
+	tx, err := e.http.challenge.DefendDataRootInclusion(transactor, blockHash, challengeContract.ChallengeDataAvailabilityChallengeDAProof{
 		RootNonce: proof.Nonce,
 		Proof:     *proof.WrappedProof,
 	})
@@ -342,7 +352,7 @@ func (e *EthereumClient) GetDataRootInlcusionChallenge(blockHash common.Hash) (c
 	}, nil
 }
 
-func (e *EthereumClient) WatchChallengesDA(c chan<- *contracts.ChallengeContractChallengeDAUpdate) (event.Subscription, error) {
+func (e *EthereumClient) WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate) (event.Subscription, error) {
 	opts := &bind.WatchOpts{}
 	topics := make([][32]byte, 0)
 	addresses := make([]*big.Int, 0)
@@ -353,17 +363,17 @@ func (e *EthereumClient) WatchChallengesDA(c chan<- *contracts.ChallengeContract
 // MOCK CLIENT FOR TESTING
 
 type ethereumMock struct {
-	rollupHeaders map[common.Hash]contracts.CanonicalStateChainHeader
+	rollupHeaders map[common.Hash]canonicalStateChainContract.CanonicalStateChainHeader
 	indexToHash   map[uint64]common.Hash
 	head          int64
 	height        uint64
 }
 
 // NewEthereumMock returns a new EthereumMock client. It is used for testing.
-func NewEthereumMock(genisis *contracts.CanonicalStateChainHeader) *ethereumMock {
+func NewEthereumMock(genisis *canonicalStateChainContract.CanonicalStateChainHeader) *ethereumMock {
 
 	e := &ethereumMock{
-		rollupHeaders: make(map[common.Hash]contracts.CanonicalStateChainHeader),
+		rollupHeaders: make(map[common.Hash]canonicalStateChainContract.CanonicalStateChainHeader),
 		indexToHash:   make(map[uint64]common.Hash),
 		head:          -1,
 	}
@@ -377,12 +387,12 @@ func (e *ethereumMock) Wait(txHash common.Hash) (*types.Receipt, error) {
 }
 
 // GetRollupHead returns the latest rollup block header.
-func (e *ethereumMock) GetRollupHead() (contracts.CanonicalStateChainHeader, error) {
+func (e *ethereumMock) GetRollupHead() (canonicalStateChainContract.CanonicalStateChainHeader, error) {
 	return e.GetRollupHeader(uint64(e.head))
 }
 
 // PushRollupHead pushes a new rollup block header.
-func (e *ethereumMock) PushRollupHead(header *contracts.CanonicalStateChainHeader) (*types.Transaction, error) {
+func (e *ethereumMock) PushRollupHead(header *canonicalStateChainContract.CanonicalStateChainHeader) (*types.Transaction, error) {
 	index := e.head + 1
 
 	hash, err := contracts.HashCanonicalStateChainHeader(header)
@@ -399,17 +409,17 @@ func (e *ethereumMock) PushRollupHead(header *contracts.CanonicalStateChainHeade
 }
 
 // GetRollupHeader returns the rollup block header at the given index.
-func (e *ethereumMock) GetRollupHeader(index uint64) (contracts.CanonicalStateChainHeader, error) {
+func (e *ethereumMock) GetRollupHeader(index uint64) (canonicalStateChainContract.CanonicalStateChainHeader, error) {
 	hash, ok := e.indexToHash[index]
 	if !ok {
-		return contracts.CanonicalStateChainHeader{}, nil
+		return canonicalStateChainContract.CanonicalStateChainHeader{}, nil
 	}
 
 	return e.rollupHeaders[hash], nil
 }
 
 // GetRollupHeaderByHash returns the rollup block header with the given hash.
-func (e *ethereumMock) GetRollupHeaderByHash(hash common.Hash) (contracts.CanonicalStateChainHeader, error) {
+func (e *ethereumMock) GetRollupHeaderByHash(hash common.Hash) (canonicalStateChainContract.CanonicalStateChainHeader, error) {
 	return e.rollupHeaders[hash], nil
 }
 

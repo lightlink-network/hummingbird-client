@@ -5,6 +5,8 @@ import (
 	"hummingbird/node/contracts"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 )
 
 type RollupInfo struct {
@@ -13,15 +15,15 @@ type RollupInfo struct {
 	L2BlocksTodo     uint64 `pretty:"L2 Blocks Todo"`
 
 	LatestRollup struct {
-		Hash                                 common.Hash `pretty:"Hash"`
-		BundleSize                           uint64      `pretty:"Bundle Size"`
-		*contracts.CanonicalStateChainHeader `pretty:"Header"`
+		Hash                                                   common.Hash `pretty:"Hash"`
+		BundleSize                                             uint64      `pretty:"Bundle Size"`
+		*canonicalStateChainContract.CanonicalStateChainHeader `pretty:"Header"`
 	} `pretty:"Latest Rollup Block"`
 
 	DataAvailability struct {
 		CelestiaHeight   uint64   `pretty:"Celestia Height"`
 		CelestiaDataRoot [32]byte `pretty:"Celestia Data Root"`
-		CelestiaTx       string   `pretty:"Celestia Tx"`
+		CelestiaTx       [32]byte `pretty:"Celestia Tx"`
 	} `pretty:"Data Availability"`
 }
 
@@ -83,27 +85,20 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	// get data availability
 	info.DataAvailability.CelestiaHeight = latestRollupHead.CelestiaHeight
 	info.DataAvailability.CelestiaDataRoot = latestRollupHead.CelestiaDataRoot
-	info.DataAvailability.CelestiaTx = "Unknown"
-
-	pointer, err := r.Store.GetDAPointer(latestRollupHash)
-	if err != nil || pointer == nil {
-		r.Opts.Logger.Warn("Failed to get celestia pointer", "error", err)
-	} else {
-		info.DataAvailability.CelestiaTx = pointer.TxHash.Hex()
-	}
+	info.DataAvailability.CelestiaTx = latestRollupHead.CelestiaTxHash
 
 	return info, nil
 }
 
 type RollupBlockInfo struct {
-	Hash                                 common.Hash `pretty:"Hash"`
-	BundleSize                           uint64      `pretty:"Bundle Size"`
-	*contracts.CanonicalStateChainHeader `pretty:"Header"`
+	Hash                                                   common.Hash `pretty:"Hash"`
+	BundleSize                                             uint64      `pretty:"Bundle Size"`
+	*canonicalStateChainContract.CanonicalStateChainHeader `pretty:"Header"`
 
 	DataAvailability struct {
 		CelestiaHeight   uint64   `pretty:"Celestia Height"`
 		CelestiaDataRoot [32]byte `pretty:"Celestia Data Root"`
-		CelestiaTx       string   `pretty:"Celestia Tx"`
+		CelestiaTx       [32]byte `pretty:"Celestia Tx"`
 	} `pretty:"Data Availability"`
 
 	Distance struct {
@@ -164,15 +159,7 @@ func (r *Rollup) GetBlockInfo(hash common.Hash) (*RollupBlockInfo, error) {
 	// set data availability
 	rbi.DataAvailability.CelestiaHeight = header.CelestiaHeight
 	rbi.DataAvailability.CelestiaDataRoot = header.CelestiaDataRoot
-	rbi.DataAvailability.CelestiaTx = "Unknown"
-
-	// get celestia pointer
-	pointer, err := r.Store.GetDAPointer(hash)
-	if err != nil || pointer == nil {
-		r.Opts.Logger.Warn("Failed to get celestia pointer", "error", err)
-	} else {
-		rbi.DataAvailability.CelestiaTx = pointer.TxHash.Hex()
-	}
+	rbi.DataAvailability.CelestiaTx = header.CelestiaTxHash
 
 	return rbi, nil
 }

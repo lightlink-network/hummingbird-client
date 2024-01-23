@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+
+	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 )
 
 type Opts struct {
@@ -105,7 +107,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	}
 
 	// 7. create the rollup header
-	header := &contracts.CanonicalStateChainHeader{
+	header := &canonicalStateChainContract.CanonicalStateChainHeader{
 		Epoch:            epoch,
 		L2Height:         bundle.Height(),
 		PrevHash:         prevHash,
@@ -114,6 +116,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 		StateRoot:        bundle.StateRoot(),
 		CelestiaHeight:   pointer.Height,
 		CelestiaDataRoot: pointer.DataRoot,
+		CelestiaTxHash:   pointer.TxHash,
 	}
 
 	// 8. calculate the hash of the header

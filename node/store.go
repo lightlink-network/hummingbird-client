@@ -19,6 +19,8 @@ type KVStore interface {
 	StoreActiveDAChallenge(c *challengeContract.ChallengeChallengeDAUpdate) error
 	GetActiveDAChallenges() ([]*challengeContract.ChallengeChallengeDAUpdate, error)
 	DeleteActiveDAChallenge(blockHash common.Hash) error
+	StoreLastScannedBlockNumber(blockNumber uint64) error
+	GetLastScannedBlockNumber() (uint64, error)
 }
 
 type LDBStore struct {
@@ -123,4 +125,41 @@ func (l *LDBStore) DeleteActiveDAChallenge(blockHash common.Hash) error {
 	}
 
 	return nil
+}
+
+func (l *LDBStore) StoreLastScannedBlockNumber(blockNumber uint64) error {
+	if l.db == nil {
+		return errors.New("no store")
+	}
+
+	buf, err := json.Marshal(blockNumber)
+	if err != nil {
+		return fmt.Errorf("failed to marshal block number: %w", err)
+	}
+
+	err = l.Put([]byte("last_scanned_block_number"), buf)
+	if err != nil {
+		return fmt.Errorf("failed to store block number: %w", err)
+	}
+
+	return nil
+}
+
+func (l *LDBStore) GetLastScannedBlockNumber() (uint64, error) {
+	if l.db == nil {
+		return 0, errors.New("no store")
+	}
+
+	buf, err := l.Get([]byte("last_scanned_block_number"))
+	if err != nil {
+		return 0, fmt.Errorf("failed to get block number from store: %w", err)
+	}
+
+	var blockNumber uint64
+	err = json.Unmarshal(buf, &blockNumber)
+	if err != nil {
+		return 0, fmt.Errorf("failed to unmarshal block number: %w", err)
+	}
+
+	return blockNumber, nil
 }

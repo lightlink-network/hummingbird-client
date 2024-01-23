@@ -44,7 +44,8 @@ func (d *Defender) Start() error {
 
 func (d *Defender) WatchAndDefendDAChallenges() error {
 	challenges := make(chan *challengeContract.ChallengeChallengeDAUpdate)
-	subscription, err := d.Ethereum.WatchChallengesDA(challenges)
+	lastScannedBlockNumber, _ := d.Store.GetLastScannedBlockNumber()
+	subscription, err := d.Ethereum.WatchChallengesDA(challenges, lastScannedBlockNumber)
 	if err != nil {
 		return fmt.Errorf("error starting WatchChallengesDA: %w", err)
 	}
@@ -67,6 +68,12 @@ func (d *Defender) WatchAndDefendDAChallenges() error {
 		wg.Add(1)
 		go func(challenge *challengeContract.ChallengeChallengeDAUpdate) {
 			defer wg.Done()
+
+			err := d.Store.StoreLastScannedBlockNumber(challenge.BlockIndex.Uint64())
+			if err != nil {
+				d.Opts.Logger.Error("error storing last scanned block number:", "error", err)
+			}
+
 			err = d.handleDAChallenge(challenge)
 			if err != nil {
 				d.Opts.Logger.Error("error handling challenge:", "challenge", challenge, "error", err)

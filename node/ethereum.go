@@ -42,7 +42,7 @@ type Ethereum interface {
 	ChallengeDataRootInclusion(index uint64) (*types.Transaction, common.Hash, error)
 	DefendDataRootInclusion(common.Hash, *CelestiaProof) (*types.Transaction, error)
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
-	WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate) (event.Subscription, error)
+	WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate, startBlock uint64) (event.Subscription, error)
 }
 
 type EthereumClient struct {
@@ -352,12 +352,18 @@ func (e *EthereumClient) GetDataRootInclusionChallenge(blockHash common.Hash) (c
 	}, nil
 }
 
-func (e *EthereumClient) WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate) (event.Subscription, error) {
+func (e *EthereumClient) WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate, startBlock uint64) (event.Subscription, error) {
 	opts := &bind.WatchOpts{}
-	topics := make([][32]byte, 0)
-	addresses := make([]*big.Int, 0)
+	blockHash := make([][32]byte, 0)
+	blockIndex := make([]*big.Int, 0)
 	statuses := make([]uint8, 0)
-	return e.ws.challenge.WatchChallengeDAUpdate(opts, c, topics, addresses, statuses)
+
+	// Create a new bind.WatchOpts that starts from the next block
+	if startBlock > 0 {
+		opts.Start = &startBlock
+	}
+
+	return e.ws.challenge.WatchChallengeDAUpdate(opts, c, blockHash, blockIndex, statuses)
 }
 
 // MOCK CLIENT FOR TESTING

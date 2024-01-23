@@ -97,7 +97,7 @@ func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChall
 
 	d.Opts.Logger.Info("Found CelestiaTx", "tx_hash", celestiaTx.TxHash.Hex(), "block_hash", blockHash.Hex())
 
-	tx, err := d.DefendDA(challenge.BlockHash, celestiaTx.TxHash)
+	tx, err := d.DefendDA(challenge.BlockHash)
 	if err != nil {
 		return fmt.Errorf("error defending DA: %w", err)
 	}
@@ -106,8 +106,8 @@ func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChall
 	return nil
 }
 
-func (d *Defender) DefendDA(block common.Hash, txHash common.Hash) (*types.Transaction, error) {
-	proof, err := d.ProveDA(txHash)
+func (d *Defender) DefendDA(block common.Hash) (*types.Transaction, error) {
+	proof, err := d.ProveDA(block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prove data availability: %w", err)
 	}
@@ -116,6 +116,15 @@ func (d *Defender) DefendDA(block common.Hash, txHash common.Hash) (*types.Trans
 	return d.Ethereum.DefendDataRootInclusion(block, proof)
 }
 
-func (d *Defender) ProveDA(txHash common.Hash) (*node.CelestiaProof, error) {
-	return d.Celestia.GetProof(txHash[:])
+func (d *Defender) ProveDA(block common.Hash) (*node.CelestiaProof, error) {
+	pointer, err := d.GetDAPointer(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Celestia pointer: %w", err)
+	}
+
+	if pointer == nil {
+		return nil, fmt.Errorf("no Celestia pointer found")
+	}
+
+	return d.Celestia.GetProof(pointer)
 }

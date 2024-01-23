@@ -46,7 +46,7 @@ type CelestiaProof struct {
 type Celestia interface {
 	Namespace() string
 	PublishBundle(blocks Bundle) (*CelestiaPointer, error)
-	GetProof(txHash []byte) (*CelestiaProof, error)
+	GetProof(pointer *CelestiaPointer) (*CelestiaProof, error)
 }
 
 type CelestiaClientOpts struct {
@@ -184,29 +184,19 @@ func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gas
 	return pointer, err
 }
 
-func (c *CelestiaClient) GetProof(txHash []byte) (*CelestiaProof, error) {
+func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error) {
 	ctx := context.Background()
 
-	// Get the tx
-	tx, err := c.trpc.Tx(ctx, txHash, true)
-	if err != nil {
-		return nil, err
-	}
+	blockHeight := int64(pointer.Height)
 
 	// Get the block that contains the tx
-	blockRes, err := c.trpc.Block(context.Background(), &tx.Height)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the tx share range inside the block
-	shareRange, err := square.TxShareRange(blockRes.Block.Data.Txs.ToSliceOfBytes(), int(tx.Index), blockRes.Block.Header.Version.App)
+	blockRes, err := c.trpc.Block(context.Background(), &blockHeight)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the shares proof
-	sharesProofs, err := c.trpc.ProveShares(ctx, uint64(tx.Height), uint64(shareRange.Start), uint64(shareRange.End))
+	sharesProofs, err := c.trpc.ProveShares(ctx, pointer.Height, pointer.ShareStart, pointer.ShareStart+pointer.ShareLen)
 	if err != nil {
 		return nil, err
 	}
@@ -220,19 +210,19 @@ func (c *CelestiaClient) GetProof(txHash []byte) (*CelestiaProof, error) {
 	queryClient := blobstreamtypes.NewQueryClient(c.grcp)
 
 	// Get the data commitment range for the block height
-	resp, err := queryClient.DataCommitmentRangeForHeight(ctx, &blobstreamtypes.QueryDataCommitmentRangeForHeightRequest{Height: uint64(tx.Height)})
+	resp, err := queryClient.DataCommitmentRangeForHeight(ctx, &blobstreamtypes.QueryDataCommitmentRangeForHeightRequest{Height: uint64(blockHeight)})
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the data root inclusion proof
-	dcProof, err := c.trpc.DataRootInclusionProof(ctx, uint64(tx.Height), resp.DataCommitment.BeginBlock, resp.DataCommitment.EndBlock)
+	dcProof, err := c.trpc.DataRootInclusionProof(ctx, uint64(blockHeight), resp.DataCommitment.BeginBlock, resp.DataCommitment.EndBlock)
 	if err != nil {
 		return nil, err
 	}
 
 	tuple := daOracleContract.DataRootTuple{
-		Height:   big.NewInt(int64(tx.Height)),
+		Height:   big.NewInt(blockHeight),
 		DataRoot: *(*[32]byte)(blockRes.Block.DataHash),
 	}
 
@@ -300,37 +290,15 @@ func (c *celestiaMock) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
 }
 
 // returns a mock proof, cannot be used for verification
-func (c *celestiaMock) GetProof(hash []byte) (*CelestiaProof, error) {
-	if c.fakeProof {
-		return &CelestiaProof{
-			Nonce: big.NewInt(0),
-			Tuple: &daOracleContract.DataRootTuple{
-				Height:   big.NewInt(0),
-				DataRoot: common.BytesToHash(hash),
-			},
-			WrappedProof: &challengeContract.BinaryMerkleProof{
-				SideNodes: make([][32]byte, 0),
-				Key:       big.NewInt(0),
-				NumLeaves: big.NewInt(0),
-			},
-		}, nil
+func (c *celestiaMock) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error) {
+	if !c.fakeProof {
+		return nil, fmt.Errorf("failed")
 	}
-
-	_, ok := c.blocks[common.BytesToHash(hash)]
-	if !ok {
-		return nil, blob.ErrBlobNotFound
-	}
-
-	p, ok := c.pointers[common.BytesToHash(hash)]
-	if !ok {
-		return nil, blob.ErrBlobNotFound
-	}
-
 	return &CelestiaProof{
 		Nonce: big.NewInt(0),
 		Tuple: &daOracleContract.DataRootTuple{
-			Height:   big.NewInt(int64(p.Height)),
-			DataRoot: p.Commitment,
+			Height:   new(big.Int).SetUint64(pointer.Height),
+			DataRoot: pointer.Commitment,
 		},
 		WrappedProof: &challengeContract.BinaryMerkleProof{
 			SideNodes: make([][32]byte, 0),
@@ -338,4 +306,5 @@ func (c *celestiaMock) GetProof(hash []byte) (*CelestiaProof, error) {
 			NumLeaves: big.NewInt(0),
 		},
 	}, nil
+
 }

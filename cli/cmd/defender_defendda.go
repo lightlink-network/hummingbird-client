@@ -49,10 +49,8 @@ var DefenderDefendDaCmd = &cobra.Command{
 
 		// get block hash and tx hash from args/flags
 		blockHash := common.HexToHash(args[0])
-		rawTxHash, _ := cmd.Flags().GetString("tx")
-		txHash := common.HexToHash(rawTxHash)
 
-		tx, err := d.DefendDA(blockHash, txHash)
+		tx, err := d.DefendDA(blockHash)
 		if err != nil {
 			logger.Error("Failed to defend data availability", "err", err)
 			panic(err)

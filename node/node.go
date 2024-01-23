@@ -107,9 +107,9 @@ func (n *Node) GetDAPointer(hash common.Hash) (*CelestiaPointer, error) {
 
 	// get pointer from header
 	pointer = &CelestiaPointer{
-		Height:   header.CelestiaHeight,
-		TxHash:   header.CelestiaTxHash,
-		DataRoot: header.CelestiaDataRoot,
+		Height:     header.CelestiaHeight,
+		ShareStart: header.CelestiaShareStart,
+		ShareLen:   header.CelestiaShareLen,
 	}
 
 	return pointer, nil

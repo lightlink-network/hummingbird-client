@@ -108,15 +108,15 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 
 	// 7. create the rollup header
 	header := &canonicalStateChainContract.CanonicalStateChainHeader{
-		Epoch:            epoch,
-		L2Height:         bundle.Height(),
-		PrevHash:         prevHash,
-		TxRoot:           bundle.TxRoot(),
-		BlockRoot:        bundle.BlockRoot(),
-		StateRoot:        bundle.StateRoot(),
-		CelestiaHeight:   pointer.Height,
-		CelestiaDataRoot: pointer.DataRoot,
-		CelestiaTxHash:   pointer.TxHash,
+		Epoch:              epoch,
+		L2Height:           bundle.Height(),
+		PrevHash:           prevHash,
+		TxRoot:             bundle.TxRoot(),
+		BlockRoot:          bundle.BlockRoot(),
+		StateRoot:          bundle.StateRoot(),
+		CelestiaHeight:     pointer.Height,
+		CelestiaShareStart: pointer.ShareStart,
+		CelestiaShareLen:   pointer.ShareLen,
 	}
 
 	// 8. calculate the hash of the header

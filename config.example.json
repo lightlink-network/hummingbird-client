@@ -26,5 +26,8 @@
     "l2pollDelay": 10000,
     "storeCelestiaPointers": true,
     "storeHeaders": true
+  },
+  "defender": {
+    "workerDelay": 60000
   }
 }

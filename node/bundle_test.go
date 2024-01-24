@@ -13,12 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func randHash() common.Hash {
-	buf := make([]byte, 32)
-	crand.Read(buf)
-	return common.BytesToHash(buf)
-}
-
 func randAddr() common.Address {
 	buf := make([]byte, 20)
 	crand.Read(buf)

@@ -5,6 +5,7 @@ import (
 	"hummingbird/defender"
 	"hummingbird/node"
 	"hummingbird/utils"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -22,7 +23,8 @@ var DefenderStartCmd = &cobra.Command{
 		utils.NoErr(err)
 
 		d := defender.NewDefender(n, &defender.Opts{
-			Logger: logger.With("ctx", "Defender"),
+			Logger:      logger.With("ctx", "Defender"),
+			WorkerDelay: time.Duration(cfg.Defender.WorkerDelay) * time.Millisecond,
 		})
 
 		err = d.Start()

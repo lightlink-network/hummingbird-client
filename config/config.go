@@ -33,7 +33,9 @@ type Config struct {
 		StoreCelestiaPointers bool   `mapstructure:"storeCelestiaPointers"`
 		StoreHeaders          bool   `mapstructure:"storeHeaders"`
 	} `mapstructure:"rollup"`
-
+	Defender struct {
+		WorkerDelay int `mapstructure:"workerDelay"`
+	} `mapstructure:"defender"`
 	// Not typically set in config file.
 	DryRun bool `mapstructure:"dryRun,omitempty"`
 }

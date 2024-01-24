@@ -13,8 +13,6 @@ import (
 
 func init() {
 	DefenderDefendDaCmd.Flags().Bool("dry", false, "dry run will not submit the rollup block to the L1 rollup contract, and will not upload real data to celestia")
-	DefenderDefendDaCmd.Flags().String("tx", "", "celestia tx hash in which data was submitted")
-	DefenderDefendDaCmd.MarkFlagRequired("tx")
 }
 
 var DefenderDefendDaCmd = &cobra.Command{
@@ -49,10 +47,8 @@ var DefenderDefendDaCmd = &cobra.Command{
 
 		// get block hash and tx hash from args/flags
 		blockHash := common.HexToHash(args[0])
-		rawTxHash, _ := cmd.Flags().GetString("tx")
-		txHash := common.HexToHash(rawTxHash)
 
-		tx, err := d.DefendDA(blockHash, txHash)
+		tx, err := d.DefendDA(blockHash)
 		if err != nil {
 			logger.Error("Failed to defend data availability", "err", err)
 			panic(err)

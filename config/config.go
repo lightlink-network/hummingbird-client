@@ -21,6 +21,7 @@ type Config struct {
 		DaOracle                string `mapstructure:"daOracle"`
 		GasPriceIncreasePercent int    `mapstructure:"gasPriceIncreasePercent"`
 		Challenge               string `mapstructure:"challenge"`
+		ChainLoader             string `mapstructure:"chainLoader"`
 	} `mapstructure:"ethereum"`
 	LightLink struct {
 		Endpoint string `mapstructure:"endpoint"`

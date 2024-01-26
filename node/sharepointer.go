@@ -11,7 +11,7 @@ type ShareRange struct {
 	End   uint64
 }
 
-// SharePointer is a pointer to some data inside a group of shares
+// SharePointer is a pointer to some data inside a group of shares.
 type SharePointer struct {
 	shares     []shares.Share
 	StartShare int
@@ -19,7 +19,7 @@ type SharePointer struct {
 }
 
 func NewSharePointer(_shares []shares.Share, startShare int, startIndex int, endShare int, endIndex int) *SharePointer {
-	// add the start range
+	// 1. add the start range
 	ranges := []ShareRange{
 		{
 			Start: uint64(startIndex) + uint64(utils.ShareDataStart(_shares[startShare])),
@@ -27,7 +27,7 @@ func NewSharePointer(_shares []shares.Share, startShare int, startIndex int, end
 		},
 	}
 
-	// add the middle ranges
+	// 2. add the middle ranges
 	for i := startShare + 1; i < endShare; i++ {
 		r := ShareRange{
 			Start: uint64(utils.ShareDataStart(_shares[i])),
@@ -37,7 +37,7 @@ func NewSharePointer(_shares []shares.Share, startShare int, startIndex int, end
 		ranges = append(ranges, r)
 	}
 
-	// add the end range
+	// 3. add the end range
 	if startShare != endShare {
 		ranges = append(ranges, ShareRange{
 			Start: uint64(utils.ShareDataStart(_shares[endShare])),

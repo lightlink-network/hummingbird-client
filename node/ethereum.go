@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
+	tendTypes "github.com/tendermint/tendermint/types"
 
 	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 	chainloaderContract "hummingbird/node/contracts/ChainLoader.sol"
@@ -45,6 +46,9 @@ type Ethereum interface {
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
 	WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate) (event.Subscription, error)
 	FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error)
+
+	// Data Loading
+	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof) (*types.Transaction, error)
 }
 
 type EthereumClient struct {
@@ -379,6 +383,20 @@ func (e *EthereumClient) WatchChallengesDA(c chan<- *challengeContract.Challenge
 
 func (e *EthereumClient) FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error) {
 	return e.ws.challenge.FilterChallengeDAUpdate(opts, _blockHash, _blockIndex, _status)
+}
+
+func (e *EthereumClient) ProvideShares(rblock common.Hash, proof *tendTypes.ShareProof) (*types.Transaction, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	p, err := contracts.NewShareProof(proof)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert proof: %w", err)
+	}
+
+	return e.http.chainLoader.LoadShares(transactor, rblock, *p)
 }
 
 // MOCK CLIENT FOR TESTING

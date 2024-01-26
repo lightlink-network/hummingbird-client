@@ -3,6 +3,7 @@ package node
 import (
 	"hummingbird/utils"
 
+	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -75,4 +76,20 @@ func (b *Bundle) IsUnderTxLimit() (bool, uint64, uint64, error) {
 		return false, bundleSizeLimit, bundleEncodedSize, nil
 	}
 	return true, bundleSizeLimit, bundleEncodedSize, nil
+}
+
+func (b *Bundle) Blob(namespace string) (*blob.Blob, error) {
+	// 1. encode the bundle to RLP
+	bundleRLP, err := b.EncodeRLP()
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. get the blob
+	return utils.BytesToBlob(namespace, bundleRLP)
+}
+
+type ShareRange struct {
+	Start uint64
+	End   uint64
 }

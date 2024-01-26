@@ -48,7 +48,7 @@ type Ethereum interface {
 	FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error)
 
 	// Data Loading
-	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof) (*types.Transaction, error)
+	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
 }
 
 type EthereumClient struct {
@@ -385,13 +385,26 @@ func (e *EthereumClient) FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHa
 	return e.ws.challenge.FilterChallengeDAUpdate(opts, _blockHash, _blockIndex, _status)
 }
 
-func (e *EthereumClient) ProvideShares(rblock common.Hash, proof *tendTypes.ShareProof) (*types.Transaction, error) {
+func (e *EthereumClient) ProvideShares(rblock common.Hash, proof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error) {
 	transactor, err := e.transactor()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 
-	p, err := contracts.NewShareProof(proof)
+	attestationProof := chainloaderContract.AttestationProof{
+		TupleRootNonce: celProof.Nonce,
+		Tuple: chainloaderContract.DataRootTuple{
+			Height:   celProof.Tuple.Height,
+			DataRoot: celProof.Tuple.DataRoot,
+		},
+		Proof: chainloaderContract.BinaryMerkleProof{
+			SideNodes: celProof.WrappedProof.SideNodes,
+			Key:       celProof.WrappedProof.Key,
+			NumLeaves: celProof.WrappedProof.NumLeaves,
+		},
+	}
+
+	p, err := contracts.NewShareProof(proof, attestationProof)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert proof: %w", err)
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
+	chainloaderContract "hummingbird/node/contracts/ChainLoader.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
 	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
 )
@@ -58,6 +59,7 @@ type EthereumHTTPClient struct {
 	canonicalStateChain *canonicalStateChainContract.CanonicalStateChain
 	daOracle            *daOracleContract.DAOracleContract
 	challenge           *challengeContract.Challenge
+	chainLoader         *chainloaderContract.ChainLoader
 	logger              *slog.Logger
 	opts                *EthereumHTTPClientOpts
 }
@@ -68,6 +70,7 @@ type EthereumHTTPClientOpts struct {
 	CanonicalStateChainAddress common.Address
 	DAOracleAddress            common.Address
 	ChallengeAddress           common.Address
+	ChainLoaderAddress         common.Address
 	Logger                     *slog.Logger
 	DryRun                     bool
 	GasPriceIncreasePercent    *big.Int
@@ -129,6 +132,11 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		return nil, fmt.Errorf("failed to connect to Challenge: %w", err)
 	}
 
+	chainLoader, err := chainloaderContract.NewChainLoader(opts.ChainLoaderAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to ChainLoader: %w", err)
+	}
+
 	chainId, err := client.ChainID(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chainId: %w", err)
@@ -146,6 +154,9 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 	if ok, _ := utils.IsContract(client, opts.ChallengeAddress); !ok {
 		opts.Logger.Warn("contract not found for Challenge at given Address", "address", opts.ChallengeAddress.Hex(), "endpoint", opts.Endpoint)
 	}
+	if ok, _ := utils.IsContract(client, opts.ChainLoaderAddress); !ok {
+		opts.Logger.Warn("contract not found for ChainLoader at given Address", "address", opts.ChainLoaderAddress.Hex(), "endpoint", opts.Endpoint)
+	}
 
 	return &EthereumHTTPClient{
 		signer:              opts.Signer,
@@ -154,6 +165,7 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		canonicalStateChain: canonicalStateChain,
 		daOracle:            daOracle,
 		challenge:           challenge,
+		chainLoader:         chainLoader,
 		logger:              opts.Logger,
 		opts:                &opts,
 	}, nil

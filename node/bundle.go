@@ -88,8 +88,3 @@ func (b *Bundle) Blob(namespace string) (*blob.Blob, error) {
 	// 2. get the blob
 	return utils.BytesToBlob(namespace, bundleRLP)
 }
-
-type ShareRange struct {
-	Start uint64
-	End   uint64
-}

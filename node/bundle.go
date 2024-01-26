@@ -114,11 +114,12 @@ func (b *Bundle) Blob(namespace string) (*blob.Blob, error) {
 }
 
 // FinderHeaderShares finds the shares in the bundle which contain the header
+// Returns a pointer to the data in the shares
 func (b *Bundle) FindHeaderShares(hash common.Hash, namespace string) (*SharePointer, error) {
 	// 1. find the block with the given hash
 	var block *types.Block
 	for _, b := range b.Blocks {
-		if b.Hash() == hash {
+		if b.Hash().Hex() == hash.Hex() {
 			block = b
 			break
 		}

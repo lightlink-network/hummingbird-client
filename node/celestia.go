@@ -17,12 +17,14 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/celestiaorg/celestia-app/pkg/square"
 	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
 	blobstreamtypes "github.com/celestiaorg/celestia-app/x/qgb/types"
 
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
 	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
+	"hummingbird/utils"
 )
 
 // CelestiaPointer is a pointer to a Celestia header
@@ -47,6 +49,7 @@ type Celestia interface {
 	Namespace() string
 	PublishBundle(blocks Bundle) (*CelestiaPointer, error)
 	GetProof(pointer *CelestiaPointer) (*CelestiaProof, error)
+	GetShares(pointer *CelestiaPointer) ([]shares.Share, error)
 }
 
 type CelestiaClientOpts struct {
@@ -245,6 +248,30 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 	return proof, nil
 }
 
+func (c *CelestiaClient) GetShares(pointer *CelestiaPointer) ([]shares.Share, error) {
+	ctx := context.Background()
+
+	// 1. Namespace
+	ns, err := share.NewBlobNamespaceV0([]byte(c.Namespace()))
+	if err != nil {
+		return nil, fmt.Errorf("GetBundle: failed to get namespace: %w", err)
+	}
+
+	// 0. Get the header
+	h, err := c.client.Header.GetByHeight(ctx, pointer.Height)
+	if err != nil {
+		return nil, fmt.Errorf("GetBundle: failed to get header: %w", err)
+	}
+
+	// 3. Get the shares
+	s, err := c.client.Share.GetSharesByNamespace(ctx, h, ns)
+	if err != nil {
+		return nil, fmt.Errorf("GetBundle: failed to get shares: %w", err)
+	}
+
+	return utils.NSSharesToShares(s), nil
+}
+
 // MOCK CLINT FOR TESTING
 
 type celestiaMock struct {
@@ -306,5 +333,8 @@ func (c *celestiaMock) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error
 			NumLeaves: big.NewInt(0),
 		},
 	}, nil
+}
 
+func (c *celestiaMock) GetShares(pointer *CelestiaPointer) ([]shares.Share, error) {
+	return nil, nil
 }

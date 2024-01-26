@@ -1,43 +1,43 @@
 package contracts
 
 import (
-	chainloader "hummingbird/node/contracts/ChainLoader.sol"
+	chainoracle "hummingbird/node/contracts/ChainOracle.sol"
 	"math/big"
 
 	"github.com/tendermint/tendermint/types"
 )
 
-func NewShareProof(proof *types.ShareProof, attestations chainloader.AttestationProof) (*chainloader.SharesProof, error) {
+func NewShareProof(proof *types.ShareProof, attestations chainoracle.AttestationProof) (*chainoracle.SharesProof, error) {
 
 	// TODO: is this correct????
 
-	ns := chainloader.Namespace{
+	ns := chainoracle.Namespace{
 		Version: [1]byte(proof.NamespaceID),
 		Id:      [28]byte(proof.NamespaceID[:28]),
 	}
 
-	sp := []chainloader.NamespaceMerkleMultiproof{}
+	sp := []chainoracle.NamespaceMerkleMultiproof{}
 	for _, s := range proof.ShareProofs {
-		sideNodes := []chainloader.NamespaceNode{}
+		sideNodes := []chainoracle.NamespaceNode{}
 		for _, sn := range s.Nodes {
-			sideNodes = append(sideNodes, chainloader.NamespaceNode{
+			sideNodes = append(sideNodes, chainoracle.NamespaceNode{
 				Min:    ns,           // Not sure if this is correct???
 				Max:    ns,           // ?
 				Digest: [32]byte(sn), // ?
 			})
 		}
 
-		sp = append(sp, chainloader.NamespaceMerkleMultiproof{
+		sp = append(sp, chainoracle.NamespaceMerkleMultiproof{
 			BeginKey:  big.NewInt(int64(s.Start)),
 			EndKey:    big.NewInt(int64(s.End)),
 			SideNodes: sideNodes,
 		})
 	}
 
-	rr := []chainloader.NamespaceNode{}
+	rr := []chainoracle.NamespaceNode{}
 	for _, r := range proof.RowProof.RowRoots {
 
-		rr = append(rr, chainloader.NamespaceNode{
+		rr = append(rr, chainoracle.NamespaceNode{
 			Min:    ns,                  // Not sure if this is correct???
 			Max:    ns,                  // ?
 			Digest: [32]byte(r.Bytes()), // ?
@@ -45,7 +45,7 @@ func NewShareProof(proof *types.ShareProof, attestations chainloader.Attestation
 
 	}
 
-	rp := []chainloader.BinaryMerkleProof{}
+	rp := []chainoracle.BinaryMerkleProof{}
 	for _, r := range proof.RowProof.Proofs {
 
 		sideNodes := [][32]byte{}
@@ -53,14 +53,14 @@ func NewShareProof(proof *types.ShareProof, attestations chainloader.Attestation
 			sideNodes = append(sideNodes, [32]byte(sn))
 		}
 
-		rp = append(rp, chainloader.BinaryMerkleProof{
+		rp = append(rp, chainoracle.BinaryMerkleProof{
 			SideNodes: sideNodes,
 			Key:       big.NewInt(r.Index),
 			NumLeaves: big.NewInt(r.Total),
 		})
 	}
 
-	return &chainloader.SharesProof{
+	return &chainoracle.SharesProof{
 		Data:             proof.Data,
 		ShareProofs:      sp,
 		Namespace:        ns,

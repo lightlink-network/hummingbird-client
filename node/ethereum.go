@@ -18,7 +18,7 @@ import (
 	tendTypes "github.com/tendermint/tendermint/types"
 
 	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
-	chainloaderContract "hummingbird/node/contracts/ChainLoader.sol"
+	chainoracleContract "hummingbird/node/contracts/ChainOracle.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
 	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
 )
@@ -49,6 +49,7 @@ type Ethereum interface {
 
 	// Data Loading
 	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
+	ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
 }
 
 type EthereumClient struct {
@@ -63,7 +64,7 @@ type EthereumHTTPClient struct {
 	canonicalStateChain *canonicalStateChainContract.CanonicalStateChain
 	daOracle            *daOracleContract.DAOracleContract
 	challenge           *challengeContract.Challenge
-	chainLoader         *chainloaderContract.ChainLoader
+	chainLoader         *chainoracleContract.ChainOracle
 	logger              *slog.Logger
 	opts                *EthereumHTTPClientOpts
 }
@@ -74,7 +75,7 @@ type EthereumHTTPClientOpts struct {
 	CanonicalStateChainAddress common.Address
 	DAOracleAddress            common.Address
 	ChallengeAddress           common.Address
-	ChainLoaderAddress         common.Address
+	ChainOracleAddress         common.Address
 	Logger                     *slog.Logger
 	DryRun                     bool
 	GasPriceIncreasePercent    *big.Int
@@ -136,9 +137,9 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		return nil, fmt.Errorf("failed to connect to Challenge: %w", err)
 	}
 
-	chainLoader, err := chainloaderContract.NewChainLoader(opts.ChainLoaderAddress, client)
+	chainLoader, err := chainoracleContract.NewChainOracle(opts.ChainOracleAddress, client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to ChainLoader: %w", err)
+		return nil, fmt.Errorf("failed to connect to ChainOracle: %w", err)
 	}
 
 	chainId, err := client.ChainID(context.TODO())
@@ -158,8 +159,8 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 	if ok, _ := utils.IsContract(client, opts.ChallengeAddress); !ok {
 		opts.Logger.Warn("contract not found for Challenge at given Address", "address", opts.ChallengeAddress.Hex(), "endpoint", opts.Endpoint)
 	}
-	if ok, _ := utils.IsContract(client, opts.ChainLoaderAddress); !ok {
-		opts.Logger.Warn("contract not found for ChainLoader at given Address", "address", opts.ChainLoaderAddress.Hex(), "endpoint", opts.Endpoint)
+	if ok, _ := utils.IsContract(client, opts.ChainOracleAddress); !ok {
+		opts.Logger.Warn("contract not found for ChainOracle at given Address", "address", opts.ChainOracleAddress.Hex(), "endpoint", opts.Endpoint)
 	}
 
 	return &EthereumHTTPClient{
@@ -391,13 +392,13 @@ func (e *EthereumClient) ProvideShares(rblock common.Hash, proof *tendTypes.Shar
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 
-	attestationProof := chainloaderContract.AttestationProof{
+	attestationProof := chainoracleContract.AttestationProof{
 		TupleRootNonce: celProof.Nonce,
-		Tuple: chainloaderContract.DataRootTuple{
+		Tuple: chainoracleContract.DataRootTuple{
 			Height:   celProof.Tuple.Height,
 			DataRoot: celProof.Tuple.DataRoot,
 		},
-		Proof: chainloaderContract.BinaryMerkleProof{
+		Proof: chainoracleContract.BinaryMerkleProof{
 			SideNodes: celProof.WrappedProof.SideNodes,
 			Key:       celProof.WrappedProof.Key,
 			NumLeaves: celProof.WrappedProof.NumLeaves,
@@ -409,7 +410,29 @@ func (e *EthereumClient) ProvideShares(rblock common.Hash, proof *tendTypes.Shar
 		return nil, fmt.Errorf("failed to convert proof: %w", err)
 	}
 
-	return e.http.chainLoader.LoadShares(transactor, rblock, *p)
+	return e.http.chainLoader.ProvideShares(transactor, rblock, *p)
+}
+
+func (e *EthereumClient) ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	sharekey, err := e.http.chainLoader.ShareKey(nil, rblock, shareData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get share key: %w", err)
+	}
+
+	ranges := make([]chainoracleContract.ChainOracleShareRange, len(pointer.Ranges))
+	for i, r := range pointer.Ranges {
+		ranges[i] = chainoracleContract.ChainOracleShareRange{
+			Start: big.NewInt(int64(r.Start)),
+			End:   big.NewInt(int64(r.End)),
+		}
+	}
+
+	return e.http.chainLoader.ProvideHeader(transactor, sharekey, ranges)
 }
 
 // MOCK CLIENT FOR TESTING

@@ -1,8 +1,10 @@
 package node
 
 import (
+	"fmt"
 	"hummingbird/utils"
 
+	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -18,6 +20,22 @@ type Bundle struct {
 	Blocks []*types.Block
 }
 
+func NewBundleFromShares(s []shares.Share) (*Bundle, error) {
+	// 1. extract the raw data from the shares
+	data := []byte{}
+	for _, share := range s {
+		d, err := share.RawData()
+		if err != nil {
+			return nil, err
+		}
+
+		data = append(data, d...)
+	}
+	// 2. decode the bundle from RLP
+	bundle := &Bundle{}
+	return bundle, bundle.DecodeRLP(data)
+}
+
 func (b *Bundle) Size() uint64 {
 	return uint64(len(b.Blocks))
 }
@@ -31,7 +49,12 @@ func (b *Bundle) EncodeRLP() ([]byte, error) {
 }
 
 func (b *Bundle) DecodeRLP(data []byte) error {
-	return rlp.DecodeBytes(data, &b.Blocks)
+	size := utils.RlpNextItemSize(data)
+	if size == -1 {
+		return fmt.Errorf("DecodeRLP: invalid rlp data")
+	}
+
+	return rlp.DecodeBytes(data[:size], &b.Blocks)
 }
 
 // get the root of the merkle tree containing all the blocks in the bundle

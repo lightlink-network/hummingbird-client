@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/tendermint/tendermint/rpc/client/http"
+	"github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -50,6 +51,7 @@ type Celestia interface {
 	PublishBundle(blocks Bundle) (*CelestiaPointer, error)
 	GetProof(pointer *CelestiaPointer) (*CelestiaProof, error)
 	GetShares(pointer *CelestiaPointer) ([]shares.Share, error)
+	GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error)
 }
 
 type CelestiaClientOpts struct {
@@ -272,6 +274,26 @@ func (c *CelestiaClient) GetShares(pointer *CelestiaPointer) ([]shares.Share, er
 	return utils.NSSharesToShares(s), nil
 }
 
+func (c *CelestiaClient) GetSharesProof(celPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
+	ctx := context.Background()
+
+	shareStart := celPointer.ShareStart + uint64(sharePointer.StartShare)
+	shareEnd := celPointer.ShareStart + uint64(sharePointer.EndShare()+1)
+
+	// Get the shares proof
+	sharesProofs, err := c.trpc.ProveShares(ctx, celPointer.Height, shareStart, shareEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify the shares proof
+	if !sharesProofs.VerifyProof() {
+		return nil, err
+	}
+
+	return &sharesProofs, nil
+}
+
 // MOCK CLINT FOR TESTING
 
 type celestiaMock struct {
@@ -336,5 +358,9 @@ func (c *celestiaMock) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error
 }
 
 func (c *celestiaMock) GetShares(pointer *CelestiaPointer) ([]shares.Share, error) {
+	return nil, nil
+}
+
+func (c *celestiaMock) GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
 	return nil, nil
 }

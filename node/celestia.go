@@ -135,8 +135,23 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 	// fee is gas price * gas limit. State machine does not refund users for unused gas so all of the fee is used
 	fee := int64(gasPrice * float64(gasLimit))
 
-	// post the blob
-	pointer, err := c.submitBlob(context.Background(), cosmosmath.NewInt(fee), gasLimit, []*blob.Blob{b})
+	var pointer *CelestiaPointer
+
+	// Retry up to 5 times
+	for i := 0; i < 5; i++ {
+		// post the blob
+		pointer, err = c.submitBlob(context.Background(), cosmosmath.NewInt(fee), gasLimit, []*blob.Blob{b})
+		if err == nil {
+			break
+		}
+
+		// Increase gas price by 20%
+		gasPrice *= 1.2
+		fee = int64(gasPrice * float64(gasLimit))
+
+		c.logger.Warn("Failed to submit blob, retrying", "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
+	}
+
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/spf13/viper"
 )
 
@@ -113,4 +114,21 @@ func (n *Node) GetDAPointer(hash common.Hash) (*CelestiaPointer, error) {
 	}
 
 	return pointer, nil
+}
+
+// Returns true if the given ethKey is the publisher set in CanonicalStateChain
+func (n *Node) IsPublisher(ethKey *ecdsa.PrivateKey) bool {
+	if ethKey == nil {
+		panic("eth key is nil")
+	}
+
+	p, err := n.Ethereum.GetPublisher()
+	if err != nil {
+		panic(err)
+	}
+
+	// Get address of public key
+	addr := crypto.PubkeyToAddress(ethKey.PublicKey)
+
+	return p == addr
 }

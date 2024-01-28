@@ -25,7 +25,7 @@ make
 
 ### Option 2:  Install from binary (Windows / Linux / MacOS)
 
-Download the latest release from [here]()
+Download the latest release from [here](https://github.com/pellartech/lightlink-hummingbird/releases)
 
 ### Configuration
 

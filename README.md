@@ -37,7 +37,7 @@ cp config.example.json config.json
 
 **Note**: configuration file `config.json` path can be specified with the `--config-path` flag. If not specified, the default path is `./config.json`
 
-```json
+```
 {
   "storePath": "./storage", // Path to the local storage
   "celestia": {

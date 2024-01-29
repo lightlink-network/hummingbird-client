@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/ecdsa"
 	"hummingbird/config"
+	canonicalstatechain "hummingbird/node/contracts/CanonicalStateChain.sol"
 	"log/slog"
 	"math/big"
 	"runtime"
@@ -114,4 +115,29 @@ func (n *Node) GetDAPointer(hash common.Hash) (*CelestiaPointer, error) {
 	}
 
 	return pointer, nil
+}
+
+func (n *Node) FetchRollupBlock(rblock common.Hash) (*canonicalstatechain.CanonicalStateChainHeader, *Bundle, error) {
+	header, err := n.GetRollupHeaderByHash(rblock)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pointer := &CelestiaPointer{
+		Height:     header.CelestiaHeight,
+		ShareStart: header.CelestiaShareStart,
+		ShareLen:   header.CelestiaShareLen,
+	}
+
+	shares, err := n.Celestia.GetShares(pointer)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	bundle, err := NewBundleFromShares(shares)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &header, bundle, nil
 }

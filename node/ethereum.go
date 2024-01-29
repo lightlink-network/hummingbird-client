@@ -432,6 +432,8 @@ func (e *EthereumClient) ProvideHeader(rblock common.Hash, shareData [][]byte, p
 		}
 	}
 
+	e.http.opts.Logger.Debug("ProvideHeader", "sharekey", fmt.Sprintf("%x", sharekey), "ranges", pointer.Ranges)
+
 	return e.http.chainLoader.ProvideHeader(transactor, sharekey, ranges)
 }
 

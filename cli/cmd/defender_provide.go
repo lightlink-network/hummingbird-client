@@ -6,6 +6,8 @@ import (
 	"hummingbird/defender"
 	"hummingbird/node"
 	"hummingbird/utils"
+	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
@@ -26,10 +28,24 @@ var DefenderProvideCmd = &cobra.Command{
 		ethKey := getEthKey()
 
 		rblockHash := common.HexToHash(args[0])
-		l2blockHash := common.HexToHash(args[1])
 
 		n, err := node.NewFromConfig(cfg, logger, ethKey)
 		utils.NoErr(err)
+
+		// allow block hash or number
+		var l2blockHash common.Hash
+		if strings.HasPrefix(args[1], "0x") {
+			l2blockHash = common.HexToHash(args[1])
+		} else {
+			logger.Info("Providing L2 Header by block number", "block", args[1])
+			num, err := strconv.Atoi(args[1])
+			utils.NoErr(err)
+			b, err := n.LightLink.GetBlock(uint64(num))
+			utils.NoErr(err)
+
+			l2blockHash = b.Header().Hash()
+			logger.Info("Providing L2 Header by block number", "block", args[1], "hash", l2blockHash.Hex())
+		}
 
 		d := defender.NewDefender(n, &defender.Opts{
 			Logger: logger.With("ctx", "Defender"),

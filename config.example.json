@@ -14,6 +14,7 @@
     "canonicalStateChain": "0x18d00cfb6c7c78CAb803A225F4EE7F6307f22f4C",
     "daOracle": "0x3a5cbB6EF4756DA0b3f6DAE7aB6430fD8c46d247",
     "challenge": "0x93c4D996C7808682cfa6Ae6D7a2b0A69eEcb5c0C",
+    "chainOracle": "0x717d17605dAcefd5AE0458530c068fdb9B188805",
     "gasPriceIncreasePercent": 10
   },
   "lightlink": {

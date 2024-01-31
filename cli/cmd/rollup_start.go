@@ -30,6 +30,12 @@ var RollupStartCmd = &cobra.Command{
 		n, err := node.NewFromConfig(cfg, logger, ethKey)
 		utils.NoErr(err)
 
+		// Can only run rollup node if the eth key is a publisher
+		if !n.IsPublisher(ethKey) {
+			logger.Warn("ETH_KEY is not a publisher, cannot run rollup start command")
+			return
+		}
+
 		r := rollup.NewRollup(n, &rollup.Opts{
 			L1PollDelay:           time.Duration(cfg.Rollup.L1PollDelay) * time.Millisecond,
 			L2PollDelay:           time.Duration(cfg.Rollup.L2PollDelay) * time.Millisecond,

@@ -35,6 +35,14 @@ Hummingbird requires a configuration file to run. A sample configuration file is
 cp config.example.json config.json
 ```
 
+A single environment variable ETH_KEY is required to be set. This is the private key of the Ethereum account that will be used to sign transactions. This account must have sufficient funds to pay for gas fees.
+  
+```bash
+export ETH_KEY=0x...
+```
+
+
+
 **Note**: configuration file `config.json` path can be specified with the `--config-path` flag. If not specified, the default path is `./config.json`
 
 ```
@@ -79,7 +87,7 @@ cp config.example.json config.json
 hb rollup info  # Get the current rollup state
 hb rollup next  # [Publisher Only] Generate the next rollup block
 hb rollup start # [Publisher Only] Start the rollup loop to generate and submit bundles
-hb challenge challenge-da <block_number> # Challenge data availability
+hb challenger challenge-da <block_number> # Challenge data availability
 hb defender defend-da <block_hash> # Defend data availability
 hd defender info-da <block_hash> # Provides info on an existing challenge
 hb defender prove-da <block_hash> # Prove data availability

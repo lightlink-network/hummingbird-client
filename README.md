@@ -4,17 +4,17 @@
 
 ![LightLink Hummingbird preview screenshot](<preview.png>)
 
-Hummingbird is a command line tool for interacting with the LightLink protocol.
+Hummingbird is a light client for interacting with the [LightLink Protocol](https://lightlink.io).
 
 It is designed to work in unison with the [lightlink-hummingbird-contracts](https://github.com/pellartech/lightlink-hummingbird-contracts) repository.
 
-## Commands
+## Usage
 
 ```bash
 hb rollup info  # Get the current rollup state
-hb rollup next  # Generate the next rollup block
-hb rollup start # Start the rollup loop to generate and submit bundles
-hb challenge challenge-da <block_number> # Challenge data availability
+hb rollup next  # [Publisher Only] Generate the next rollup block
+hb rollup start # [Publisher Only] Start the rollup loop to generate and submit bundles
+hb challenger challenge-da <block_number> # Challenge data availability
 hb defender defend-da <block_hash> # Defend data availability
 hd defender info-da <block_hash> # Provides info on an existing challenge
 hb defender prove-da <block_hash> # Prove data availability
@@ -29,6 +29,64 @@ The following root flags are available for all commands:
 --log-format <format> # Log format (json, text)
 --log-source <bool> # Log source file and line
 ```
+
+## Installation
+
+### Prerequisites
+
+- [Golang](https://go.dev/dl/) (v1.21.5 or higher) installed. Go version can be checked with `$ go version`
+
+### Option 1: Install from source (MacOS/Linux)
+
+Build the binary from source:
+
+```bash
+cd $HOME
+rm -rf lightlink-hummingbird
+git clone https://github.com/pellartech/lightlink-hummingbird.git
+cd lightlink-hummingbird
+git checkout tags/v0.0.3 -b v0.0.3
+make build
+```
+
+Install the binary to your `$GOPATH/bin`:
+
+
+```bash
+make install
+```
+
+Check the installation was successful:
+
+```bash
+hb --help
+```
+
+Note: If your go path is not set in your system path, the binary can be run directly from the `./build` directory:
+
+```bash
+./build/hb_darwin_amd64 --help
+```
+
+### Option 2: Use pre-built binary
+
+Download the latest release from [here](https://github.com/pellartech/lightlink-hummingbird/releases)
+
+## Configuration
+
+Hummingbird requires a configuration file to run. A sample configuration file is provided in the repository [here](config.example.yaml). Copy this file and rename it to `config.yaml`. Then fill in the required fields.
+
+```bash
+cp config.example.yaml config.yaml
+```
+
+A single environment variable `ETH_KEY` is required to be set. This is the private key of the Ethereum account that will be used to sign transactions. This account must have sufficient funds to pay for gas fees.
+  
+```bash
+export ETH_KEY=0x...
+```
+
+**Note**: configuration file `config.yaml` path can be specified with the `--config-path` flag. If not specified, the default path is `./config.yaml`
 
 see `hb --help` for more information
 

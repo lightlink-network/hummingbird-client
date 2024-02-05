@@ -40,7 +40,7 @@ var DefenderProveDaCmd = &cobra.Command{
 		})
 
 		blockHash := common.HexToHash(args[0])
-		proof, err := d.ProveDA(blockHash)
+		proof, err := d.GetDAProof(blockHash)
 		if err != nil {
 			logger.Error("Failed to prove data availability", "err", err)
 			panic(err)

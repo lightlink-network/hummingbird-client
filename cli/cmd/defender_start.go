@@ -26,11 +26,13 @@ var DefenderStartCmd = &cobra.Command{
 			Logger:      logger.With("ctx", "Defender"),
 			WorkerDelay: time.Duration(cfg.Defender.WorkerDelay) * time.Millisecond,
 		})
+		for {
+			err = d.Start()
+			if err != nil {
+				logger.Error("Defender.Start failed", "err", err, "retry_in", "5s")
+			}
 
-		err = d.Start()
-		if err != nil {
-			logger.Error("Defender.Start failed", "err", err, "retry_in", "5s")
+			time.Sleep(5 * time.Second)
 		}
-
 	},
 }

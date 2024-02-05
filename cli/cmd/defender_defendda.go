@@ -42,7 +42,6 @@ var DefenderDefendDaCmd = &cobra.Command{
 
 		d := defender.NewDefender(n, &defender.Opts{
 			Logger: logger.With("ctx", "Defender"),
-			DryRun: dryRun,
 		})
 
 		// get block hash and tx hash from args/flags

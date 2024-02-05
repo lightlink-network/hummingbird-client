@@ -11,6 +11,8 @@ store
 config.ganache.json
 config.hardhat.json
 config.json
+config.yaml
 
 store
 storage
+build

@@ -1,28 +1,26 @@
 package defender
 
 import (
+	"context"
 	"fmt"
 	"hummingbird/node"
+	"strings"
 	"time"
 
 	"log/slog"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"hummingbird/node/contracts"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
 )
 
 type Opts struct {
 	Logger      *slog.Logger
 	WorkerDelay time.Duration
-	DryRun      bool // DryRun indicates whether or not to actually submit the block to the L1 rollup contract.
 }
 
 type Defender struct {
@@ -34,18 +32,58 @@ func NewDefender(node *node.Node, opts *Opts) *Defender {
 	return &Defender{Node: node, Opts: opts}
 }
 
+// Start starts the defender.
+//
+// It will:
+//  1. Start a goroutine to Scan Challenge.sol historic events, find any pending
+//     DA challenges that were missed and defend them.
+//  2. In main thread, watch Challenge.sol for new DA challenges and defend them.
 func (d *Defender) Start() error {
-	d.retryMissedDAChallenges()
-	go d.retryActiveDAChallengesWorker()
+	errChan := make(chan error, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	if err := d.WatchAndDefendDAChallenges(); err != nil {
-		return fmt.Errorf("error watching and defending DA challenges: %w", err)
+	go func() {
+		errChan <- d.startHistoricWorker(ctx)
+	}()
+
+	go func() {
+		errChan <- d.watchAndDefendDAChallenges(ctx)
+	}()
+
+	select {
+	case err := <-errChan:
+		if err != nil {
+			return err
+		}
+	case <-ctx.Done():
+		return ctx.Err()
 	}
+
 	return nil
 }
 
-func (d *Defender) WatchAndDefendDAChallenges() error {
+func (d *Defender) startHistoricWorker(ctx context.Context) error {
+	ticker := time.NewTicker(d.Opts.WorkerDelay)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if err := d.scanAndDefendHistoricChallenges(); err != nil {
+				return fmt.Errorf("error retrying historic DA challenges: %w", err)
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// Watches the Challenge.sol contract for new DA challenges and defends them.
+func (d *Defender) watchAndDefendDAChallenges(ctx context.Context) error {
 	challenges := make(chan *challengeContract.ChallengeChallengeDAUpdate)
+	errChan := make(chan error, 1)
+
 	subscription, err := d.Ethereum.WatchChallengesDA(challenges)
 	if err != nil {
 		return fmt.Errorf("error starting WatchChallengesDA: %w", err)
@@ -54,12 +92,8 @@ func (d *Defender) WatchAndDefendDAChallenges() error {
 
 	d.Opts.Logger.Info("Defender is watching for DA challenges")
 
-	// Listen for shutdown signals
-	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
-
 	go func() {
-		<-shutdown
+		<-ctx.Done()
 		close(challenges)
 	}()
 
@@ -70,149 +104,116 @@ func (d *Defender) WatchAndDefendDAChallenges() error {
 		go func(challenge *challengeContract.ChallengeChallengeDAUpdate) {
 			defer wg.Done()
 
-			header, err := d.Ethereum.GetRollupHeaderByHash(challenge.BlockHash)
-			if err != nil {
-				d.Opts.Logger.Error("error getting rollup header by hash:", "error", err)
-			}
-			err = d.Store.StoreLastScannedBlockNumber(header.Epoch)
-			if err != nil {
-				d.Opts.Logger.Error("error storing last scanned block number:", "error", err)
-			}
-
-			err = d.handleDAChallenge(challenge)
-			if err != nil {
-				d.Opts.Logger.Error("error handling challenge:", "challenge", challenge, "error", err)
-				err := d.Store.StoreActiveDAChallenge(challenge)
-				if err != nil {
-					d.Opts.Logger.Error("error storing active DA challenge:", "challenge", challenge, "error", err)
-				}
+			if err := d.handleDAChallenge(challenge); err != nil {
+				errChan <- err
+				return
 			}
 		}(challenge)
 	}
 
-	// Wait for all challenges to be handled before returning
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	for err := range errChan {
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
+// Handles a DA challenge by attempting to defend it.
+//
+// If the challenged data root is not yet available, it will be ignored
+// and retried later by the scanAndDefendHistoricChallenges() worker function.
 func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChallengeDAUpdate) error {
-	blockHash := common.BytesToHash(challenge.BlockHash[:])
-
-	d.Opts.Logger.Info("DA challenge received", "block", blockHash.Hex(), "block_index", challenge.BlockIndex, "expiry", challenge.Expiry, "status", challenge.Status)
-
+	// we are only interested in challenges that have been initiated by a challenger, ready to be defended
 	if challenge.Status != 1 {
 		return nil
 	}
 
-	celestiaTx, err := d.GetDAPointer(challenge.BlockHash)
-	if err != nil {
-		return fmt.Errorf("error getting CelestiaTx: %w", err)
-	}
+	blockHash := common.BytesToHash(challenge.BlockHash[:])
+	statusString := contracts.StatusString(challenge.Status)
 
-	if celestiaTx == nil {
-		d.Opts.Logger.Info("No CelestiaTx found", "block:", blockHash.Hex())
-		return nil
-	}
+	log := d.Opts.Logger.With(
+		"blockHash", blockHash.Hex(),
+		"blockIndex", challenge.BlockIndex,
+		"expiry", time.Unix(challenge.Expiry.Int64(), 0).Format(time.RFC1123Z),
+		"statusEnum", challenge.Status,
+		"statusString", statusString,
+	)
+	log.Info("Pending DA challenge log event found")
 
-	d.Opts.Logger.Info("Found CelestiaTx", "tx_hash", celestiaTx.TxHash.Hex(), "block_hash", blockHash.Hex())
-
+	// attempt to defend the challenge by submitting a tx to the Challenge contract
 	tx, err := d.DefendDA(challenge.BlockHash)
 	if err != nil {
-		return fmt.Errorf("error defending DA: %w", err)
+		if strings.Contains(err.Error(), "no data commitment has been generated for the provided height") {
+			log.Info("Pending DA challenge is awaiting data commitment from Celestia validators, will retry later")
+			return nil
+		} else {
+			return fmt.Errorf("error defending DA challenge: %w", err)
+		}
 	}
 
-	d.Opts.Logger.Info("DA challenge defended", "tx", tx.Hash().Hex(), "block", blockHash.Hex(), "block_index", challenge.BlockIndex, "expiry", challenge.Expiry, "status", challenge.Status)
+	log.Info("Pending DA challenge defended successfully", "tx", tx.Hash().Hex())
 	return nil
 }
 
+// Attempts to defend a DA challenge for the given block hash.
+//
+// Queries Celestia for a proof of data availability and submits a tx to the Challenge contract.
 func (d *Defender) DefendDA(block common.Hash) (*types.Transaction, error) {
-	proof, err := d.ProveDA(block)
+	proof, err := d.GetDAProof(block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prove data availability: %w", err)
 	}
-
-	d.Opts.Logger.Debug("Submitting data availability proof to L1 rollup contract", "block", block.Hex(), "dataroot", hexutil.Encode(proof.Tuple.DataRoot[:]))
 	return d.Ethereum.DefendDataRootInclusion(block, proof)
 }
 
-func (d *Defender) ProveDA(block common.Hash) (*node.CelestiaProof, error) {
+// Gets the Celestia pointer for the given block hash and queries Celestia for a proof
+// of data availability.
+func (d *Defender) GetDAProof(block common.Hash) (*node.CelestiaProof, error) {
 	pointer, err := d.GetDAPointer(block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Celestia pointer: %w", err)
 	}
-
 	if pointer == nil {
 		return nil, fmt.Errorf("no Celestia pointer found")
 	}
-
 	return d.Celestia.GetProof(pointer)
 }
 
-func (d *Defender) retryActiveDAChallengesWorker() {
-	ticker := time.NewTicker(d.Opts.WorkerDelay)
-	defer ticker.Stop()
+// Scans the Challenge.sol contract for historic DA challenges and attempts to defend them.
+//
+// This function runs every opts.WorkerDelay and will scan all historic Challenge.sol challenge
+// logs. This ensure we don't miss any challenges that were initiated when offline. It also
+// allows defenders to retry challenges that failed to be defended i.e. due to data commitments
+// not being available yet.
+func (d *Defender) scanAndDefendHistoricChallenges() error {
+	d.Opts.Logger.Debug("Starting log scan for historic pending DA challenges")
 
-	for range ticker.C {
-		d.Opts.Logger.Info("Retrying active DA challenges...")
-		challenges, err := d.Store.GetActiveDAChallenges()
-		if err != nil {
-			d.Opts.Logger.Error("error getting active DA challenges from store:", "error", err)
-			continue
-		}
-		for _, challenge := range challenges {
-			block := common.BytesToHash(challenge.BlockHash[:])
-
-			// Check if challenge has expired, if so delete from active challenges and continue
-			if challenge.Expiry.Int64() <= time.Now().Unix() {
-				d.Opts.Logger.Info("Active DA challenge has expired, deleting from active challenges", "challengeBlock", block, "expiry", challenge.Expiry)
-				err = d.Store.DeleteActiveDAChallenge(challenge.BlockHash)
-				if err != nil {
-					d.Opts.Logger.Error("error deleting active DA challenge:", "challengeBlock", block, "error", err)
-				}
-				continue
-			}
-
-			err = d.handleDAChallenge(challenge)
-			if err != nil {
-				d.Opts.Logger.Error("error retrying active DA challenge:", "challengeBlock", block, "error", err)
-				continue
-			}
-
-			err = d.Store.DeleteActiveDAChallenge(challenge.BlockHash)
-			if err != nil {
-				d.Opts.Logger.Error("error deleting active DA challenge:", "challengeBlock", block, "error", err)
-			}
-		}
-		d.Opts.Logger.Info("Active DA challenges retry worker finished")
-	}
-}
-
-func (d *Defender) retryMissedDAChallenges() {
-	d.Opts.Logger.Info("Retrying missed DA challenges...")
-	lastScannedBlockNumber, err := d.Store.GetLastScannedBlockNumber()
+	h, err := d.Ethereum.GetRollupHeader(uint64(1))
 	if err != nil {
-		d.Opts.Logger.Error("error getting last scanned block number:", "error", err)
-		return
+		return fmt.Errorf("error getting rollup header: %w", err)
 	}
 
 	opts := &bind.FilterOpts{
-		Start: lastScannedBlockNumber,
+		Start: h.Epoch,
 	}
 
-	status := []uint8{1}
-
-	challenges, err := d.Ethereum.FilterChallengeDAUpdate(opts, nil, nil, status)
+	challenges, err := d.Ethereum.FilterChallengeDAUpdate(opts, nil, nil, []uint8{1})
 	if err != nil {
-		d.Opts.Logger.Error("error filtering challenges:", "error", err)
-		return
+		return fmt.Errorf("error filtering challenges: %w", err)
 	}
 
-	// iterate through challenges and retry
+	// iterate through historic challenges events
 	for challenges.Next() {
-		challenge := challenges.Event // Access the current challenge
+		challenge := challenges.Event
 
-		// Check if challenge has already been defended
+		// check if challenge has already been defended by checking the current status
 		challengeInfo, err := d.Ethereum.GetDataRootInclusionChallenge(challenge.BlockHash)
 		if err != nil {
 			d.Opts.Logger.Error("error getting data root inclusion challenge:", "error", err)
@@ -220,17 +221,18 @@ func (d *Defender) retryMissedDAChallenges() {
 		}
 
 		if challengeInfo.Status != 1 {
-			d.Opts.Logger.Info("DA challenge has already been defended", "blockIndex", challenge.BlockIndex)
 			continue
 		}
 
 		err = d.handleDAChallenge(challenge)
 		if err != nil {
-			d.Opts.Logger.Error("error retrying missed DA challenge:", "blockIndex", challenge.BlockIndex, "error", err)
 			continue
 		}
+
 	}
-	d.Opts.Logger.Info("Missed DA challenges retry finished")
+	d.Opts.Logger.Debug("Finished log scan for historic pending DA challenges")
+
+	return nil
 }
 
 func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash) (*types.Transaction, error) {
@@ -259,7 +261,7 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash) (*ty
 	}
 
 	// Get proof the data is available
-	celProof, err := d.ProveDA(rblock)
+	celProof, err := d.GetDAProof(rblock)
 	if err != nil {
 		return nil, fmt.Errorf("error proving data availability: %w", err)
 	}

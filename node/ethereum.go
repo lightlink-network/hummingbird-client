@@ -27,16 +27,23 @@ import (
 // It Provides access to the Ethereum Network and methods for
 // interacting with important contracts on the network including:
 // - CanonicalStateChain.sol With with methods for getting and pushing
+// - DAOracle.sol With methods for verifying data availability
+// - Challenge.sol With methods for challenging data availability etc d
 // rollup block headers.
 type Ethereum interface {
+	// CanonicalStateChain
 	GetRollupHeight() (uint64, error)                                                                         // Get the current rollup block height.
 	GetHeight() (uint64, error)                                                                               // Get the current block height of the Ethereum network.
 	GetRollupHead() (canonicalStateChainContract.CanonicalStateChainHeader, error)                            // Get the latest rollup block header in the CanonicalStateChain.sol contract.
 	PushRollupHead(header *canonicalStateChainContract.CanonicalStateChainHeader) (*types.Transaction, error) // Push a new rollup block header to the CanonicalStateChain.sol contract.
 	GetRollupHeader(index uint64) (canonicalStateChainContract.CanonicalStateChainHeader, error)              // Get the rollup block header at the given index from the CanonicalStateChain.sol contract.
 	GetRollupHeaderByHash(hash common.Hash) (canonicalStateChainContract.CanonicalStateChainHeader, error)    // Get the rollup block header with the given hash from the CanonicalStateChain.sol contract.
-	Wait(txHash common.Hash) (*types.Receipt, error)                                                          // Wait for the given transaction to be mined.
+	Wait(txHash common.Hash) (*types.Receipt, error)                                                          // Wait for a transaction to be mined.
+	GetPublisher() (common.Address, error)                                                                    // Get the address of the publisher of the CanonicalStateChain.sol contract.
+
+	// DAOracle
 	DAVerify(*CelestiaProof) (bool, error)
+
 	// Check if the data availability layer is verified.
 	// Challenges
 	GetChallengeFee() (*big.Int, error)
@@ -435,6 +442,10 @@ func (e *EthereumClient) ProvideHeader(rblock common.Hash, shareData [][]byte, p
 	e.http.opts.Logger.Debug("ProvideHeader", "sharekey", fmt.Sprintf("%x", sharekey), "ranges", pointer.Ranges)
 
 	return e.http.chainLoader.ProvideHeader(transactor, sharekey, ranges)
+}
+
+func (e *EthereumClient) GetPublisher() (common.Address, error) {
+	return e.http.canonicalStateChain.Publisher(nil)
 }
 
 // MOCK CLIENT FOR TESTING

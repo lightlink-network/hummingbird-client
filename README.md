@@ -8,79 +8,6 @@ Hummingbird is a light client for interacting with the [LightLink Protocol](http
 
 It is designed to work in unison with the [lightlink-hummingbird-contracts](https://github.com/pellartech/lightlink-hummingbird-contracts) repository.
 
-## Installation
-
-### Prerequisites
-
-- [Golang](https://go.dev/dl/) (v1.21.5 or higher) installed. Go version can be checked with `$ go version`
-
-### Option 1: Install from source (Linux / MacOS)
-
-```bash
-git clone git@github.com:pellartech/lightlink-hummingbird.git
-cd lightlink-hummingbird
-git checkout -b v0.0.1
-make
-```
-
-### Option 2:  Install from binary (Windows / Linux / MacOS)
-
-Download the latest release from [here](https://github.com/pellartech/lightlink-hummingbird/releases)
-
-### Configuration
-
-Hummingbird requires a configuration file to run. A sample configuration file is provided in the repository [here](config.example.json). Copy this file and rename it to `config.json`. Then fill in the required fields.
-
-```bash
-cp config.example.json config.json
-```
-
-A single environment variable ETH_KEY is required to be set. This is the private key of the Ethereum account that will be used to sign transactions. This account must have sufficient funds to pay for gas fees.
-  
-```bash
-export ETH_KEY=0x...
-```
-
-
-
-**Note**: configuration file `config.json` path can be specified with the `--config-path` flag. If not specified, the default path is `./config.json`
-
-```
-{
-  "storePath": "./storage", // Path to the local storage
-  "celestia": {
-    "token": "abcd", // Celestia token
-    "endpoint": "", // Celestia rpc endpoint
-    "namespace": "", // Celestia namespace to identify the blobs
-    "tendermint_rpc": "", // Tendermint rpc endpoint
-    "grpc": "", // Celestia grpc endpoint
-    "gasPrice": 0.01 // Gas price to use when submitting new headers to Celestia
-  },
-  "ethereum": {
-    "httpEndpoint": "", // Ethereum http rpc endpoint
-    "wsEndpoint": "", // Ethereum websocket rpc endpoint
-    "canonicalStateChain": "", // Canonical state chain contract address
-    "daOracle": "", // Data availability oracle contract address
-    "challenge": "", // Challenge contract address
-    "gasPriceIncreasePercent": 100 // Increase gas price manually when submitting new headers to L1
-  },
-  "lightlink": {
-    "endpoint": "", // LightLink rpc endpoint
-    "delay": 100 // Delay in ms between each block query
-  },
-  "rollup": {
-    "bundleSize": 200, // Number of headers to include in each bundle
-    "l1pollDelay": 90000, // (90sec) Delay in ms between each L1 block query
-    "l2pollDelay": 30000, // (30sec) Delay in ms between each L2 block query
-    "storeCelestiaPointers": true, // Store celestia pointers in the local storage
-    "storeHeaders": true // Store headers in the local storage
-  },
-  "defender": {
-    "workerDelay": 60000 // (60sec) Delay in ms between scanning for historical challenges to defend 
-  }
-}
-```
-
 ## Usage
 
 ```bash
@@ -102,6 +29,64 @@ The following root flags are available for all commands:
 --log-format <format> # Log format (json, text)
 --log-source <bool> # Log source file and line
 ```
+
+## Installation
+
+### Prerequisites
+
+- [Golang](https://go.dev/dl/) (v1.21.5 or higher) installed. Go version can be checked with `$ go version`
+
+### Option 1: Install from source (MacOS/Linux)
+
+Build the binary from source:
+
+```bash
+cd $HOME
+rm -rf lightlink-hummingbird
+git clone https://github.com/pellartech/lightlink-hummingbird.git
+cd lightlink-hummingbird
+git checkout tags/v0.0.3 -b v0.0.3
+make build
+```
+
+Install the binary to your `$GOPATH/bin`:
+
+
+```bash
+make install
+```
+
+Check the installation was successful:
+
+```bash
+hb --help
+```
+
+Note: If your go path is not set in your system path, the binary can be run directly from the `./build` directory:
+
+```bash
+./build/hb_darwin_amd64 --help
+```
+
+### Option 2: Use pre-built binary
+
+Download the latest release from [here](https://github.com/pellartech/lightlink-hummingbird/releases)
+
+## Configuration
+
+Hummingbird requires a configuration file to run. A sample configuration file is provided in the repository [here](config.example.yaml). Copy this file and rename it to `config.yaml`. Then fill in the required fields.
+
+```bash
+cp config.example.yaml config.yaml
+```
+
+A single environment variable `ETH_KEY` is required to be set. This is the private key of the Ethereum account that will be used to sign transactions. This account must have sufficient funds to pay for gas fees.
+  
+```bash
+export ETH_KEY=0x...
+```
+
+**Note**: configuration file `config.yaml` path can be specified with the `--config-path` flag. If not specified, the default path is `./config.yaml`
 
 see `hb --help` for more information
 

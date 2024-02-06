@@ -15,8 +15,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
+	tendTypes "github.com/tendermint/tendermint/types"
 
 	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
+	chainoracleContract "hummingbird/node/contracts/ChainOracle.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
 	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
 )
@@ -51,6 +53,10 @@ type Ethereum interface {
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
 	WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate) (event.Subscription, error)
 	FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error)
+
+	// Data Loading
+	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
+	ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
 }
 
 type EthereumClient struct {
@@ -65,6 +71,7 @@ type EthereumHTTPClient struct {
 	canonicalStateChain *canonicalStateChainContract.CanonicalStateChain
 	daOracle            *daOracleContract.DAOracleContract
 	challenge           *challengeContract.Challenge
+	chainLoader         *chainoracleContract.ChainOracle
 	logger              *slog.Logger
 	opts                *EthereumHTTPClientOpts
 }
@@ -75,6 +82,7 @@ type EthereumHTTPClientOpts struct {
 	CanonicalStateChainAddress common.Address
 	DAOracleAddress            common.Address
 	ChallengeAddress           common.Address
+	ChainOracleAddress         common.Address
 	Logger                     *slog.Logger
 	DryRun                     bool
 	GasPriceIncreasePercent    *big.Int
@@ -136,6 +144,11 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		return nil, fmt.Errorf("failed to connect to Challenge: %w", err)
 	}
 
+	chainLoader, err := chainoracleContract.NewChainOracle(opts.ChainOracleAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to ChainOracle: %w", err)
+	}
+
 	chainId, err := client.ChainID(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chainId: %w", err)
@@ -153,6 +166,9 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 	if ok, _ := utils.IsContract(client, opts.ChallengeAddress); !ok {
 		opts.Logger.Warn("contract not found for Challenge at given Address", "address", opts.ChallengeAddress.Hex(), "endpoint", opts.Endpoint)
 	}
+	if ok, _ := utils.IsContract(client, opts.ChainOracleAddress); !ok {
+		opts.Logger.Warn("contract not found for ChainOracle at given Address", "address", opts.ChainOracleAddress.Hex(), "endpoint", opts.Endpoint)
+	}
 
 	return &EthereumHTTPClient{
 		signer:              opts.Signer,
@@ -161,6 +177,7 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		canonicalStateChain: canonicalStateChain,
 		daOracle:            daOracle,
 		challenge:           challenge,
+		chainLoader:         chainLoader,
 		logger:              opts.Logger,
 		opts:                &opts,
 	}, nil
@@ -374,6 +391,57 @@ func (e *EthereumClient) WatchChallengesDA(c chan<- *challengeContract.Challenge
 
 func (e *EthereumClient) FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error) {
 	return e.ws.challenge.FilterChallengeDAUpdate(opts, _blockHash, _blockIndex, _status)
+}
+
+func (e *EthereumClient) ProvideShares(rblock common.Hash, proof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	attestationProof := chainoracleContract.AttestationProof{
+		TupleRootNonce: celProof.Nonce,
+		Tuple: chainoracleContract.DataRootTuple{
+			Height:   celProof.Tuple.Height,
+			DataRoot: celProof.Tuple.DataRoot,
+		},
+		Proof: chainoracleContract.BinaryMerkleProof{
+			SideNodes: celProof.WrappedProof.SideNodes,
+			Key:       celProof.WrappedProof.Key,
+			NumLeaves: celProof.WrappedProof.NumLeaves,
+		},
+	}
+
+	p, err := contracts.NewShareProof(proof, attestationProof)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert proof: %w", err)
+	}
+
+	return e.http.chainLoader.ProvideShares(transactor, rblock, *p)
+}
+
+func (e *EthereumClient) ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	sharekey, err := e.http.chainLoader.ShareKey(nil, rblock, shareData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get share key: %w", err)
+	}
+
+	ranges := make([]chainoracleContract.ChainOracleShareRange, len(pointer.Ranges))
+	for i, r := range pointer.Ranges {
+		ranges[i] = chainoracleContract.ChainOracleShareRange{
+			Start: big.NewInt(int64(r.Start)),
+			End:   big.NewInt(int64(r.End)),
+		}
+	}
+
+	e.http.opts.Logger.Debug("ProvideHeader", "sharekey", fmt.Sprintf("%x", sharekey), "ranges", pointer.Ranges)
+
+	return e.http.chainLoader.ProvideHeader(transactor, sharekey, ranges)
 }
 
 func (e *EthereumClient) GetPublisher() (common.Address, error) {

@@ -14,15 +14,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/tendermint/tendermint/rpc/client/http"
+	"github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/celestiaorg/celestia-app/pkg/square"
 	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
 	blobstreamtypes "github.com/celestiaorg/celestia-app/x/qgb/types"
 
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
 	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
+	"hummingbird/utils"
 )
 
 // CelestiaPointer is a pointer to a Celestia header
@@ -47,6 +50,8 @@ type Celestia interface {
 	Namespace() string
 	PublishBundle(blocks Bundle) (*CelestiaPointer, error)
 	GetProof(pointer *CelestiaPointer) (*CelestiaProof, error)
+	GetShares(pointer *CelestiaPointer) ([]shares.Share, error)
+	GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error)
 }
 
 type CelestiaClientOpts struct {
@@ -260,6 +265,50 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 	return proof, nil
 }
 
+func (c *CelestiaClient) GetShares(pointer *CelestiaPointer) ([]shares.Share, error) {
+	ctx := context.Background()
+
+	// 1. Namespace
+	ns, err := share.NewBlobNamespaceV0([]byte(c.Namespace()))
+	if err != nil {
+		return nil, fmt.Errorf("GetBundle: failed to get namespace: %w", err)
+	}
+
+	// 0. Get the header
+	h, err := c.client.Header.GetByHeight(ctx, pointer.Height)
+	if err != nil {
+		return nil, fmt.Errorf("GetBundle: failed to get header: %w", err)
+	}
+
+	// 3. Get the shares
+	s, err := c.client.Share.GetSharesByNamespace(ctx, h, ns)
+	if err != nil {
+		return nil, fmt.Errorf("GetBundle: failed to get shares: %w", err)
+	}
+
+	return utils.NSSharesToShares(s), nil
+}
+
+func (c *CelestiaClient) GetSharesProof(celPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
+	ctx := context.Background()
+
+	shareStart := celPointer.ShareStart + uint64(sharePointer.StartShare)
+	shareEnd := celPointer.ShareStart + uint64(sharePointer.EndShare()+1)
+
+	// Get the shares proof
+	sharesProofs, err := c.trpc.ProveShares(ctx, celPointer.Height, shareStart, shareEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify the shares proof
+	if !sharesProofs.VerifyProof() {
+		return nil, err
+	}
+
+	return &sharesProofs, nil
+}
+
 // MOCK CLINT FOR TESTING
 
 type celestiaMock struct {
@@ -321,5 +370,12 @@ func (c *celestiaMock) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error
 			NumLeaves: big.NewInt(0),
 		},
 	}, nil
+}
 
+func (c *celestiaMock) GetShares(pointer *CelestiaPointer) ([]shares.Share, error) {
+	return nil, nil
+}
+
+func (c *celestiaMock) GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
+	return nil, nil
 }

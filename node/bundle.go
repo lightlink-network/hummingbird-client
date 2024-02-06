@@ -1,8 +1,12 @@
 package node
 
 import (
+	"bytes"
+	"fmt"
 	"hummingbird/utils"
 
+	"github.com/celestiaorg/celestia-app/pkg/shares"
+	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -15,6 +19,22 @@ const TxSizeLimit = uint64(1962441)
 // data availability layer (Celestia).
 type Bundle struct {
 	Blocks []*types.Block
+}
+
+func NewBundleFromShares(s []shares.Share) (*Bundle, error) {
+	// 1. extract the raw data from the shares
+	data := []byte{}
+	for _, share := range s {
+		d, err := share.RawData()
+		if err != nil {
+			return nil, err
+		}
+
+		data = append(data, d...)
+	}
+	// 2. decode the bundle from RLP
+	bundle := &Bundle{}
+	return bundle, bundle.DecodeRLP(data)
 }
 
 func (b *Bundle) Size() uint64 {
@@ -30,7 +50,12 @@ func (b *Bundle) EncodeRLP() ([]byte, error) {
 }
 
 func (b *Bundle) DecodeRLP(data []byte) error {
-	return rlp.DecodeBytes(data, &b.Blocks)
+	size := utils.RlpNextItemSize(data)
+	if size == -1 {
+		return fmt.Errorf("DecodeRLP: invalid rlp data")
+	}
+
+	return rlp.DecodeBytes(data[:size], &b.Blocks)
 }
 
 // get the root of the merkle tree containing all the blocks in the bundle
@@ -75,4 +100,68 @@ func (b *Bundle) IsUnderTxLimit() (bool, uint64, uint64, error) {
 		return false, bundleSizeLimit, bundleEncodedSize, nil
 	}
 	return true, bundleSizeLimit, bundleEncodedSize, nil
+}
+
+func (b *Bundle) Blob(namespace string) (*blob.Blob, error) {
+	// 1. encode the bundle to RLP
+	bundleRLP, err := b.EncodeRLP()
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. get the blob
+	return utils.BytesToBlob(namespace, bundleRLP)
+}
+
+// FinderHeaderShares finds the shares in the bundle which contain the header
+// Returns a pointer to the data in the shares
+func (b *Bundle) FindHeaderShares(hash common.Hash, namespace string) (*SharePointer, error) {
+	// 1. find the block with the given hash
+	var block *types.Block
+	for _, b := range b.Blocks {
+		if b.Hash().Hex() == hash.Hex() {
+			block = b
+			break
+		}
+	}
+	if block == nil {
+		return nil, fmt.Errorf("block with hash %s not found in bundle", hash.Hex())
+	}
+
+	// 2. get the header RLP
+	header := block.Header()
+	headerRLP, err := rlp.EncodeToBytes(header)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Get the bundle shares
+	bundleRLP, err := b.EncodeRLP()
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. get bundle shares
+	blob, err := utils.BytesToBlob(namespace, bundleRLP)
+	if err != nil {
+		return nil, err
+	}
+	shares, err := utils.BlobToShares(blob)
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. find the header coords in the raw bundleRLP
+	rlpStart := bytes.Index(bundleRLP, headerRLP)
+	rlpEnd := rlpStart + len(headerRLP)
+
+	if rlpStart == -1 {
+		return nil, fmt.Errorf("encoded header not found in the bundle")
+	}
+
+	// 6. find the header coords in the shares
+	startShare, startIndex := utils.RawIndexToSharesIndex(rlpStart, shares)
+	endShare, endIndex := utils.RawIndexToSharesIndex(rlpEnd, shares)
+
+	return NewSharePointer(shares, startShare, startIndex, endShare, endIndex), nil
 }

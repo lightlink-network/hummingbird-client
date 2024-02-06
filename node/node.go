@@ -3,6 +3,7 @@ package node
 import (
 	"crypto/ecdsa"
 	"hummingbird/config"
+	canonicalstatechain "hummingbird/node/contracts/CanonicalStateChain.sol"
 	"log/slog"
 	"math/big"
 	"runtime"
@@ -37,6 +38,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		CanonicalStateChainAddress: common.HexToAddress(cfg.Ethereum.CanonicalStateChain),
 		DAOracleAddress:            common.HexToAddress(cfg.Ethereum.DaOracle),
 		ChallengeAddress:           common.HexToAddress(cfg.Ethereum.Challenge),
+		ChainOracleAddress:         common.HexToAddress(cfg.Ethereum.ChainOracle),
 		Signer:                     ethKey,
 		Logger:                     logger.With("ctx", "ethereum-http"),
 		DryRun:                     cfg.DryRun,
@@ -114,6 +116,31 @@ func (n *Node) GetDAPointer(hash common.Hash) (*CelestiaPointer, error) {
 	}
 
 	return pointer, nil
+}
+
+func (n *Node) FetchRollupBlock(rblock common.Hash) (*canonicalstatechain.CanonicalStateChainHeader, *Bundle, error) {
+	header, err := n.GetRollupHeaderByHash(rblock)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pointer := &CelestiaPointer{
+		Height:     header.CelestiaHeight,
+		ShareStart: header.CelestiaShareStart,
+		ShareLen:   header.CelestiaShareLen,
+	}
+
+	shares, err := n.Celestia.GetShares(pointer)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	bundle, err := NewBundleFromShares(shares)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &header, bundle, nil
 }
 
 // Returns true if the given ethKey is the publisher set in CanonicalStateChain

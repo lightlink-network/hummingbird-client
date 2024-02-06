@@ -234,3 +234,46 @@ func (d *Defender) scanAndDefendHistoricChallenges() error {
 
 	return nil
 }
+
+func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash) (*types.Transaction, error) {
+
+	// Download the rollup block and bundle from L1 and
+	// Celestia
+	rheader, bundle, err := d.Node.FetchRollupBlock(rblock)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching rollup block: %w", err)
+	}
+
+	// Get a pointer to the shares that contain the header
+	sharePointer, err := bundle.FindHeaderShares(l2Block, d.Namespace())
+	if err != nil {
+		return nil, fmt.Errorf("error finding header shares in the bundle: %w", err)
+	}
+
+	// Get proof the shares are in the bundle
+	shareProof, err := d.Celestia.GetSharesProof(&node.CelestiaPointer{
+		Height:     rheader.CelestiaHeight,
+		ShareStart: rheader.CelestiaShareStart,
+		ShareLen:   rheader.CelestiaShareLen,
+	}, sharePointer)
+	if err != nil {
+		return nil, fmt.Errorf("error getting share proof: %w", err)
+	}
+
+	// Get proof the data is available
+	celProof, err := d.GetDAProof(rblock)
+	if err != nil {
+		return nil, fmt.Errorf("error proving data availability: %w", err)
+	}
+
+	// Provide the shares
+	tx, err := d.Ethereum.ProvideShares(rblock, shareProof, celProof)
+	if err != nil {
+		return nil, fmt.Errorf("error providing shares: %w", err)
+	}
+	d.Opts.Logger.Info("Provided shares", "tx", tx.Hash().Hex(), "block", rblock.Hex(), "shares", len(shareProof.Data))
+	d.Ethereum.Wait(tx.Hash())
+
+	// Finally, provide the header
+	return d.Ethereum.ProvideHeader(rblock, shareProof.Data, *sharePointer)
+}

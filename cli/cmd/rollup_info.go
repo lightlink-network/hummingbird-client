@@ -19,6 +19,7 @@ func init() {
 	RollupInfoCmd.Flags().Bool("json", false, "output info in json format")
 	RollupInfoCmd.Flags().String("hash", "", "block hash to get info for")
 	RollupInfoCmd.Flags().Uint64("num", 0, "block number to get info for")
+	RollupInfoCmd.Flags().Bool("bundle", false, "get bundle info. Requires --hash or --num to be set")
 }
 
 var RollupInfoCmd = &cobra.Command{
@@ -55,23 +56,43 @@ var RollupInfoCmd = &cobra.Command{
 			useNum = err == nil
 		}
 
-		// if a hash is specified, get info for the block with that hash
-		if useHash {
-			info, err := r.GetBlockInfo(common.HexToHash(hash))
-			utils.NoErr(err)
-			printInfo(info, useJson)
-			return
-		}
-
+		var blockHash common.Hash
 		if useNum {
 			h, err := r.Ethereum.GetRollupHeader(num)
 			utils.NoErr(err)
-			hash, err := contracts.HashCanonicalStateChainHeader(&h)
+			blockHash, err = contracts.HashCanonicalStateChainHeader(&h)
 			utils.NoErr(err)
-			info, err := r.GetBlockInfo(hash)
+		}
+		if useHash {
+			blockHash = common.HexToHash(hash)
+		}
+
+		// if a hash or number is specified, get info for the block with that hash
+		if useHash || useNum {
+			info, err := r.GetBlockInfo(blockHash)
 			utils.NoErr(err)
 			printInfo(info, useJson)
+
+			// if bundle flag is set, get bundle info
+			if bundle, _ := cmd.Flags().GetBool("bundle"); bundle {
+				s, err := r.Celestia.GetShares(&node.CelestiaPointer{
+					Height:     info.CanonicalStateChainHeader.CelestiaHeight,
+					ShareStart: info.CanonicalStateChainHeader.CelestiaShareStart,
+					ShareLen:   info.CanonicalStateChainHeader.CelestiaShareLen,
+				})
+				utils.NoErr(err)
+
+				bundle, err := node.NewBundleFromShares(s)
+				utils.NoErr(err)
+
+				printBundle(bundle)
+			}
 			return
+		}
+
+		// warn user if bundle flag is set but no block is specified
+		if bundle, _ := cmd.Flags().GetBool("bundle"); bundle {
+			logger.Warn("Bundle flag is set but no block specified. No Bundle info will be shown")
 		}
 
 		// otherwise get info for the chain
@@ -91,5 +112,15 @@ func printInfo(info any, useJson bool) {
 	// otherwise print as pretty text
 	fmt.Println(" ")
 	fmt.Println(utils.MarshalText(info))
+	fmt.Println(" ")
+}
+
+func printBundle(bundle *node.Bundle) {
+	fmt.Println(" ")
+	fmt.Println("Bundle:")
+	fmt.Println(" Blocks:", len(bundle.Blocks))
+	for _, b := range bundle.Blocks {
+		fmt.Println("  →", "Index:", b.Number(), "Hash:", b.Header().Hash().Hex())
+	}
 	fmt.Println(" ")
 }

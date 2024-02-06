@@ -63,6 +63,7 @@ func main() {
 	defenderCmd.AddCommand(cmd.DefenderDefendDaCmd)
 	defenderCmd.AddCommand(cmd.DefenderInfoDaCmd)
 	defenderCmd.AddCommand(cmd.DefenderStartCmd)
+	defenderCmd.AddCommand(cmd.DefenderProvideCmd)
 
 	// add subcommands to rollup
 	rollupCmd.AddCommand(cmd.RollupInfoCmd)

@@ -183,8 +183,6 @@ func (o *Oracle) PreFetchBlock(blockNum *big.Int, startBlock bool) error {
 		return err
 	}
 
-	fmt.Printf("fetched block %v\n", blockNum)
-
 	for k, v := range images {
 		o.images[k] = v
 	}
@@ -199,14 +197,11 @@ func (o *Oracle) PreFetchBlock(blockNum *big.Int, startBlock bool) error {
 		return nil
 	}
 
-	fmt.Println("Second block")
-
 	// otherwise if we are the second block
 	if o.inputs[0] != header.ParentHash {
 		return fmt.Errorf("block parent incorrect– have: %v, want: %v", header.ParentHash, o.inputs[0])
 	}
 
-	fmt.Printf("block parent correct– have: %v, want: %v\n", header.ParentHash, o.inputs[0])
 	o.inputs[1] = header.TxHash
 	o.inputs[2] = crypto.Keccak256Hash(header.Coinbase[:])
 	o.inputs[3] = header.UncleHash

@@ -9,9 +9,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ethclient/gethclient"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // PreImages is a map of preimage hashes to their values
@@ -74,6 +76,9 @@ type PreImageOracle struct {
 
 	cached map[string]bool
 	images PreImages
+
+	inputs  [6]common.Hash
+	outputs [2]common.Hash
 }
 
 func NewPreImageOracle(client *gethclient.Client) *PreImageOracle {
@@ -166,6 +171,46 @@ func (o *PreImageOracle) PreFetchCode(blockNum *big.Int, addr common.Address, po
 	return nil
 }
 
+func (o *PreImageOracle) PrefetchBlock(blockNum *big.Int, startBlock bool) error {
+	images, header, err := o.fetchBlock(blockNum)
+	if err != nil {
+		return err
+	}
+
+	for k, v := range images {
+		o.images[k] = v
+	}
+
+	// if we are the start block header, just insert the hash as the first input
+	if startBlock {
+		hash := header.Hash()
+		emptyHash := common.Hash{}
+		if o.inputs[0] != emptyHash {
+			o.inputs[0] = hash
+		}
+		return nil
+	}
+
+	// otherwise if we are the second block
+	if header.ParentHash != o.inputs[0] {
+		return fmt.Errorf("block parent incorrect– have: %s, want: %s", header.ParentHash, o.inputs[0])
+	}
+	o.inputs[1] = header.TxHash
+	o.inputs[2] = crypto.Keccak256Hash(header.Coinbase[:])
+	o.inputs[3] = header.UncleHash
+	o.inputs[4] = common.BigToHash(big.NewInt(int64(header.GasLimit)))
+	o.inputs[5] = common.BigToHash(big.NewInt(int64(header.Time)))
+
+	// output – (secret inputs)
+	o.outputs[0] = header.Root
+	o.outputs[1] = header.ReceiptHash
+
+	// TODO: check txroot is correct
+	// TODO: Do we need to save uncle roots? We have no uncles...
+
+	return nil
+}
+
 func (o *PreImageOracle) fetchStorage(blockNum *big.Int, addr common.Address, skey common.Hash) (PreImages, error) {
 	// 1. get storage proof from remote node
 	ctx := context.Background()
@@ -208,6 +253,27 @@ func (o *PreImageOracle) fetchCode(blockNumber *big.Int, addr common.Address) (P
 	newPreImages[hash] = code
 
 	return newPreImages, nil
+}
+
+func (o *PreImageOracle) fetchBlock(blockNumber *big.Int) (PreImages, *types.Header, error) {
+	// 1. get block from remote node
+	ctx := context.Background()
+	block, err := o.ethclient.BlockByNumber(ctx, blockNumber)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 2. convert block to preimages
+	blockHeaderRLP, err := rlp.EncodeToBytes(block.Header())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	newPreImages := make(map[common.Hash][]byte)
+	hash := crypto.Keccak256Hash(blockHeaderRLP)
+	newPreImages[hash] = blockHeaderRLP
+
+	return newPreImages, nil, nil
 }
 
 func (o *PreImageOracle) PreImages() PreImages {

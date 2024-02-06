@@ -82,7 +82,13 @@ type Oracle struct {
 }
 
 func NewOracle(geth *gethclient.Client, eth *ethclient.Client, logger *slog.Logger) *Oracle {
-	return &Oracle{gethclient: geth, ethclient: eth, logger: logger, cached: make(map[string]bool), images: make(PreImages)}
+	return &Oracle{
+		gethclient: geth,
+		ethclient:  eth,
+		logger:     logger,
+		cached:     make(map[string]bool),
+		images:     make(PreImages),
+	}
 }
 
 func (o *Oracle) Clear() {
@@ -177,6 +183,8 @@ func (o *Oracle) PreFetchBlock(blockNum *big.Int, startBlock bool) error {
 		return err
 	}
 
+	fmt.Printf("fetched block %v\n", blockNum)
+
 	for k, v := range images {
 		o.images[k] = v
 	}
@@ -191,10 +199,14 @@ func (o *Oracle) PreFetchBlock(blockNum *big.Int, startBlock bool) error {
 		return nil
 	}
 
+	fmt.Println("Second block")
+
 	// otherwise if we are the second block
-	if header.ParentHash.Cmp(o.inputs[0]) != 0 {
+	if o.inputs[0] != header.ParentHash {
 		return fmt.Errorf("block parent incorrect– have: %v, want: %v", header.ParentHash, o.inputs[0])
 	}
+
+	fmt.Printf("block parent correct– have: %v, want: %v\n", header.ParentHash, o.inputs[0])
 	o.inputs[1] = header.TxHash
 	o.inputs[2] = crypto.Keccak256Hash(header.Coinbase[:])
 	o.inputs[3] = header.UncleHash
@@ -273,7 +285,7 @@ func (o *Oracle) fetchBlock(blockNumber *big.Int) (PreImages, *types.Header, err
 	hash := crypto.Keccak256Hash(blockHeaderRLP)
 	newPreImages[hash] = blockHeaderRLP
 
-	return newPreImages, nil, nil
+	return newPreImages, block.Header(), nil
 }
 
 func (o *Oracle) PreImages() PreImages    { return o.images }

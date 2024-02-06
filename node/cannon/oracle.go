@@ -81,8 +81,8 @@ type Oracle struct {
 	outputs [2]common.Hash
 }
 
-func NewOracle(client *gethclient.Client) *Oracle {
-	return &Oracle{gethclient: client}
+func NewOracle(geth *gethclient.Client, eth *ethclient.Client, logger *slog.Logger) *Oracle {
+	return &Oracle{gethclient: geth, ethclient: eth, logger: logger, cached: make(map[string]bool), images: make(PreImages)}
 }
 
 func (o *Oracle) Clear() {
@@ -276,9 +276,9 @@ func (o *Oracle) fetchBlock(blockNumber *big.Int) (PreImages, *types.Header, err
 	return newPreImages, nil, nil
 }
 
-func (o *Oracle) PreImages() PreImages {
-	return o.images
-}
+func (o *Oracle) PreImages() PreImages    { return o.images }
+func (o *Oracle) Inputs() [6]common.Hash  { return o.inputs }
+func (o *Oracle) Outputs() [2]common.Hash { return o.outputs }
 
 func (o *Oracle) Writer() *PreimageKeyValueWriter {
 	return &PreimageKeyValueWriter{preimages: o.images}

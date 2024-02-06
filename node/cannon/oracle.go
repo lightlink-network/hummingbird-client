@@ -69,7 +69,7 @@ func (w PreimageKeyValueWriter) Delete(key []byte) error {
 
 // Oracle will fetch preimages from a remote node
 
-type PreImageOracle struct {
+type Oracle struct {
 	logger     *slog.Logger
 	gethclient *gethclient.Client
 	ethclient  *ethclient.Client
@@ -81,16 +81,16 @@ type PreImageOracle struct {
 	outputs [2]common.Hash
 }
 
-func NewPreImageOracle(client *gethclient.Client) *PreImageOracle {
-	return &PreImageOracle{gethclient: client}
+func NewOracle(client *gethclient.Client) *Oracle {
+	return &Oracle{gethclient: client}
 }
 
-func (o *PreImageOracle) Clear() {
+func (o *Oracle) Clear() {
 	o.cached = nil
 	o.images = nil
 }
 
-func (o *PreImageOracle) PreFetchStorage(blockNum *big.Int, addr common.Address, skey common.Hash, postProcess func(PreImages)) error {
+func (o *Oracle) PreFetchStorage(blockNum *big.Int, addr common.Address, skey common.Hash, postProcess func(PreImages)) error {
 	// 1. Check if we already have the preimages cached
 	cacheKey := fmt.Sprintf("proof_%d_%s_%s", blockNum, addr, skey)
 	if o.cached[cacheKey] {
@@ -117,7 +117,7 @@ func (o *PreImageOracle) PreFetchStorage(blockNum *big.Int, addr common.Address,
 	return nil
 }
 
-func (o *PreImageOracle) PreFetchAccount(blockNum *big.Int, addr common.Address, postProcess func(PreImages)) error {
+func (o *Oracle) PreFetchAccount(blockNum *big.Int, addr common.Address, postProcess func(PreImages)) error {
 	// 1. Check if we already have the preimages cached
 	cacheKey := fmt.Sprintf("proof_%d_%s", blockNum, addr)
 	if o.cached[cacheKey] {
@@ -144,7 +144,7 @@ func (o *PreImageOracle) PreFetchAccount(blockNum *big.Int, addr common.Address,
 	return nil
 }
 
-func (o *PreImageOracle) PreFetchCode(blockNum *big.Int, addr common.Address, postProcess func(PreImages)) error {
+func (o *Oracle) PreFetchCode(blockNum *big.Int, addr common.Address, postProcess func(PreImages)) error {
 	// 1. Check if we already have the preimages cached
 	cacheKey := fmt.Sprintf("code_%d_%s", blockNum, addr)
 	if o.cached[cacheKey] {
@@ -171,7 +171,7 @@ func (o *PreImageOracle) PreFetchCode(blockNum *big.Int, addr common.Address, po
 	return nil
 }
 
-func (o *PreImageOracle) PrefetchBlock(blockNum *big.Int, startBlock bool) error {
+func (o *Oracle) PrefetchBlock(blockNum *big.Int, startBlock bool) error {
 	images, header, err := o.fetchBlock(blockNum)
 	if err != nil {
 		return err
@@ -211,7 +211,7 @@ func (o *PreImageOracle) PrefetchBlock(blockNum *big.Int, startBlock bool) error
 	return nil
 }
 
-func (o *PreImageOracle) fetchStorage(blockNum *big.Int, addr common.Address, skey common.Hash) (PreImages, error) {
+func (o *Oracle) fetchStorage(blockNum *big.Int, addr common.Address, skey common.Hash) (PreImages, error) {
 	// 1. get storage proof from remote node
 	ctx := context.Background()
 	proof, err := o.gethclient.GetProof(ctx, addr, []string{hexutil.Encode(skey[:])}, blockNum)
@@ -225,7 +225,7 @@ func (o *PreImageOracle) fetchStorage(blockNum *big.Int, addr common.Address, sk
 	return newPreImages, nil
 }
 
-func (o *PreImageOracle) fetchAccount(blockNumber *big.Int, addr common.Address) (PreImages, error) {
+func (o *Oracle) fetchAccount(blockNumber *big.Int, addr common.Address) (PreImages, error) {
 	// 1. get account proof from remote node
 	ctx := context.Background()
 	proof, err := o.gethclient.GetProof(ctx, addr, nil, blockNumber)
@@ -239,7 +239,7 @@ func (o *PreImageOracle) fetchAccount(blockNumber *big.Int, addr common.Address)
 	return newPreImages, nil
 }
 
-func (o *PreImageOracle) fetchCode(blockNumber *big.Int, addr common.Address) (PreImages, error) {
+func (o *Oracle) fetchCode(blockNumber *big.Int, addr common.Address) (PreImages, error) {
 	// 1. get code from remote node
 	ctx := context.Background()
 	code, err := o.ethclient.CodeAt(ctx, addr, blockNumber)
@@ -255,7 +255,7 @@ func (o *PreImageOracle) fetchCode(blockNumber *big.Int, addr common.Address) (P
 	return newPreImages, nil
 }
 
-func (o *PreImageOracle) fetchBlock(blockNumber *big.Int) (PreImages, *types.Header, error) {
+func (o *Oracle) fetchBlock(blockNumber *big.Int) (PreImages, *types.Header, error) {
 	// 1. get block from remote node
 	ctx := context.Background()
 	block, err := o.ethclient.BlockByNumber(ctx, blockNumber)
@@ -276,10 +276,10 @@ func (o *PreImageOracle) fetchBlock(blockNumber *big.Int) (PreImages, *types.Hea
 	return newPreImages, nil, nil
 }
 
-func (o *PreImageOracle) PreImages() PreImages {
+func (o *Oracle) PreImages() PreImages {
 	return o.images
 }
 
-func (o *PreImageOracle) Writer() *PreimageKeyValueWriter {
+func (o *Oracle) Writer() *PreimageKeyValueWriter {
 	return &PreimageKeyValueWriter{preimages: o.images}
 }

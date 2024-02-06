@@ -171,7 +171,7 @@ func (o *Oracle) PreFetchCode(blockNum *big.Int, addr common.Address, postProces
 	return nil
 }
 
-func (o *Oracle) PrefetchBlock(blockNum *big.Int, startBlock bool) error {
+func (o *Oracle) PreFetchBlock(blockNum *big.Int, startBlock bool) error {
 	images, header, err := o.fetchBlock(blockNum)
 	if err != nil {
 		return err
@@ -185,15 +185,15 @@ func (o *Oracle) PrefetchBlock(blockNum *big.Int, startBlock bool) error {
 	if startBlock {
 		hash := header.Hash()
 		emptyHash := common.Hash{}
-		if o.inputs[0] != emptyHash {
+		if o.inputs[0] == emptyHash {
 			o.inputs[0] = hash
 		}
 		return nil
 	}
 
 	// otherwise if we are the second block
-	if header.ParentHash != o.inputs[0] {
-		return fmt.Errorf("block parent incorrect– have: %s, want: %s", header.ParentHash, o.inputs[0])
+	if header.ParentHash.Cmp(o.inputs[0]) != 0 {
+		return fmt.Errorf("block parent incorrect– have: %v, want: %v", header.ParentHash, o.inputs[0])
 	}
 	o.inputs[1] = header.TxHash
 	o.inputs[2] = crypto.Keccak256Hash(header.Coinbase[:])

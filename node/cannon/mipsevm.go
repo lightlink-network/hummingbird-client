@@ -25,7 +25,6 @@ type MipsEvm struct {
 }
 
 func NewMipsEvm(opts *MipsEvmOpts) *MipsEvm {
-
 	regfault := -1
 	regfault_str, regfault_valid := os.LookupEnv("REGFAULT")
 	if regfault_valid {
@@ -80,6 +79,7 @@ func (m *MipsEvm) prepare(blockNum int64, target int) (*MipsProgram, error) {
 	mipsevm.ZeroRegisters(ram)
 
 	// Load the program
+	m.Opts.Logger.Debug("Loading program", "path", m.Opts.ProgramPath)
 	mipsevm.LoadMappedFileUnicorn(mu, m.Opts.ProgramPath, ram, 0)
 
 	return &MipsProgram{
@@ -124,13 +124,13 @@ func (m *MipsEvm) WriteCheckpoints(blockNum int64, target int) error {
 	mipsevm.SyncRegs(program.unicorn, program.ram)
 	if program.target == -1 {
 		if program.ram[0x30000800] != 0x1337f00d {
-			return fmt.Errorf("Failed to output stateroot")
+			return fmt.Errorf("failed to output stateroot")
 		}
 
 		output_filename := fmt.Sprintf("%s/output", program.root)
 		outputs, err := ioutil.ReadFile(output_filename)
 		if err != nil {
-			return fmt.Errorf("Failed to read output file %w", err)
+			return fmt.Errorf("failed to read output file %w", err)
 		}
 		real := append([]byte{0x13, 0x37, 0xf0, 0x0d}, outputs...)
 
@@ -142,7 +142,7 @@ func (m *MipsEvm) WriteCheckpoints(blockNum int64, target int) error {
 		}
 
 		if bytes.Compare(real, output) != 0 {
-			return fmt.Errorf("Output mismatch, overwriting")
+			return fmt.Errorf("output mismatch, overwriting")
 		}
 		m.Opts.Logger.Debug("Output matches")
 

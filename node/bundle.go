@@ -195,6 +195,10 @@ func (b *Bundle) FindTxShares(hash common.Hash, namespace string) (*SharePointer
 		return nil, fmt.Errorf("tx with hash %s not found in bundle", hash.Hex())
 	}
 
+	if tx.Type() != types.LegacyTxType {
+		return nil, fmt.Errorf("tx with hash %s is not a legacy tx, only legacy txns supported", hash.Hex())
+	}
+
 	// 2. get the tx RLP
 	txRLP, err := rlp.EncodeToBytes(tx)
 	if err != nil {

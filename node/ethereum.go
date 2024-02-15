@@ -57,6 +57,7 @@ type Ethereum interface {
 	// Data Loading
 	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
 	ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
+	ProvideLegacyTx(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
 }
 
 type EthereumClient struct {
@@ -442,6 +443,29 @@ func (e *EthereumClient) ProvideHeader(rblock common.Hash, shareData [][]byte, p
 	e.http.opts.Logger.Debug("ProvideHeader", "sharekey", fmt.Sprintf("%x", sharekey), "ranges", pointer.Ranges)
 
 	return e.http.chainLoader.ProvideHeader(transactor, sharekey, ranges)
+}
+
+func (e *EthereumClient) ProvideLegacyTx(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	sharekey, err := e.http.chainLoader.ShareKey(nil, rblock, shareData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get share key: %w", err)
+	}
+
+	ranges := make([]chainoracleContract.ChainOracleShareRange, len(pointer.Ranges))
+	for i, r := range pointer.Ranges {
+		ranges[i] = chainoracleContract.ChainOracleShareRange{
+			Start: big.NewInt(int64(r.Start)),
+			End:   big.NewInt(int64(r.End)),
+		}
+	}
+
+	e.http.opts.Logger.Debug("ProvideTx", "sharekey", fmt.Sprintf("%x", sharekey), "ranges", pointer.Ranges)
+	return e.http.chainLoader.ProvideLegacyTx(transactor, sharekey, ranges)
 }
 
 func (e *EthereumClient) GetPublisher() (common.Address, error) {

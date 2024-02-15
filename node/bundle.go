@@ -113,6 +113,17 @@ func (b *Bundle) Blob(namespace string) (*blob.Blob, error) {
 	return utils.BytesToBlob(namespace, bundleRLP)
 }
 
+func (b *Bundle) Shares(namespace string) ([]shares.Share, error) {
+	// 1. get the blob
+	blob, err := b.Blob(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. get the shares
+	return utils.BlobToShares(blob)
+}
+
 // FinderHeaderShares finds the shares in the bundle which contain the header
 // Returns a pointer to the data in the shares
 func (b *Bundle) FindHeaderShares(hash common.Hash, namespace string) (*SharePointer, error) {
@@ -135,7 +146,7 @@ func (b *Bundle) FindHeaderShares(hash common.Hash, namespace string) (*SharePoi
 		return nil, err
 	}
 
-	// 3. Get the bundle shares
+	// 3. Get the bundle rlp
 	bundleRLP, err := b.EncodeRLP()
 	if err != nil {
 		return nil, err
@@ -164,4 +175,62 @@ func (b *Bundle) FindHeaderShares(hash common.Hash, namespace string) (*SharePoi
 	endShare, endIndex := utils.RawIndexToSharesIndex(rlpEnd, shares)
 
 	return NewSharePointer(shares, startShare, startIndex, endShare, endIndex), nil
+}
+
+// FinderTxShares finds the shares in the bundle which contain the transaction
+// Returns a pointer to the data in the shares
+func (b *Bundle) FindTxShares(hash common.Hash, namespace string) (*SharePointer, error) {
+	// 1. find the tx with the given hash
+	var tx *types.Transaction
+	for _, block := range b.Blocks {
+		for _, t := range block.Transactions() {
+			if t.Hash().Hex() == hash.Hex() {
+				tx = t
+				break
+			}
+		}
+	}
+
+	if tx == nil {
+		return nil, fmt.Errorf("tx with hash %s not found in bundle", hash.Hex())
+	}
+
+	// 2. get the tx RLP
+	txRLP, err := rlp.EncodeToBytes(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Get the bundle rlp
+	bundleRLP, err := b.EncodeRLP()
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. get bundle shares
+	blob, err := utils.BytesToBlob(namespace, bundleRLP)
+	if err != nil {
+		return nil, err
+	}
+	shares, err := utils.BlobToShares(blob)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. find the tx coords in the raw bundleRLP
+	rlpStart := bytes.Index(bundleRLP, txRLP)
+	rlpEnd := rlpStart + len(txRLP)
+
+	if rlpStart == -1 {
+		return nil, fmt.Errorf("encoded tx not found in the bundle")
+	}
+
+	// 5. find the tx coords in the shares
+	startShare, startIndex := utils.RawIndexToSharesIndex(rlpStart, shares)
+	endShare, endIndex := utils.RawIndexToSharesIndex(rlpEnd, shares)
+
+	return NewSharePointer(shares, startShare, startIndex, endShare, endIndex), nil
+
+	// TODO: this code repeats the same logic as FindHeaderShares, we should refactor it
+	// to avoid code duplication. `FindBytesShares` ?
 }

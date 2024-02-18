@@ -49,8 +49,8 @@ var DefenderDefendDaCmd = &cobra.Command{
 
 		tx, err := d.DefendDA(blockHash)
 		if err != nil {
-			logger.Error("Failed to defend data availability", "err", err)
-			panic(err)
+			logger.Error("Failed to defend data availability, please wait for Celestia validators to commit data root", "err", err)
+			return
 		}
 
 		fmt.Println("Defended data availability with tx:", tx.Hash().Hex(), "gas used:", tx.Gas(), "gas price:", tx.GasPrice().Uint64())

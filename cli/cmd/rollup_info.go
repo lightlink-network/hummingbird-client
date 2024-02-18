@@ -120,7 +120,9 @@ func printBundle(bundle *node.Bundle) {
 	fmt.Println("Bundle:")
 	fmt.Println(" Blocks:", len(bundle.Blocks))
 	for _, b := range bundle.Blocks {
-		fmt.Println("  →", "Index:", b.Number(), "Hash:", b.Header().Hash().Hex())
+		h := b.Header()
+		h.Extra = common.Hex2Bytes("0x")
+		fmt.Println("  →", "Index:", b.Number(), "Hash:", h.Hash().Hex())
 	}
 	fmt.Println(" ")
 }

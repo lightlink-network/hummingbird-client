@@ -12,13 +12,15 @@ It is designed to work in unison with the [lightlink-hummingbird-contracts](http
 
 ```bash
 hb rollup info  # Get the current rollup state
+hb rollup info --hash <rblock_hash> --bundle # View the bundled L2 block hashes in an L1 block
 hb rollup next  # [Publisher Only] Generate the next rollup block
 hb rollup start # [Publisher Only] Start the rollup loop to generate and submit bundles
-hb challenger challenge-da <block_number> # Challenge data availability
-hb defender defend-da <block_hash> # Defend data availability
-hd defender info-da <block_hash> # Provides info on an existing challenge
-hb defender prove-da <block_hash> # Prove data availability
+hb challenger challenge-da <rblock_number> # Challenge data availability
+hb defender defend-da <rblock_hash> # Defend data availability
+hd defender info-da <rblock_hash> # Provides info on an existing challenge
+hb defender prove-da <rblock_hash> # Prove data availability
 hb defender start # Start the defender loop to watch and defend challenges
+hb defender provide <rblock_hash> <l2_block_hash-or-index> # Provide will download data from Celestia and provide them to Layer 1 ChainOracle
 ```
 
 The following root flags are available for all commands:

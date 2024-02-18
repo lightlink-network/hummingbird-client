@@ -62,6 +62,7 @@ type CelestiaClientOpts struct {
 	Namespace     string
 	Logger        *slog.Logger
 	GasPrice      float64
+	Retries       int
 }
 
 type CelestiaClient struct {
@@ -71,6 +72,7 @@ type CelestiaClient struct {
 	grcp      *grpc.ClientConn
 	logger    *slog.Logger
 	gasPrice  float64
+	retries   int
 }
 
 func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
@@ -105,6 +107,7 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		grcp:      grcp,
 		logger:    opts.Logger,
 		gasPrice:  opts.GasPrice,
+		retries:   opts.Retries,
 	}, nil
 }
 
@@ -142,19 +145,21 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 
 	var pointer *CelestiaPointer
 
-	// Retry up to 5 times
-	for i := 0; i < 5; i++ {
+	i := 0
+	for {
 		// post the blob
 		pointer, err = c.submitBlob(context.Background(), cosmosmath.NewInt(fee), gasLimit, []*blob.Blob{b})
-		if err == nil {
+		if err == nil || i >= c.retries {
 			break
 		}
 
-		// Increase gas price by 20%
+		// Increase gas price by 20% if the transaction fails
 		gasPrice *= 1.2
 		fee = int64(gasPrice * float64(gasLimit))
 
 		c.logger.Warn("Failed to submit blob, retrying", "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
+
+		i++
 	}
 
 	if err != nil {

@@ -43,7 +43,7 @@ var DefenderProveDaCmd = &cobra.Command{
 		proof, err := d.GetDAProof(blockHash)
 		if err != nil {
 			logger.Error("Failed to prove data availability", "err", err)
-			panic(err)
+			return
 		}
 
 		if useJson, _ := cmd.Flags().GetBool("json"); useJson {
@@ -72,7 +72,7 @@ var DefenderProveDaCmd = &cobra.Command{
 		verified, err := n.Ethereum.DAVerify(proof)
 		if err != nil {
 			logger.Error("Failed to verify proof", "err", err)
-			panic(err)
+			return
 		}
 
 		fmt.Println(" ")

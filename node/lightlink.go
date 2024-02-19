@@ -79,7 +79,10 @@ func (l *LightLinkClient) GetBlock(height uint64) (*types.Block, error) {
 		return nil, err
 	}
 
-	result := resp.Result.(map[string]interface{})
+	result, ok := resp.Result.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("response is not a map[string]interface{}: %v", resp.Result)
+	}
 	txs := types.Transactions{}
 	for k, v := range result["transactions"].([]interface{}) {
 

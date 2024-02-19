@@ -43,7 +43,9 @@ var DefenderProvideCmd = &cobra.Command{
 			b, err := n.LightLink.GetBlock(uint64(num))
 			utils.NoErr(err)
 
-			l2blockHash = b.Header().Hash()
+			h := b.Header()
+			h.Extra = common.Hex2Bytes("0x")
+			l2blockHash = h.Hash()
 			logger.Info("Providing L2 Header by block number", "block", args[1], "hash", l2blockHash.Hex())
 		}
 

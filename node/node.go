@@ -60,6 +60,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		Namespace:     cfg.Celestia.Namespace,
 		Logger:        logger.With("ctx", "celestia"),
 		GasPrice:      cfg.Celestia.GasPrice,
+		Retries:       cfg.Celestia.Retries,
 	})
 	if err != nil {
 		return nil, err

@@ -6,8 +6,6 @@ import (
 	"hummingbird/defender"
 	"hummingbird/node"
 	"hummingbird/utils"
-	"strconv"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -39,21 +37,6 @@ var DefenderProvideCmd = &cobra.Command{
 
 		// allow block hash or number
 		targetHash := common.HexToHash(args[1])
-		var l2blockHash common.Hash
-		if strings.HasPrefix(args[1], "0x") {
-			l2blockHash = common.HexToHash(args[1])
-		} else {
-			logger.Info("Providing L2 Header by block number", "block", args[1])
-			num, err := strconv.Atoi(args[1])
-			utils.NoErr(err)
-			b, err := n.LightLink.GetBlock(uint64(num))
-			utils.NoErr(err)
-
-			h := b.Header()
-			h.Extra = common.Hex2Bytes("0x")
-			l2blockHash = h.Hash()
-			logger.Info("Providing L2 Header by block number", "block", args[1], "hash", l2blockHash.Hex())
-		}
 
 		d := defender.NewDefender(n, &defender.Opts{
 			Logger: logger.With("ctx", "Defender"),
@@ -67,13 +50,13 @@ var DefenderProvideCmd = &cobra.Command{
 			logger.Info("Providing L2 Header...")
 			tx, err = d.ProvideL2Header(rblockHash, targetHash)
 			if err != nil {
-				logger.Error("Defender.Provide failed", "err", err)
+				logger.Error("Defender.Provide header failed", "err", err)
 			}
 		case "tx":
 			logger.Info("Providing L2 Tx...")
 			tx, err = d.ProvideL2Tx(rblockHash, targetHash)
 			if err != nil {
-				logger.Error("Defender.Provide failed", "err", err)
+				logger.Error("Defender.Provide tx failed", "err", err)
 			}
 		default:
 			logger.Error("Invalid type", "type", t)

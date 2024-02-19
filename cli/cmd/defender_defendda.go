@@ -6,6 +6,7 @@ import (
 	"hummingbird/defender"
 	"hummingbird/node"
 	"hummingbird/utils"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
@@ -49,7 +50,12 @@ var DefenderDefendDaCmd = &cobra.Command{
 
 		tx, err := d.DefendDA(blockHash)
 		if err != nil {
-			logger.Error("Failed to defend data availability, please wait for Celestia validators to commit data root", "err", err)
+			if strings.Contains(err.Error(), "no data commitment has been generated for the provided height") {
+				logger.Error("Failed to defend data availability, please wait for Celestia validators to commit data root", "err", err)
+				return
+			}
+
+			logger.Error("Failed to defend data availability", "err", err)
 			return
 		}
 

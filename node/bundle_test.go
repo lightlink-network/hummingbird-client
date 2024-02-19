@@ -52,7 +52,7 @@ func newRandomBundle(size int, withTxns bool) *Bundle {
 			for j := 0; j < randN; j++ {
 				to := randAddr()
 				rtx := ethtypes.NewTx(&ethtypes.LegacyTx{
-					Nonce:    uint64(j),
+					Nonce:    uint64(j + 1),
 					To:       &to,
 					Value:    big.NewInt(10000),
 					Gas:      21000,
@@ -138,6 +138,15 @@ func TestBundle_FindTxShares(t *testing.T) {
 	foundTx, err := sharesPointerToTx(pointer, shares)
 	assert.NoError(t, err)
 	assert.Equal(t, tx.Hash().Hex(), foundTx.Hash().Hex())
+
+	txJson, _ := tx.MarshalJSON()
+	t.Logf("tx: %s", txJson)
+	t.Logf("tx rlp: %x", encTx)
+	for i, r := range pointer.Ranges {
+		_share := shares[i+pointer.StartShare].ToBytes()
+		t.Logf("Share %d: %x", i, _share)
+		t.Logf("Range %d: start: %d, end: %d", i, r.Start, r.End)
+	}
 }
 
 func sharesPointerToTx(pointer *SharePointer, s []shares.Share) (*ethtypes.Transaction, error) {

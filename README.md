@@ -1,12 +1,12 @@
 # LightLink Hummingbird
 
-![Test, Build Image & Push to ECR](https://github.com/pellartech/lightlink-hummingbird/actions/workflows/build_and_publish.yml/badge.svg?branch=main)
+![Test, Build Image & Push to ECR](https://github.com/lightlink-network/hummingbird-client/actions/workflows/build_and_publish.yml/badge.svg?branch=main)
 
 ![LightLink Hummingbird preview screenshot](<preview.png>)
 
 Hummingbird is a light client for interacting with the [LightLink Protocol](https://lightlink.io).
 
-It is designed to work in unison with the [lightlink-hummingbird-contracts](https://github.com/pellartech/lightlink-hummingbird-contracts) repository.
+It is designed to work in unison with the [hummingbird-contracts](https://github.com/lightlink-network/hummingbird-contracts) repository.
 
 ## Usage
 
@@ -44,9 +44,9 @@ Build the binary from source:
 
 ```bash
 cd $HOME
-rm -rf lightlink-hummingbird
-git clone https://github.com/pellartech/lightlink-hummingbird.git
-cd lightlink-hummingbird
+rm -rf hummingbird-client
+git clone https://github.com/lightlink-network/hummingbird-client.git
+cd hummingbird-client
 git checkout tags/v0.0.3 -b v0.0.3
 make build
 ```
@@ -72,7 +72,7 @@ Note: If your go path is not set in your system path, the binary can be run dire
 
 ### Option 2: Use pre-built binary
 
-Download the latest release from [here](https://github.com/pellartech/lightlink-hummingbird/releases)
+Download the latest release from [here](https://github.com/lightlink-network/hummingbird-client/releases)
 
 ## Configuration
 

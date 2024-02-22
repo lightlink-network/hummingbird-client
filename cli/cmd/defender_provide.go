@@ -15,6 +15,7 @@ import (
 
 func init() {
 	DefenderProvideCmd.Flags().String("type", "header", "type of data to provide (header, tx)")
+	DefenderProvideCmd.Flags().Bool("skip-shares", false, "skip providing shares")
 }
 
 var DefenderProvideCmd = &cobra.Command{
@@ -42,21 +43,29 @@ var DefenderProvideCmd = &cobra.Command{
 			Logger: logger.With("ctx", "Defender"),
 		})
 
+		// skip shares
+		skipShares, _ := cmd.Flags().GetBool("skip-shares")
+		if skipShares {
+			logger.Info("Skipping providing shares")
+		}
+
 		// type
 		t, _ := cmd.Flags().GetString("type")
 		var tx *types.Transaction
 		switch t {
 		case "header":
 			logger.Info("Providing L2 Header...")
-			tx, err = d.ProvideL2Header(rblockHash, targetHash)
+			tx, err = d.ProvideL2Header(rblockHash, targetHash, skipShares)
 			if err != nil {
 				logger.Error("Defender.Provide header failed", "err", err)
+				return
 			}
 		case "tx":
 			logger.Info("Providing L2 Tx...")
-			tx, err = d.ProvideL2Tx(rblockHash, targetHash)
+			tx, err = d.ProvideL2Tx(rblockHash, targetHash, skipShares)
 			if err != nil {
 				logger.Error("Defender.Provide tx failed", "err", err)
+				return
 			}
 		default:
 			logger.Error("Invalid type", "type", t)

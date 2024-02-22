@@ -432,6 +432,16 @@ func (e *EthereumClient) ProvideHeader(rblock common.Hash, shareData [][]byte, p
 		return nil, fmt.Errorf("failed to get share key: %w", err)
 	}
 
+	// check shares are found
+	s, err := e.http.chainLoader.Shares(nil, sharekey, big.NewInt(0))
+	if err != nil {
+		return nil, fmt.Errorf("failed checking shares were deployed: %w", err)
+	}
+
+	if len(s) == 0 {
+		return nil, fmt.Errorf("failed checking shares: shares not found")
+	}
+
 	ranges := make([]chainoracleContract.ChainOracleShareRange, len(pointer.Ranges))
 	for i, r := range pointer.Ranges {
 		ranges[i] = chainoracleContract.ChainOracleShareRange{
@@ -454,6 +464,16 @@ func (e *EthereumClient) ProvideLegacyTx(rblock common.Hash, shareData [][]byte,
 	sharekey, err := e.http.chainLoader.ShareKey(nil, rblock, shareData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get share key: %w", err)
+	}
+
+	// check shares are found
+	s, err := e.http.chainLoader.Shares(nil, sharekey, big.NewInt(0))
+	if err != nil {
+		return nil, fmt.Errorf("failed checking shares were deployed: %w", err)
+	}
+
+	if len(s) == 0 {
+		return nil, fmt.Errorf("failed checking shares: shares not found")
 	}
 
 	ranges := make([]chainoracleContract.ChainOracleShareRange, len(pointer.Ranges))

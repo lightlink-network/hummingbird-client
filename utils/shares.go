@@ -79,3 +79,18 @@ func RawIndexToSharesIndex(rawIndex int, s []shares.Share) (share int, shareInde
 
 	return
 }
+
+func ExtractDataFromShares(s []shares.Share) []byte {
+	data := []byte{}
+
+	for _, share := range s {
+		d, err := share.RawData()
+		if err != nil {
+			panic(err)
+		}
+
+		data = append(data, d...)
+	}
+
+	return data
+}

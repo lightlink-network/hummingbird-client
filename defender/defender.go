@@ -274,6 +274,10 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 		}
 		d.Opts.Logger.Info("Provided shares", "tx", tx.Hash().Hex(), "block", rblock.Hex(), "shares", len(shareProof.Data))
 		d.Ethereum.Wait(tx.Hash())
+
+		// TODO: remove this sleep hack and fix Ethereum.Wait
+		d.Opts.Logger.Info("Waiting for 3 seconds to ensure shares are available")
+		time.Sleep(3 * time.Second)
 	}
 
 	// Finally, provide the header
@@ -319,6 +323,10 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 		}
 		d.Opts.Logger.Info("Provided shares", "tx", tx.Hash().Hex(), "block", rblock.Hex(), "shares", len(shareProof.Data))
 		d.Ethereum.Wait(tx.Hash())
+
+		// TODO: remove this sleep hack and fix Ethereum.Wait
+		d.Opts.Logger.Info("Waiting for 3 seconds to ensure shares are available")
+		time.Sleep(3 * time.Second)
 	}
 
 	// Finally, provide the transaction

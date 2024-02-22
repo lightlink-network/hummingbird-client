@@ -54,10 +54,11 @@ func panicErr(err error, prefix ...string) {
 }
 
 func printJSON(v interface{}) {
-	buf, err := json.MarshalIndent(v, "", " ")
-	panicErr(err, "output formatting failed")
+	output, err := utils.PrepareTidyJSON(v)
+	panicErr(err, "json output preparation failed")
 
-	// TODO: display byte arrays as hex strings
+	buf, err := json.MarshalIndent(&output, "", " ")
+	panicErr(err, "json output formatting failed")
 
 	fmt.Println(string(buf))
 }

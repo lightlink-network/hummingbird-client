@@ -87,7 +87,6 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Celestia: %w", err)
 	}
-	defer c.Close()
 
 	trpc, err := http.New(opts.TendermintRPC, "/websocket")
 	if err != nil {
@@ -97,13 +96,11 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	if err := trpc.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start Tendermint RPC: %w", err)
 	}
-	defer trpc.Stop()
 
 	grcp, err := grpc.Dial(opts.GRPC, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Celestia GRPC: %w", err)
 	}
-	defer grcp.Close()
 
 	opts.Logger.Info("Connected to Celestia")
 	return &CelestiaClient{

@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"fmt"
 	"math/big"
 
+	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -11,11 +13,13 @@ import (
 	"hummingbird/node"
 	"hummingbird/node/contracts"
 	chainoracleContract "hummingbird/node/contracts/ChainOracle.sol"
+	"hummingbird/utils"
 )
 
 func init() {
 	FetchCmd.Flags().StringVar(&format, "format", "json", "format of the output (json, pretty)")
 	FetchCmd.Flags().BoolVar(&withProof, "proof", false, "whether to generate share proofs in the output")
+	FetchCmd.Flags().BoolVar(&checkProof, "check-proof", false, "whether to check the proof")
 
 	// Add the fetch command to the root command
 	RootCmd.AddCommand(FetchCmd)
@@ -23,8 +27,9 @@ func init() {
 
 var (
 	// variables for the fetch command
-	format    string // format of the output (json)
-	withProof bool   // whether to generate share proofs in the output
+	format     string // format of the output (json)
+	withProof  bool   // whether to generate share proofs in the output
+	checkProof bool   // whether to check the pointer
 
 	// fetch command
 	FetchCmd = &cobra.Command{
@@ -114,6 +119,22 @@ var (
 
 				proof, err = contracts.NewShareProof(shareProof, attestationProof)
 				panicErr(err, "failed to create proof")
+
+				// check the proof can be decoded
+				if checkProof {
+					ss, err := utils.BytesToShares(proof.Data)
+					panicErr(err, "failed to convert proof to shares")
+
+					decH, err := sharesToHeader(ss, pointer.Ranges)
+					panicErr(err, "failed to convert shares to header")
+
+					decH.Extra = common.Hex2Bytes("0x")
+					if decH.Hash().Hex() != dataHash.Hex() {
+						panicErr(err, "proof does not match data")
+					}
+
+					fmt.Println("✔️  Proof is valid")
+				}
 			}
 
 			// 5. Generate output
@@ -157,4 +178,14 @@ type Output[T any] struct {
 	Shares [][]byte                                    `json:"shares,omitempty"`
 	Ranges []chainoracleContract.ChainOracleShareRange `json:"ranges,omitempty"`
 	Proof  *chainoracleContract.SharesProof            `json:"proof,omitempty"`
+}
+
+func sharesToHeader(s []shares.Share, ranges []node.ShareRange) (*types.Header, error) {
+	data := []byte{}
+	for i, r := range ranges {
+		data = append(data, s[i].ToBytes()[r.Start:r.End]...)
+	}
+
+	header := &types.Header{}
+	return header, rlp.DecodeBytes(data, &header)
 }

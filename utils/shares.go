@@ -94,3 +94,17 @@ func ExtractDataFromShares(s []shares.Share) []byte {
 
 	return data
 }
+
+func BytesToShares(buf [][]byte) ([]shares.Share, error) {
+	s := []shares.Share{}
+	for _, b := range buf {
+		share, err := shares.NewShare(b)
+		if err != nil {
+			return nil, err
+		}
+
+		s = append(s, *share)
+	}
+
+	return s, nil
+}

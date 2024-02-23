@@ -69,17 +69,17 @@ var DefenderInfoDaCmd = &cobra.Command{
 			return
 		}
 
-		if info.Status == 4 {
+		if info.Status == 2 {
 			fmt.Println("→ The Challenge has completed")
-			fmt.Println(" 🏛️	Verdict: The Defender has won the challenge.")
+			fmt.Println(" 🏛️	Verdict: The Challenger has won the challenge.")
+			fmt.Println(" 👮	The chain was rolled back.")
 			fmt.Println(" ")
 			return
 		}
 
 		if info.Status == 3 {
 			fmt.Println("→ The Challenge has completed")
-			fmt.Println(" 🏛️	Verdict: The Challenger has won the challenge.")
-			fmt.Println(" 👮	The chain was rolled back.")
+			fmt.Println(" 🏛️	Verdict: The Defender has won the challenge.")
 			fmt.Println(" ")
 			return
 		}

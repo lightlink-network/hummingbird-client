@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
+	"strings"
+	"time"
 
 	cosmosmath "cosmossdk.io/math"
 	"github.com/celestiaorg/celestia-node/api/rpc/client"
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/celestiaorg/celestia-node/share"
 	"github.com/ethereum/go-ethereum/common"
-
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tendermint/tendermint/rpc/client/http"
+	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -84,6 +87,7 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Celestia: %w", err)
 	}
+	defer c.Close()
 
 	trpc, err := http.New(opts.TendermintRPC, "/websocket")
 	if err != nil {
@@ -93,11 +97,13 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	if err := trpc.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start Tendermint RPC: %w", err)
 	}
+	defer trpc.Stop()
 
 	grcp, err := grpc.Dial(opts.GRPC, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Celestia GRPC: %w", err)
 	}
+	defer grcp.Close()
 
 	opts.Logger.Info("Connected to Celestia")
 	return &CelestiaClient{
@@ -169,25 +175,111 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 	return pointer, nil
 }
 
+func (c *CelestiaClient) waitForTxInclusion(ctx context.Context, h common.Hash) (*ctypes.ResultTx, error) {
+	txHash := []byte{}
+	maxRetries := 1000
+	retryInterval := 10 * time.Second
+
+	c.logger.Debug("Waiting for tx inclusion", "blob_hash", h.Hex())
+
+	// Scan the mempool every 'retryInterval' until 'maxRetries' is reached or the tx is not found in the mempool
+	// Scanning the pool gives us the tx hash
+	for i := 0; i < maxRetries; i++ {
+		txns, err := c.trpc.UnconfirmedTxs(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		found := false
+		for _, tx := range txns.Txs {
+			blobtx, isBlob := types.UnmarshalBlobTx(tx)
+			if !isBlob {
+				c.logger.Info("waitForTxInclusion: discovered tx is not a blob")
+				continue
+			}
+			if len(blobtx.Blobs) == 0 {
+				return nil, fmt.Errorf("waitForTxInclusion: discovered tx has no blobs")
+			}
+			// Check if the data hash of the tx matches the hash of the data we submitted
+			if crypto.Keccak256Hash(blobtx.Blobs[0].Data) == h {
+				txHash = tx.Hash()
+				c.logger.Debug("Tx found in mempool", "tx", h.Hex())
+				found = true
+				break // if the tx is found in the mempool, break the inner loop as it is not included in a block yet
+			}
+		}
+
+		if !found {
+			break // if the tx is not found in the mempool, break the outer loop as it is already included in a block
+		}
+
+		time.Sleep(retryInterval)
+	}
+
+	if len(txHash) == 0 {
+		return nil, fmt.Errorf("waitForTxInclusion: tx not found after max retries:  %v", maxRetries)
+	}
+
+	// Get the tx with block inclusion info
+	for i := 0; i < maxRetries; i++ {
+		time.Sleep(retryInterval)
+
+		tx, err := c.trpc.Tx(ctx, txHash, true)
+		if err != nil {
+			// Sometimes the tx is not in the mempool, but not found in the block yet
+			// We need to wait for it to be included in a block
+			if strings.Contains(err.Error(), "not found") {
+				continue
+			} else {
+				return nil, err
+			}
+		}
+		if tx.Height == 0 {
+			c.logger.Debug("Tx found but height is 0, retrying...", "tx", tx.Hash, "height", tx.Height, "index", tx.Index)
+			time.Sleep(retryInterval)
+			continue
+		}
+		c.logger.Debug("Tx found and included in a block", "tx", tx.Hash, "height", tx.Height, "index", tx.Index)
+		return tx, nil
+	}
+
+	return nil, fmt.Errorf("waitForTxInclusion: tx not found after max retries:  %v", maxRetries)
+}
+
 // PostData submits a new transaction with the provided data to the Celestia node.
 func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
+	tx := &ctypes.ResultTx{}
 	response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
 	if err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), "timed out waiting for tx to be included in a block") {
+			tx, err = c.waitForTxInclusion(ctx, crypto.Keccak256Hash(blobs[0].Data))
+			if err != nil {
+				return nil, fmt.Errorf("submitBlob: failed to wait for tx inclusion: %w", err)
+			}
+			if tx == nil {
+				return nil, fmt.Errorf("submitBlob: failed to wait for tx inclusion: %w", err)
+			}
+		} else {
+			return nil, err
+		}
 	}
 
-	txHash, err := hex.DecodeString(response.TxHash)
-	if err != nil {
-		return nil, err
-	}
+	var txHash []byte
+	var txHeight int64
 
-	tx, err := c.trpc.Tx(ctx, txHash, true)
-	if err != nil {
-		return nil, fmt.Errorf("submitBlob: failed to get celestia tx: %w", err)
+	if response != nil {
+		txHash, err = hex.DecodeString(response.TxHash)
+		if err != nil {
+			return nil, err
+		}
+		txHeight = response.Height
+	} else {
+		txHash = tx.Hash
+		txHeight = tx.Height
 	}
 
 	// Get the block that contains the tx
-	blockRes, err := c.trpc.Block(context.Background(), &tx.Height)
+	blockRes, err := c.trpc.Block(context.Background(), &txHeight)
 	if err != nil {
 		return nil, fmt.Errorf("submitBlob: failed to get celestia block: %w", err)
 	}
@@ -199,7 +291,7 @@ func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gas
 	}
 
 	pointer := &CelestiaPointer{
-		Height:     uint64(response.Height),
+		Height:     uint64(txHeight),
 		Commitment: common.BytesToHash(blobs[0].Commitment),
 		ShareStart: uint64(shareRange.Start),
 		ShareLen:   uint64(shareRange.End - shareRange.Start),

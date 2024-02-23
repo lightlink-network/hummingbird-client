@@ -87,6 +87,7 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Celestia: %w", err)
 	}
+	defer c.Close()
 
 	trpc, err := http.New(opts.TendermintRPC, "/websocket")
 	if err != nil {
@@ -96,11 +97,13 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	if err := trpc.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start Tendermint RPC: %w", err)
 	}
+	defer trpc.Stop()
 
 	grcp, err := grpc.Dial(opts.GRPC, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Celestia GRPC: %w", err)
 	}
+	defer grcp.Close()
 
 	opts.Logger.Info("Connected to Celestia")
 	return &CelestiaClient{
@@ -176,6 +179,8 @@ func (c *CelestiaClient) waitForTxInclusion(ctx context.Context, h common.Hash) 
 	txHash := []byte{}
 	maxRetries := 1000
 	retryInterval := 10 * time.Second
+
+	c.logger.Debug("Waiting for tx inclusion", "blob_hash", h.Hex())
 
 	// Scan the mempool every 'retryInterval' until 'maxRetries' is reached or the tx is not found in the mempool
 	// Scanning the pool gives us the tx hash

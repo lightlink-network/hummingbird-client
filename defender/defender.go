@@ -235,7 +235,7 @@ func (d *Defender) scanAndDefendHistoricChallenges() error {
 	return nil
 }
 
-func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash) (*types.Transaction, error) {
+func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skipShares bool) (*types.Transaction, error) {
 
 	// Download the rollup block and bundle from L1 and
 	// Celestia
@@ -267,18 +267,24 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash) (*ty
 	}
 
 	// Provide the shares
-	tx, err := d.Ethereum.ProvideShares(rblock, shareProof, celProof)
-	if err != nil {
-		return nil, fmt.Errorf("error providing shares: %w", err)
+	if !skipShares {
+		tx, err := d.Ethereum.ProvideShares(rblock, shareProof, celProof)
+		if err != nil {
+			return nil, fmt.Errorf("error providing shares: %w", err)
+		}
+		d.Opts.Logger.Info("Provided shares", "tx", tx.Hash().Hex(), "block", rblock.Hex(), "shares", len(shareProof.Data))
+		d.Ethereum.Wait(tx.Hash())
+
+		// TODO: remove this sleep hack and fix Ethereum.Wait
+		d.Opts.Logger.Info("Waiting for 3 seconds to ensure shares are available")
+		time.Sleep(3 * time.Second)
 	}
-	d.Opts.Logger.Info("Provided shares", "tx", tx.Hash().Hex(), "block", rblock.Hex(), "shares", len(shareProof.Data))
-	d.Ethereum.Wait(tx.Hash())
 
 	// Finally, provide the header
 	return d.Ethereum.ProvideHeader(rblock, shareProof.Data, *sharePointer)
 }
 
-func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash) (*types.Transaction, error) {
+func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares bool) (*types.Transaction, error) {
 
 	// Download the rollup block and bundle from L1 and
 	// Celestia
@@ -310,12 +316,18 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash) (*types.Tra
 	}
 
 	// Provide the shares
-	tx, err := d.Ethereum.ProvideShares(rblock, shareProof, celProof)
-	if err != nil {
-		return nil, fmt.Errorf("error providing shares: %w", err)
+	if !skipShares {
+		tx, err := d.Ethereum.ProvideShares(rblock, shareProof, celProof)
+		if err != nil {
+			return nil, fmt.Errorf("error providing shares: %w", err)
+		}
+		d.Opts.Logger.Info("Provided shares", "tx", tx.Hash().Hex(), "block", rblock.Hex(), "shares", len(shareProof.Data))
+		d.Ethereum.Wait(tx.Hash())
+
+		// TODO: remove this sleep hack and fix Ethereum.Wait
+		d.Opts.Logger.Info("Waiting for 3 seconds to ensure shares are available")
+		time.Sleep(3 * time.Second)
 	}
-	d.Opts.Logger.Info("Provided shares", "tx", tx.Hash().Hex(), "block", rblock.Hex(), "shares", len(shareProof.Data))
-	d.Ethereum.Wait(tx.Hash())
 
 	// Finally, provide the transaction
 	return d.Ethereum.ProvideLegacyTx(rblock, shareProof.Data, *sharePointer)

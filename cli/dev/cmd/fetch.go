@@ -124,13 +124,18 @@ var (
 				if checkProof {
 					ss, err := utils.BytesToShares(proof.Data)
 					panicErr(err, "failed to convert proof to shares")
+					switch dataType {
+					case "header":
+						decH, err := sharesToHeader(ss, pointer.Ranges)
+						panicErr(err, "failed to convert shares to header")
 
-					decH, err := sharesToHeader(ss, pointer.Ranges)
-					panicErr(err, "failed to convert shares to header")
+						decH.Extra = common.Hex2Bytes("0x")
+						if decH.Hash().Hex() != dataHash.Hex() {
+							panicErr(err, "proof does not match data")
+						}
 
-					decH.Extra = common.Hex2Bytes("0x")
-					if decH.Hash().Hex() != dataHash.Hex() {
-						panicErr(err, "proof does not match data")
+					default:
+						log.Warn("proof check not implemented for tx")
 					}
 
 					fmt.Println("✔️  Proof is valid")

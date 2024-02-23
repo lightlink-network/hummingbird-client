@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 
@@ -99,18 +98,22 @@ var (
 			log.Debug("✔️  Fetched Item", "type", dataType)
 
 			if checkPointer {
-				ss, err := n.Celestia.GetShares(&node.CelestiaPointer{
-					Height:     celPointer.Height,
-					ShareStart: celPointer.ShareStart + uint64(pointer.StartShare),
-					ShareLen:   uint64(pointer.EndShare() - pointer.StartShare),
-				})
-				panicErr(err, "failed to get shares")
+				log.Warn("Not implemented: check-pointer")
+				// ss, err := n.Celestia.GetShares(&node.CelestiaPointer{
+				// 	Height:     celPointer.Height,
+				// 	ShareStart: uint64(pointer.StartShare),
+				// 	ShareLen:   uint64(pointer.EndShare()-pointer.StartShare) + 1,
+				// })
+				// panicErr(err, "failed to get shares")
 
-				for i, s := range pointer.Shares() {
-					if bytes.Equal(s.ToBytes(), ss[i].ToBytes()) {
-						panic("check-pointer: share does not match")
-					}
-				}
+				// for i, s := range pointer.Shares() {
+				// 	if !bytes.Equal(s.ToBytes(), ss[i].ToBytes()) {
+				// 		log.Info("share pointer length", "expect", uint64(pointer.EndShare()-pointer.StartShare), "got", len(pointer.Ranges))
+				// 		log.Error("share does not match", "index", i, "expected", fmt.Sprintf("%x", s), "got", fmt.Sprintf("%x", ss[i]))
+				// 		panic("check-pointer: share does not match")
+				// 	}
+				// 	log.Debug("✔️  Share matches", "index", i)
+				// }
 			}
 
 			// 5. Generate proofs

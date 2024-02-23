@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 
@@ -20,6 +21,7 @@ func init() {
 	FetchCmd.Flags().StringVar(&format, "format", "json", "format of the output (json, pretty)")
 	FetchCmd.Flags().BoolVar(&withProof, "proof", false, "whether to generate share proofs in the output")
 	FetchCmd.Flags().BoolVar(&checkProof, "check-proof", false, "whether to check the proof")
+	FetchCmd.Flags().BoolVar(&checkPointer, "check-pointer", false, "whether to check the pointer")
 
 	// Add the fetch command to the root command
 	RootCmd.AddCommand(FetchCmd)
@@ -27,9 +29,10 @@ func init() {
 
 var (
 	// variables for the fetch command
-	format     string // format of the output (json)
-	withProof  bool   // whether to generate share proofs in the output
-	checkProof bool   // whether to check the pointer
+	format       string // format of the output (json)
+	withProof    bool   // whether to generate share proofs in the output
+	checkProof   bool   // whether to check the proof
+	checkPointer bool   // whether to check the pointer
 
 	// fetch command
 	FetchCmd = &cobra.Command{
@@ -94,6 +97,21 @@ var (
 				panicErr(err, "invalid data type")
 			}
 			log.Debug("✔️  Fetched Item", "type", dataType)
+
+			if checkPointer {
+				ss, err := n.Celestia.GetShares(&node.CelestiaPointer{
+					Height:     celPointer.Height,
+					ShareStart: celPointer.ShareStart + uint64(pointer.StartShare),
+					ShareLen:   uint64(pointer.EndShare() - pointer.StartShare),
+				})
+				panicErr(err, "failed to get shares")
+
+				for i, s := range pointer.Shares() {
+					if bytes.Equal(s.ToBytes(), ss[i].ToBytes()) {
+						panic("check-pointer: share does not match")
+					}
+				}
+			}
 
 			// 5. Generate proofs
 			var proof *chainoracleContract.SharesProof

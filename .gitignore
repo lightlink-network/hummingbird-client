@@ -16,3 +16,4 @@ config.yaml
 store
 storage
 build
+config.sepolia.yaml

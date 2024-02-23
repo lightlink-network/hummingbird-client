@@ -130,7 +130,9 @@ func (b *Bundle) FindHeaderShares(hash common.Hash, namespace string) (*SharePoi
 	// 1. find the block with the given hash
 	var block *types.Block
 	for _, b := range b.Blocks {
-		if b.Hash().Hex() == hash.Hex() {
+		// This is a hack to fix the issue with the extra data in the block header.
+		// TODO: remove this hack and fix extra data before bundle upload
+		if utils.HashWithoutExtraData(b).Hex() == hash.Hex() {
 			block = b
 			break
 		}

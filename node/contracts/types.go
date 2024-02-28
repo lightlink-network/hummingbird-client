@@ -2,6 +2,17 @@ package contracts
 
 import "math/big"
 
+const (
+	// Status for a DA challenge that has not been initiated
+	ChallengeDAStatusNone = 0
+	// Status for a DA challenge initiated by a challenger
+	ChallengeDAStatusChallengerInitiated = 1
+	// Status for a DA challenge that has been won by the challenger
+	ChallengeDAStatusChallengerWon = 2
+	// Status for a DA challenge that has been won by the defender
+	ChallengeDAStatusDefenderWon = 3
+)
+
 // Helper struct for pretty printing
 type ChallengeDaInfo struct {
 	BlockIndex *big.Int `pretty:"Block Index"`
@@ -11,16 +22,16 @@ type ChallengeDaInfo struct {
 }
 
 // Helper to convert challenge status enum to string
-func StatusString(c uint8) string {
+func DAChallengeStatusToString(c uint8) string {
 	switch c {
-	case 0:
+	case ChallengeDAStatusNone:
 		return "None"
-	case 1:
+	case ChallengeDAStatusChallengerInitiated:
 		return "ChallengerInitiated"
-	case 2:
-		return "DefenderResponded"
-	case 3:
+	case ChallengeDAStatusChallengerWon:
 		return "ChallengerWon"
+	case ChallengeDAStatusDefenderWon:
+		return "DefenderWon"
 	default:
 		return "Unknown"
 	}

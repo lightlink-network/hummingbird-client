@@ -27,19 +27,19 @@ linux: $(LINUX) ## Build for Linux
 darwin: $(DARWIN) ## Build for Darwin (macOS)
 
 $(WINDOWS):
-	@env GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(WINDOWS) -ldflags="-X main.Version=$(VERSION)" ./cli/main.go
+	@env GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(WINDOWS) -ldflags="-X main.Version=$(VERSION)" ./cli/hb/main.go
 
 $(LINUX):
-	@env GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(LINUX) -ldflags="-X main.Version=$(VERSION)" ./cli/main.go
+	@env GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(LINUX) -ldflags="-X main.Version=$(VERSION)" ./cli/hb/main.go
 
 $(DARWIN):
-	@env GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(DARWIN) -ldflags="-X main.Version=$(VERSION)" ./cli/main.go
+	@env GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(DARWIN) -ldflags="-X main.Version=$(VERSION)" ./cli/hb/main.go
 
 install: ## Install binary (mac or linux)
 	@echo "--> Installing Hummingbird on your system"
-	@go install -ldflags="-X main.Version=$(VERSION)" ./cli
-	@echo "--> Installation complete. Run 'cli --help' to get started."
-	@echo "--> NOTE: Your go path must be in your system path to run the binary via 'cli' command."
+	@go install -ldflags="-X main.Version=$(VERSION)" ./cli/hb
+	@echo "--> Installation complete. Run 'hb --help' to get started."
+	@echo "--> NOTE: Your go path must be in your system path to run the binary via 'hb' command."
 	@echo "--> Otherwise, you can run the binary via '$(BUILD_DIR)/$(DARWIN) --help' command."
 
 clean: ## Remove previous build

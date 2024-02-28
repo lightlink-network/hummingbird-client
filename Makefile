@@ -27,13 +27,13 @@ linux: $(LINUX) ## Build for Linux
 darwin: $(DARWIN) ## Build for Darwin (macOS)
 
 $(WINDOWS):
-	@env GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(WINDOWS) -ldflags="-X main.Version=$(VERSION)" ./cli/main.go
+	@env GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(WINDOWS) -ldflags="-X main.Version=$(VERSION)" ./cli/hb/main.go
 
 $(LINUX):
-	@env GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(LINUX) -ldflags="-X main.Version=$(VERSION)" ./cli/main.go
+	@env GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(LINUX) -ldflags="-X main.Version=$(VERSION)" ./cli/hb/main.go
 
 $(DARWIN):
-	@env GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(DARWIN) -ldflags="-X main.Version=$(VERSION)" ./cli/main.go
+	@env GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(DARWIN) -ldflags="-X main.Version=$(VERSION)" ./cli/hb/main.go
 
 install: ## Install binary (mac or linux)
 	@echo "--> Installing Hummingbird on your system"

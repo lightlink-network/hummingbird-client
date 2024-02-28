@@ -37,9 +37,9 @@ $(DARWIN):
 
 install: ## Install binary (mac or linux)
 	@echo "--> Installing Hummingbird on your system"
-	@go install -ldflags="-X main.Version=$(VERSION)" ./cli
-	@echo "--> Installation complete. Run 'cli --help' to get started."
-	@echo "--> NOTE: Your go path must be in your system path to run the binary via 'cli' command."
+	@go install -ldflags="-X main.Version=$(VERSION)" ./cli/hb
+	@echo "--> Installation complete. Run 'hb --help' to get started."
+	@echo "--> NOTE: Your go path must be in your system path to run the binary via 'hb' command."
 	@echo "--> Otherwise, you can run the binary via '$(BUILD_DIR)/$(DARWIN) --help' command."
 
 clean: ## Remove previous build

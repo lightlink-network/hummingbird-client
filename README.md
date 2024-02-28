@@ -11,7 +11,7 @@ Hummingbird is a light client for interacting with the [LightLink Protocol](http
 
 It is designed to work in unison with the [hummingbird-contracts](https://github.com/lightlink-network/hummingbird-contracts) repository.
 
-Documentation can be found [here](https://docs.lightlink.io/lightlink-protocol/achitecture-and-design/lightlink-protocol-deep-dive)
+Documentation & deployed contract addresses can be found [here](https://docs.lightlink.io/lightlink-protocol/achitecture-and-design/lightlink-protocol-deep-dive).
 
 ## Usage
 
@@ -52,7 +52,7 @@ cd $HOME
 rm -rf hummingbird-client
 git clone https://github.com/lightlink-network/hummingbird-client.git
 cd hummingbird-client
-git checkout tags/v0.1.0 -b v0.1.0
+git checkout tags/v0.1.1 -b v0.1.1
 make build
 ```
 

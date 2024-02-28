@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"hummingbird/cli/cmd"
+	"hummingbird/cli/hb/cmd"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

@@ -132,7 +132,7 @@ func (b *Bundle) FindHeaderShares(hash common.Hash, namespace string) (*SharePoi
 	for _, b := range b.Blocks {
 		// This is a hack to fix the issue with the extra data in the block header.
 		// TODO: remove this hack and fix extra data before bundle upload
-		if hashWithoutExtraData(b).Hex() == hash.Hex() {
+		if utils.HashWithoutExtraData(b).Hex() == hash.Hex() {
 			block = b
 			break
 		}
@@ -239,10 +239,4 @@ func (b *Bundle) FindTxShares(hash common.Hash, namespace string) (*SharePointer
 
 	// TODO: this code repeats the same logic as FindHeaderShares, we should refactor it
 	// to avoid code duplication. `FindBytesShares` ?
-}
-
-func hashWithoutExtraData(block *types.Block) common.Hash {
-	header := block.Header()
-	header.Extra = common.Hex2Bytes("0x")
-	return header.Hash()
 }

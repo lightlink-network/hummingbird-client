@@ -1,26 +1,31 @@
 # LightLink Hummingbird
 
-![Test, Build Image & Push to ECR](https://github.com/pellartech/lightlink-hummingbird/actions/workflows/build_and_publish.yml/badge.svg?branch=main)
+![Test, Build Image & Push to ECR](https://github.com/lightlink-network/hummingbird-client/actions/workflows/build_and_publish.yml/badge.svg?branch=main)
 
-![LightLink Hummingbird preview screenshot](<preview.png>)
+> [!NOTE]  
+> Hummingbird is a work in progress and is not yet ready for production use.
+
+![LightLink Hummingbird preview screenshot](preview.png)
 
 Hummingbird is a light client for interacting with the [LightLink Protocol](https://lightlink.io).
 
-It is designed to work in unison with the [lightlink-hummingbird-contracts](https://github.com/pellartech/lightlink-hummingbird-contracts) repository.
+It is designed to work in unison with the [hummingbird-contracts](https://github.com/lightlink-network/hummingbird-contracts) repository.
+
+Documentation & deployed contract addresses can be found [here](https://docs.lightlink.io/lightlink-protocol/achitecture-and-design/lightlink-protocol-deep-dive).
 
 ## Usage
 
-```bash
-hb rollup info  # Get the current rollup state
-hb rollup info --hash <rblock_hash> --bundle # View the bundled L2 block hashes in an L1 block
+```bash rollup info  # Get the current rollup state
+hb rollup info --num <rblock_number> --bundle # View the bundled L2 block hashes in an L1 rblock
 hb rollup next  # [Publisher Only] Generate the next rollup block
 hb rollup start # [Publisher Only] Start the rollup loop to generate and submit bundles
 hb challenger challenge-da <rblock_number> # Challenge data availability
 hb defender defend-da <rblock_hash> # Defend data availability
-hd defender info-da <rblock_hash> # Provides info on an existing challenge
+hb defender info-da <rblock_hash> # Provides info on an existing challenge
 hb defender prove-da <rblock_hash> # Prove data availability
 hb defender start # Start the defender loop to watch and defend challenges
-hb defender provide <rblock_hash> <l2_block_hash-or-index> # Provide will download data from Celestia and provide them to Layer 1 ChainOracle
+hb defender provide --type=header <rblock_hash> <l2_block_hash> # Provide will download header for the given <l2_block_hash> from Celestia and provide it to Layer 1 ChainOracle
+hb defender provide --type=tx <rblock_hash> <l2_tx_hash> # Provide will download tx for the given <l2_tx_hash> from Celestia and provide it to Layer 1 ChainOracle
 ```
 
 The following root flags are available for all commands:
@@ -44,15 +49,14 @@ Build the binary from source:
 
 ```bash
 cd $HOME
-rm -rf lightlink-hummingbird
-git clone https://github.com/pellartech/lightlink-hummingbird.git
-cd lightlink-hummingbird
-git checkout tags/v0.0.3 -b v0.0.3
+rm -rf hummingbird-client
+git clone https://github.com/lightlink-network/hummingbird-client.git
+cd hummingbird-client
+git checkout tags/v0.1.1 -b v0.1.1
 make build
 ```
 
 Install the binary to your `$GOPATH/bin`:
-
 
 ```bash
 make install
@@ -72,7 +76,7 @@ Note: If your go path is not set in your system path, the binary can be run dire
 
 ### Option 2: Use pre-built binary
 
-Download the latest release from [here](https://github.com/pellartech/lightlink-hummingbird/releases)
+Download the latest release from [here](https://github.com/lightlink-network/hummingbird-client/releases)
 
 ## Configuration
 
@@ -83,7 +87,7 @@ cp config.example.yaml config.yaml
 ```
 
 A single environment variable `ETH_KEY` is required to be set. This is the private key of the Ethereum account that will be used to sign transactions. This account must have sufficient funds to pay for gas fees.
-  
+
 ```bash
 export ETH_KEY=0x...
 ```

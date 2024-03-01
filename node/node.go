@@ -75,9 +75,13 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		return nil, err
 	}
 
-	store, err := NewLDBStore(cfg.StorePath)
-	if err != nil {
-		return nil, err
+	var store *LDBStore
+
+	if cfg.Rollup.StoreHeaders || cfg.Rollup.StoreCelestiaPointers {
+		store, err = NewLDBStore(cfg.StorePath)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	logger.Info("Rollup Node created!", "dryRun", cfg.DryRun)
@@ -92,15 +96,19 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 
 // GetDAPointer gets the Celestia pointer for the given rollup block hash.
 func (n *Node) GetDAPointer(hash common.Hash) (*CelestiaPointer, error) {
-	pointer, err := n.Store.GetDAPointer(hash)
-	// if err is not found, get pointer from header, any other error return
-	if err != nil && err.Error() != "failed to get celestia pointer from store: leveldb: not found" {
-		return nil, err
-	}
+	pointer := &CelestiaPointer{}
 
-	// if pointer is found, return it
-	if pointer != nil {
-		return pointer, nil
+	if config.Load().Rollup.StoreCelestiaPointers {
+		pointer, err := n.Store.GetDAPointer(hash)
+		// if err is not found, get pointer from header, any other error return
+		if err != nil && err.Error() != "failed to get celestia pointer from store: leveldb: not found" {
+			return nil, err
+		}
+
+		// if pointer is found, return it
+		if pointer != nil {
+			return pointer, nil
+		}
 	}
 
 	// pointer is not found in local store so get rollup header

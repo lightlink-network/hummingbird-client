@@ -8,10 +8,10 @@ store
 
 # Sensitive Data
 .env
-config.ganache.json
-config.hardhat.json
-config.json
-config.yaml
+
+# Ignore all .config files except .config.example
+config*
+!config.example.yaml
 
 store
 storage

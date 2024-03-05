@@ -1,6 +1,12 @@
 package contracts
 
-import "math/big"
+import (
+	"math/big"
+
+	challenge "hummingbird/node/contracts/Challenge.sol"
+
+	"github.com/ethereum/go-ethereum/common"
+)
 
 const (
 	// Status for a DA challenge that has not been initiated
@@ -35,4 +41,12 @@ func DAChallengeStatusToString(c uint8) string {
 	default:
 		return "Unknown"
 	}
+}
+
+type L2HeaderChallengeInfo struct {
+	Header       challenge.ChallengeL2HeaderL2HeaderPointer
+	PrevHeader   challenge.ChallengeL2HeaderL2HeaderPointer
+	ChallengeEnd *big.Int
+	Challenger   common.Address
+	Status       uint8
 }

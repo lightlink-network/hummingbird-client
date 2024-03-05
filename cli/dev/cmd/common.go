@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
-	"hummingbird/cli/cmd"
+	"hummingbird/cli/hb/cmd"
 	"hummingbird/config"
 	"hummingbird/node"
 	"hummingbird/utils"

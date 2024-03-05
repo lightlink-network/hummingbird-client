@@ -53,6 +53,9 @@ type Ethereum interface {
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
 	WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate) (event.Subscription, error)
 	FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error)
+	DefendL2Header(common.Hash, common.Hash, common.Hash) (*types.Transaction, error)
+	GetL2HeaderChallengeHash(common.Hash, *big.Int) (common.Hash, error)
+	GetL2HeaderChallenge(common.Hash) (contracts.L2HeaderChallengeInfo, error)
 
 	// Data Loading
 	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
@@ -392,6 +395,34 @@ func (e *EthereumClient) WatchChallengesDA(c chan<- *challengeContract.Challenge
 
 func (e *EthereumClient) FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error) {
 	return e.ws.challenge.FilterChallengeDAUpdate(opts, _blockHash, _blockIndex, _status)
+}
+
+func (e *EthereumClient) GetL2HeaderChallengeHash(rblockHash common.Hash, l2Num *big.Int) (common.Hash, error) {
+	return e.ws.challenge.L2HeaderChallengeHash(nil, rblockHash, l2Num)
+}
+
+func (e *EthereumClient) GetL2HeaderChallenge(challengeHash common.Hash) (contracts.L2HeaderChallengeInfo, error) {
+	res, err := e.ws.challenge.L2HeaderChallenges(nil, challengeHash)
+	if err != nil {
+		return contracts.L2HeaderChallengeInfo{}, fmt.Errorf("failed to get L2 header challenge: %w", err)
+	}
+
+	return contracts.L2HeaderChallengeInfo{
+		Header:       res.Header,
+		PrevHeader:   res.PrevHeader,
+		ChallengeEnd: res.ChallengeEnd,
+		Challenger:   res.Challenger,
+		Status:       res.Status,
+	}, nil
+}
+
+func (e *EthereumClient) DefendL2Header(blockHash, rootHash, headerHash common.Hash) (*types.Transaction, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	return e.ws.challenge.DefendL2Header(transactor, blockHash, rootHash, headerHash)
 }
 
 func (e *EthereumClient) ProvideShares(rblock common.Hash, proof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error) {

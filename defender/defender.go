@@ -3,6 +3,8 @@ package defender
 import (
 	"fmt"
 	"hummingbird/node"
+	"hummingbird/utils"
+	"math/big"
 	"strings"
 	"time"
 
@@ -195,8 +197,9 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 		d.Ethereum.Wait(tx.Hash())
 
 		// TODO: remove this sleep hack and fix Ethereum.Wait
-		d.Opts.Logger.Info("Waiting for 3 seconds to ensure shares are available")
+		d.Opts.Logger.Info("Waiting for 10 seconds to ensure shares are available")
 		time.Sleep(10 * time.Second)
+		d.Ethereum.Wait(tx.Hash())
 	}
 
 	// Finally, provide the header
@@ -250,4 +253,52 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 
 	// Finally, provide the transaction
 	return d.Ethereum.ProvideLegacyTx(rblock, shareProof.Data, *sharePointer)
+}
+
+func (d *Defender) DefendL2Header(rblock common.Hash, l2BlockNum *big.Int) (*types.Transaction, error) {
+	// 1. Get the challenge key
+	challengeHash, err := d.Ethereum.GetL2HeaderChallengeHash(rblock, l2BlockNum)
+	if err != nil {
+		return nil, fmt.Errorf("error getting challenge hash: %w", err)
+	}
+
+	// 2. Get the challenge
+	challenge, err := d.Ethereum.GetL2HeaderChallenge(challengeHash)
+	if err != nil {
+		return nil, fmt.Errorf("error getting challenge: %w", err)
+	}
+
+	// 3. Get the hashes of the header and previous header
+	l2Block, err := d.LightLink.GetBlock(l2BlockNum.Uint64())
+	if err != nil {
+		return nil, fmt.Errorf("error getting block from l2: %w", err)
+	}
+	l2BlockHash := utils.HashWithoutExtraData(l2Block)
+
+	l2PrevBlock, err := d.LightLink.GetBlock(l2BlockNum.Uint64() - 1)
+	if err != nil {
+		return nil, fmt.Errorf("error getting previous block from l2: %w", err)
+	}
+	l2PrevBlockHash := utils.HashWithoutExtraData(l2PrevBlock)
+
+	// 4. Provide the headers
+	tx, err := d.ProvideL2Header(challenge.Header.Rblock, l2BlockHash, false)
+	if err != nil {
+		return nil, fmt.Errorf("error providing header: %w", err)
+	}
+	d.Opts.Logger.Info("Provided header", "tx", tx.Hash().Hex(), "rblock", rblock.Hex(), "header", l2BlockHash.Hex())
+
+	tx, err = d.ProvideL2Header(challenge.PrevHeader.Rblock, l2PrevBlockHash, false)
+	if err != nil {
+		return nil, fmt.Errorf("error providing previous header: %w", err)
+	}
+	d.Opts.Logger.Info("Provided previous header", "tx", tx.Hash().Hex(), "rblock", rblock.Hex(), "header", l2PrevBlockHash.Hex())
+
+	// 5. Defend the challenge
+	tx, err = d.Ethereum.DefendL2Header(challengeHash, l2BlockHash, l2PrevBlockHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to defend l2 header challenge: %w", err)
+	}
+
+	return tx, nil
 }

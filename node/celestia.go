@@ -365,19 +365,19 @@ func (c *CelestiaClient) GetShares(pointer *CelestiaPointer) ([]shares.Share, er
 	// 1. Namespace
 	ns, err := share.NewBlobNamespaceV0([]byte(c.Namespace()))
 	if err != nil {
-		return nil, fmt.Errorf("GetBundle: failed to get namespace: %w", err)
+		return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
 	}
 
 	// 0. Get the header
 	h, err := c.client.Header.GetByHeight(ctx, pointer.Height)
 	if err != nil {
-		return nil, fmt.Errorf("GetBundle: failed to get header: %w", err)
+		return nil, fmt.Errorf("GetShares: failed to get header: %d %w", pointer.Height, err)
 	}
 
 	// 3. Get the shares
 	s, err := c.client.Share.GetSharesByNamespace(ctx, h, ns)
 	if err != nil {
-		return nil, fmt.Errorf("GetBundle: failed to get shares: %w", err)
+		return nil, fmt.Errorf("GetShares: failed to get shares: %w", err)
 	}
 
 	return utils.NSSharesToShares(s), nil

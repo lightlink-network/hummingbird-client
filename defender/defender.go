@@ -267,6 +267,9 @@ func (d *Defender) DefendL2Header(rblock common.Hash, l2BlockNum *big.Int) (*typ
 	if err != nil {
 		return nil, fmt.Errorf("error getting challenge: %w", err)
 	}
+	if challenge.Status != contracts.ChallengeL2HeaderStatusChallengerInitiated {
+		return nil, fmt.Errorf("challenge is not pending")
+	}
 
 	// 3. Get the hashes of the header and previous header
 	l2Block, err := d.LightLink.GetBlock(l2BlockNum.Uint64())

@@ -17,6 +17,11 @@ const (
 	ChallengeDAStatusChallengerWon = 2
 	// Status for a DA challenge that has been won by the defender
 	ChallengeDAStatusDefenderWon = 3
+
+	ChallengeL2HeaderStatusNone                = 0
+	ChallengeL2HeaderStatusChallengerInitiated = 1
+	ChallengeL2HeaderStatusChallengerWon       = 3
+	ChallengeL2HeaderStatusDefenderWon         = 2
 )
 
 // Helper struct for pretty printing

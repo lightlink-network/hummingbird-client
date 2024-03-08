@@ -117,8 +117,22 @@ func (d *Defender) findAndDefendL2HeaderChallenges() error {
 	// iterate through historic challenges events
 	for challenges.Next() {
 		challenge := challenges.Event
+		challengeKey := common.BytesToHash(challenge.ChallengeHash[:])
 		rblock := common.BytesToHash(challenge.Rblock[:])
 		l2BlockNum := challenge.L2Number
+
+		// check if challenge has already been defended by getting the current status
+		// required as we are scanning historic logs, and the challenge may have been defended since log was emitted
+		challengeInfo, err := d.Ethereum.GetL2HeaderChallenge(challengeKey)
+		if err != nil {
+			d.Opts.Logger.Error("error getting L2 header challenge", "rblock", rblock, "l2BlockNum", l2BlockNum, "error", err)
+			continue
+		}
+
+		// we are only interested in challenges that have been initiated by a challenger, ready to be defended
+		if challengeInfo.Status != contracts.ChallengeL2HeaderStatusChallengerInitiated {
+			continue
+		}
 
 		err = d.handleL2HeaderChallenge(challenge)
 		if err != nil {

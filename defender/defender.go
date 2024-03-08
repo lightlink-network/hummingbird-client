@@ -45,6 +45,10 @@ func (d *Defender) Start() error {
 		d.Opts.Logger.Debug("error defending historic DA challenges: %w", err)
 	}
 
+	if err := d.findAndDefendL2HeaderChallenges(); err != nil {
+		d.Opts.Logger.Debug("error defending historic L2 header challenges: %w", err)
+	}
+
 	ticker := time.NewTicker(d.Opts.WorkerDelay)
 	defer ticker.Stop()
 
@@ -52,7 +56,9 @@ func (d *Defender) Start() error {
 	for range ticker.C {
 		if err := d.findAndDefendChallenges(); err != nil {
 			d.Opts.Logger.Debug("error defending historic DA challenges: %w", err)
-			continue
+		}
+		if err := d.findAndDefendL2HeaderChallenges(); err != nil {
+			d.Opts.Logger.Debug("error defending historic L2 header challenges: %w", err)
 		}
 	}
 	return nil
@@ -100,6 +106,31 @@ func (d *Defender) findAndDefendChallenges() error {
 	return nil
 }
 
+func (d *Defender) findAndDefendL2HeaderChallenges() error {
+	d.Opts.Logger.Debug("Starting log scan for historic pending L2 header challenges")
+
+	challenges, err := d.Ethereum.FilterL2HeaderChallengeUpdate(nil, nil, nil, []uint8{contracts.ChallengeL2HeaderStatusChallengerInitiated})
+	if err != nil {
+		return fmt.Errorf("error filtering challenges: %w", err)
+	}
+
+	// iterate through historic challenges events
+	for challenges.Next() {
+		challenge := challenges.Event
+		rblock := common.BytesToHash(challenge.Rblock[:])
+		l2BlockNum := challenge.L2Number
+
+		err = d.handleL2HeaderChallenge(challenge)
+		if err != nil {
+			d.Opts.Logger.Error("error handling L2 header challenge", "rblock", rblock, "l2BlockNum", l2BlockNum, "error", err)
+			continue
+		}
+	}
+	d.Opts.Logger.Debug("Finished log scan for historic pending L2 header challenges")
+
+	return nil
+}
+
 // Handles a DA challenge by attempting to defend it.
 //
 // If the challenged data root is not yet available, it will be ignored
@@ -129,6 +160,19 @@ func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChall
 	}
 
 	log.Info("Pending DA challenge defended successfully", "tx", tx.Hash().Hex())
+	return nil
+}
+
+func (d *Defender) handleL2HeaderChallenge(challenge *challengeContract.ChallengeL2HeaderChallengeUpdate) error {
+	rblock := common.BytesToHash(challenge.Rblock[:])
+	l2BlockNum := challenge.L2Number
+
+	tx, err := d.DefendL2Header(rblock, l2BlockNum)
+	if err != nil {
+		return fmt.Errorf("error defending L2 header challenge: %w", err)
+	}
+
+	d.Opts.Logger.Info("Pending L2 header challenge defended successfully", "tx", tx.Hash().Hex())
 	return nil
 }
 

@@ -201,6 +201,12 @@ func (d *Defender) GetDAProof(block common.Hash) (*node.CelestiaProof, error) {
 }
 
 func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skipShares bool) (*types.Transaction, error) {
+	// check if the header is already provided
+	headerProvided, _ := d.Ethereum.AlreadyProvidedHeader(l2Block)
+	if headerProvided {
+		d.Opts.Logger.Info("Header already provided", "block", rblock.Hex(), "header", l2Block.Hex())
+		return types.NewTx(&types.LegacyTx{}), nil
+	}
 
 	// Download the rollup block and bundle from L1 and
 	// Celestia
@@ -231,8 +237,11 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 		return nil, fmt.Errorf("error proving data availability: %w", err)
 	}
 
+	// check if the shares are already provided
+	provided, _ := d.Ethereum.AlreadyProvidedShares(rblock, shareProof.Data)
+
 	// Provide the shares
-	if !skipShares {
+	if !skipShares && !provided {
 		tx, err := d.Ethereum.ProvideShares(rblock, shareProof, celProof)
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)

@@ -167,12 +167,22 @@ func (d *Defender) handleL2HeaderChallenge(challenge *challengeContract.Challeng
 	rblock := common.BytesToHash(challenge.Rblock[:])
 	l2BlockNum := challenge.L2Number
 
+	log := d.Opts.Logger.With(
+		"rblock", rblock.Hex(),
+		"l2BlockNum", l2BlockNum,
+		"expiry", time.Unix(challenge.Expiry.Int64(), 0).Format(time.RFC1123Z),
+		"statusEnum", challenge.Status,
+	)
+
+	log.Info("Pending L2 header challenge log event found")
+
 	tx, err := d.DefendL2Header(rblock, l2BlockNum)
 	if err != nil {
+		log.Error("Error defending L2 header challenge", "error", err)
 		return fmt.Errorf("error defending L2 header challenge: %w", err)
 	}
 
-	d.Opts.Logger.Info("Pending L2 header challenge defended successfully", "tx", tx.Hash().Hex())
+	log.Info("Pending L2 header challenge defended successfully", "tx", tx.Hash().Hex())
 	return nil
 }
 

@@ -62,6 +62,8 @@ type Ethereum interface {
 	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
 	ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
 	ProvideLegacyTx(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
+	AlreadyProvidedShares(rblock common.Hash, shareData [][]byte) (bool, error)
+	AlreadyProvidedHeader(l2Hash common.Hash) (bool, error)
 }
 
 type EthereumClient struct {
@@ -522,6 +524,30 @@ func (e *EthereumClient) ProvideLegacyTx(rblock common.Hash, shareData [][]byte,
 
 	e.http.opts.Logger.Debug("ProvideTx", "sharekey", fmt.Sprintf("%x", sharekey), "ranges", pointer.Ranges)
 	return e.http.chainLoader.ProvideLegacyTx(transactor, sharekey, ranges)
+}
+
+func (e *EthereumClient) AlreadyProvidedShares(rblock common.Hash, shareData [][]byte) (bool, error) {
+	sharekey, err := e.http.chainLoader.ShareKey(nil, rblock, shareData)
+	if err != nil {
+		return false, fmt.Errorf("failed to get share key: %w", err)
+	}
+
+	// check shares are found
+	s, err := e.http.chainLoader.Shares(nil, sharekey, big.NewInt(0))
+	if err != nil {
+		return false, fmt.Errorf("failed checking shares were deployed: %w", err)
+	}
+
+	return len(s) > 0, nil
+}
+
+func (e *EthereumClient) AlreadyProvidedHeader(l2Hash common.Hash) (bool, error) {
+	h, err := e.http.chainLoader.GetHeader(nil, l2Hash)
+	if err != nil {
+		return false, fmt.Errorf("failed to get header: %w", err)
+	}
+
+	return h.Number.Uint64() > 0, nil
 }
 
 func (e *EthereumClient) GetPublisher() (common.Address, error) {

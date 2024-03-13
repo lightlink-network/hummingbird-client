@@ -54,7 +54,8 @@ type Celestia interface {
 	Namespace() string
 	PublishBundle(blocks Bundle) (*CelestiaPointer, error)
 	GetProof(pointer *CelestiaPointer) (*CelestiaProof, error)
-	GetShares(pointer *CelestiaPointer) ([]shares.Share, error)
+	GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error)
+	GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error)
 	GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error)
 	GetPointer(txHash common.Hash) (*CelestiaPointer, error)
 }
@@ -344,6 +345,7 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 	return proof, nil
 }
 
+// GetPointer returns the pointer to the Celestia header that contains the tx with the given hash
 func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error) {
 	tx, err := c.trpc.Tx(context.Background(), txHash.Bytes(), true)
 	if err != nil {
@@ -371,7 +373,7 @@ func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error
 	}, nil
 }
 
-func (c *CelestiaClient) GetShares(pointer *CelestiaPointer) ([]shares.Share, error) {
+func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error) {
 	ctx := context.Background()
 
 	// 1. Namespace
@@ -393,6 +395,17 @@ func (c *CelestiaClient) GetShares(pointer *CelestiaPointer) ([]shares.Share, er
 	}
 
 	return utils.NSSharesToShares(s), nil
+}
+
+func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error) {
+	ctx := context.Background()
+
+	proof, err := c.trpc.ProveShares(ctx, pointer.Height, pointer.ShareStart, pointer.ShareStart+pointer.ShareLen)
+	if err != nil {
+		return nil, err
+	}
+
+	return utils.BytesToShares(proof.Data)
 }
 
 func (c *CelestiaClient) GetSharesProof(celPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
@@ -478,7 +491,7 @@ func (c *celestiaMock) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error
 	}, nil
 }
 
-func (c *celestiaMock) GetShares(pointer *CelestiaPointer) ([]shares.Share, error) {
+func (c *celestiaMock) GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error) {
 	return nil, nil
 }
 
@@ -488,4 +501,8 @@ func (c *celestiaMock) GetSharesProof(celestiaPointer *CelestiaPointer, sharePoi
 
 func (c *celestiaMock) GetPointer(txHash common.Hash) (*CelestiaPointer, error) {
 	return c.pointers[txHash], nil
+}
+
+func (c *celestiaMock) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error) {
+	return nil, nil
 }

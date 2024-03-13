@@ -66,7 +66,7 @@ var (
 			log.Debug("✔️  Got Rollup Block", "hash", rblockHash)
 
 			// 3. Download the rollup bundle bundleShares
-			bundleShares, err := n.Celestia.GetShares(celPointer)
+			bundleShares, err := n.Celestia.GetSharesByNamespace(celPointer)
 			panicErr(err, "failed to get shares")
 			log.Debug("✔️  Got Shares", "count", len(bundleShares))
 			bundle, err := node.NewBundleFromShares(bundleShares)

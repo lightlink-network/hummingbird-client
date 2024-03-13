@@ -67,7 +67,7 @@ var InspectCmd = &cobra.Command{
 
 		// 2. download the rollup bundles shares
 		log.Debug("Downloading shares...", "source", "Celestia")
-		shares, err := n.Celestia.GetShares(&node.CelestiaPointer{
+		shares, err := n.Celestia.GetSharesByNamespace(&node.CelestiaPointer{
 			Height:     header.CelestiaHeight,
 			ShareStart: header.CelestiaShareStart,
 			ShareLen:   header.CelestiaShareLen,

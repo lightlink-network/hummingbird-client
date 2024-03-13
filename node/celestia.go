@@ -13,6 +13,7 @@ import (
 	"github.com/celestiaorg/celestia-node/api/rpc/client"
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/celestiaorg/celestia-node/share"
+	gosquare "github.com/celestiaorg/go-square/square"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tendermint/tendermint/rpc/client/http"
@@ -21,8 +22,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/celestiaorg/celestia-app/pkg/appconsts"
 	"github.com/celestiaorg/celestia-app/pkg/shares"
-	"github.com/celestiaorg/celestia-app/pkg/square"
 	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
 	blobstreamtypes "github.com/celestiaorg/celestia-app/x/qgb/types"
 
@@ -55,6 +56,7 @@ type Celestia interface {
 	GetProof(pointer *CelestiaPointer) (*CelestiaProof, error)
 	GetShares(pointer *CelestiaPointer) ([]shares.Share, error)
 	GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error)
+	GetPointer(txHash common.Hash) (*CelestiaPointer, error)
 }
 
 type CelestiaClientOpts struct {
@@ -262,37 +264,20 @@ func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gas
 	}
 
 	var txHash []byte
-	var txHeight int64
 
 	if response != nil {
 		txHash, err = hex.DecodeString(response.TxHash)
 		if err != nil {
 			return nil, err
 		}
-		txHeight = response.Height
 	} else {
 		txHash = tx.Hash
-		txHeight = tx.Height
 	}
 
 	// Get the block that contains the tx
-	blockRes, err := c.trpc.Block(context.Background(), &txHeight)
+	pointer, err := c.GetPointer(common.BytesToHash(txHash))
 	if err != nil {
-		return nil, fmt.Errorf("submitBlob: failed to get celestia block: %w", err)
-	}
-
-	// Get the blob share range inside the block
-	shareRange, err := square.BlobShareRange(blockRes.Block.Data.Txs.ToSliceOfBytes(), int(tx.Index), 0, blockRes.Block.Header.Version.App)
-	if err != nil {
-		return nil, fmt.Errorf("submitBlob: failed to get celestia share range: %w", err)
-	}
-
-	pointer := &CelestiaPointer{
-		Height:     uint64(txHeight),
-		Commitment: common.BytesToHash(blobs[0].Commitment),
-		ShareStart: uint64(shareRange.Start),
-		ShareLen:   uint64(shareRange.End - shareRange.Start),
-		TxHash:     common.BytesToHash(txHash),
+		return nil, err
 	}
 
 	return pointer, err
@@ -357,6 +342,33 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 	}
 
 	return proof, nil
+}
+
+func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error) {
+	tx, err := c.trpc.Tx(context.Background(), txHash.Bytes(), true)
+	if err != nil {
+		return nil, err
+	}
+	// Get the block that contains the tx
+	blockRes, err := c.trpc.Block(context.Background(), &tx.Height)
+	if err != nil {
+		return nil, err
+	}
+	// Get the blob share range inside the block, using square instead
+	version := blockRes.Block.Header.Version.App
+	maxSquareSize := appconsts.SquareSizeUpperBound(version)
+	subtreeRootThreshold := appconsts.SubtreeRootThreshold(version)
+	blobShareRange, err := gosquare.BlobShareRange(blockRes.Block.Txs.ToSliceOfBytes(), int(tx.Index), int(0), maxSquareSize, subtreeRootThreshold)
+	if err != nil {
+		return nil, err
+	}
+	return &CelestiaPointer{
+		Height:     uint64(tx.Height),
+		Commitment: common.BytesToHash(blockRes.Block.DataHash),
+		ShareStart: uint64(blobShareRange.Start),
+		ShareLen:   uint64(blobShareRange.End - blobShareRange.Start),
+		TxHash:     txHash,
+	}, nil
 }
 
 func (c *CelestiaClient) GetShares(pointer *CelestiaPointer) ([]shares.Share, error) {
@@ -472,4 +484,8 @@ func (c *celestiaMock) GetShares(pointer *CelestiaPointer) ([]shares.Share, erro
 
 func (c *celestiaMock) GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
 	return nil, nil
+}
+
+func (c *celestiaMock) GetPointer(txHash common.Hash) (*CelestiaPointer, error) {
+	return c.pointers[txHash], nil
 }

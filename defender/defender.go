@@ -3,6 +3,8 @@ package defender
 import (
 	"fmt"
 	"hummingbird/node"
+	"hummingbird/utils"
+	"math/big"
 	"strings"
 	"time"
 
@@ -43,6 +45,10 @@ func (d *Defender) Start() error {
 		d.Opts.Logger.Debug("error defending historic DA challenges: %w", err)
 	}
 
+	if err := d.findAndDefendL2HeaderChallenges(); err != nil {
+		d.Opts.Logger.Debug("error defending historic L2 header challenges: %w", err)
+	}
+
 	ticker := time.NewTicker(d.Opts.WorkerDelay)
 	defer ticker.Stop()
 
@@ -50,7 +56,9 @@ func (d *Defender) Start() error {
 	for range ticker.C {
 		if err := d.findAndDefendChallenges(); err != nil {
 			d.Opts.Logger.Debug("error defending historic DA challenges: %w", err)
-			continue
+		}
+		if err := d.findAndDefendL2HeaderChallenges(); err != nil {
+			d.Opts.Logger.Debug("error defending historic L2 header challenges: %w", err)
 		}
 	}
 	return nil
@@ -98,6 +106,45 @@ func (d *Defender) findAndDefendChallenges() error {
 	return nil
 }
 
+func (d *Defender) findAndDefendL2HeaderChallenges() error {
+	d.Opts.Logger.Debug("Starting log scan for historic pending L2 header challenges")
+
+	challenges, err := d.Ethereum.FilterL2HeaderChallengeUpdate(nil, nil, nil, []uint8{contracts.ChallengeL2HeaderStatusChallengerInitiated})
+	if err != nil {
+		return fmt.Errorf("error filtering challenges: %w", err)
+	}
+
+	// iterate through historic challenges events
+	for challenges.Next() {
+		challenge := challenges.Event
+		challengeKey := common.BytesToHash(challenge.ChallengeHash[:])
+		rblock := common.BytesToHash(challenge.Rblock[:])
+		l2BlockNum := challenge.L2Number
+
+		// check if challenge has already been defended by getting the current status
+		// required as we are scanning historic logs, and the challenge may have been defended since log was emitted
+		challengeInfo, err := d.Ethereum.GetL2HeaderChallenge(challengeKey)
+		if err != nil {
+			d.Opts.Logger.Error("error getting L2 header challenge", "rblock", rblock, "l2BlockNum", l2BlockNum, "error", err)
+			continue
+		}
+
+		// we are only interested in challenges that have been initiated by a challenger, ready to be defended
+		if challengeInfo.Status != contracts.ChallengeL2HeaderStatusChallengerInitiated {
+			continue
+		}
+
+		err = d.handleL2HeaderChallenge(challenge)
+		if err != nil {
+			d.Opts.Logger.Error("error handling L2 header challenge", "rblock", rblock, "l2BlockNum", l2BlockNum, "error", err)
+			continue
+		}
+	}
+	d.Opts.Logger.Debug("Finished log scan for historic pending L2 header challenges")
+
+	return nil
+}
+
 // Handles a DA challenge by attempting to defend it.
 //
 // If the challenged data root is not yet available, it will be ignored
@@ -130,6 +177,29 @@ func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChall
 	return nil
 }
 
+func (d *Defender) handleL2HeaderChallenge(challenge *challengeContract.ChallengeL2HeaderChallengeUpdate) error {
+	rblock := common.BytesToHash(challenge.Rblock[:])
+	l2BlockNum := challenge.L2Number
+
+	log := d.Opts.Logger.With(
+		"rblock", rblock.Hex(),
+		"l2BlockNum", l2BlockNum,
+		"expiry", time.Unix(challenge.Expiry.Int64(), 0).Format(time.RFC1123Z),
+		"statusEnum", challenge.Status,
+	)
+
+	log.Info("Pending L2 header challenge log event found")
+
+	tx, err := d.DefendL2Header(rblock, l2BlockNum)
+	if err != nil {
+		log.Error("Error defending L2 header challenge", "error", err)
+		return fmt.Errorf("error defending L2 header challenge: %w", err)
+	}
+
+	log.Info("Pending L2 header challenge defended successfully", "tx", tx.Hash().Hex())
+	return nil
+}
+
 // Attempts to defend a DA challenge for the given block hash.
 //
 // Queries Celestia for a proof of data availability and submits a tx to the Challenge contract.
@@ -155,6 +225,12 @@ func (d *Defender) GetDAProof(block common.Hash) (*node.CelestiaProof, error) {
 }
 
 func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skipShares bool) (*types.Transaction, error) {
+	// check if the header is already provided
+	headerProvided, _ := d.Ethereum.AlreadyProvidedHeader(l2Block)
+	if headerProvided {
+		d.Opts.Logger.Info("Header already provided", "block", rblock.Hex(), "header", l2Block.Hex())
+		return types.NewTx(&types.LegacyTx{}), nil
+	}
 
 	// Download the rollup block and bundle from L1 and
 	// Celestia
@@ -185,8 +261,11 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 		return nil, fmt.Errorf("error proving data availability: %w", err)
 	}
 
+	// check if the shares are already provided
+	provided, _ := d.Ethereum.AlreadyProvidedShares(rblock, shareProof.Data)
+
 	// Provide the shares
-	if !skipShares {
+	if !skipShares && !provided {
 		tx, err := d.Ethereum.ProvideShares(rblock, shareProof, celProof)
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
@@ -195,8 +274,9 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 		d.Ethereum.Wait(tx.Hash())
 
 		// TODO: remove this sleep hack and fix Ethereum.Wait
-		d.Opts.Logger.Info("Waiting for 3 seconds to ensure shares are available")
+		d.Opts.Logger.Info("Waiting for 10 seconds to ensure shares are available")
 		time.Sleep(10 * time.Second)
+		d.Ethereum.Wait(tx.Hash())
 	}
 
 	// Finally, provide the header
@@ -250,4 +330,55 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 
 	// Finally, provide the transaction
 	return d.Ethereum.ProvideLegacyTx(rblock, shareProof.Data, *sharePointer)
+}
+
+func (d *Defender) DefendL2Header(rblock common.Hash, l2BlockNum *big.Int) (*types.Transaction, error) {
+	// 1. Get the challenge key
+	challengeHash, err := d.Ethereum.GetL2HeaderChallengeHash(rblock, l2BlockNum)
+	if err != nil {
+		return nil, fmt.Errorf("error getting challenge hash: %w", err)
+	}
+
+	// 2. Get the challenge
+	challenge, err := d.Ethereum.GetL2HeaderChallenge(challengeHash)
+	if err != nil {
+		return nil, fmt.Errorf("error getting challenge: %w", err)
+	}
+	if challenge.Status != contracts.ChallengeL2HeaderStatusChallengerInitiated {
+		return nil, fmt.Errorf("challenge is not pending")
+	}
+
+	// 3. Get the hashes of the header and previous header
+	l2Block, err := d.LightLink.GetBlock(l2BlockNum.Uint64())
+	if err != nil {
+		return nil, fmt.Errorf("error getting block from l2: %w", err)
+	}
+	l2BlockHash := utils.HashWithoutExtraData(l2Block)
+
+	l2PrevBlock, err := d.LightLink.GetBlock(l2BlockNum.Uint64() - 1)
+	if err != nil {
+		return nil, fmt.Errorf("error getting previous block from l2: %w", err)
+	}
+	l2PrevBlockHash := utils.HashWithoutExtraData(l2PrevBlock)
+
+	// 4. Provide the headers
+	tx, err := d.ProvideL2Header(challenge.Header.Rblock, l2BlockHash, false)
+	if err != nil {
+		return nil, fmt.Errorf("error providing header: %w", err)
+	}
+	d.Opts.Logger.Info("Provided header", "tx", tx.Hash().Hex(), "rblock", rblock.Hex(), "header", l2BlockHash.Hex())
+
+	tx, err = d.ProvideL2Header(challenge.PrevHeader.Rblock, l2PrevBlockHash, false)
+	if err != nil {
+		return nil, fmt.Errorf("error providing previous header: %w", err)
+	}
+	d.Opts.Logger.Info("Provided previous header", "tx", tx.Hash().Hex(), "rblock", rblock.Hex(), "header", l2PrevBlockHash.Hex())
+
+	// 5. Defend the challenge
+	tx, err = d.Ethereum.DefendL2Header(challengeHash, l2BlockHash, l2PrevBlockHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to defend l2 header challenge: %w", err)
+	}
+
+	return tx, nil
 }

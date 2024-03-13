@@ -53,11 +53,17 @@ type Ethereum interface {
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
 	WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate) (event.Subscription, error)
 	FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error)
+	DefendL2Header(common.Hash, common.Hash, common.Hash) (*types.Transaction, error)
+	GetL2HeaderChallengeHash(common.Hash, *big.Int) (common.Hash, error)
+	GetL2HeaderChallenge(common.Hash) (contracts.L2HeaderChallengeInfo, error)
+	FilterL2HeaderChallengeUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeL2HeaderChallengeUpdateIterator, error)
 
 	// Data Loading
 	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
 	ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
 	ProvideLegacyTx(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
+	AlreadyProvidedShares(rblock common.Hash, shareData [][]byte) (bool, error)
+	AlreadyProvidedHeader(l2Hash common.Hash) (bool, error)
 }
 
 type EthereumClient struct {
@@ -394,6 +400,38 @@ func (e *EthereumClient) FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHa
 	return e.ws.challenge.FilterChallengeDAUpdate(opts, _blockHash, _blockIndex, _status)
 }
 
+func (e *EthereumClient) FilterL2HeaderChallengeUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeL2HeaderChallengeUpdateIterator, error) {
+	return e.ws.challenge.FilterL2HeaderChallengeUpdate(opts, _blockHash, _blockIndex, _status)
+}
+
+func (e *EthereumClient) GetL2HeaderChallengeHash(rblockHash common.Hash, l2Num *big.Int) (common.Hash, error) {
+	return e.ws.challenge.L2HeaderChallengeHash(nil, rblockHash, l2Num)
+}
+
+func (e *EthereumClient) GetL2HeaderChallenge(challengeHash common.Hash) (contracts.L2HeaderChallengeInfo, error) {
+	res, err := e.ws.challenge.L2HeaderChallenges(nil, challengeHash)
+	if err != nil {
+		return contracts.L2HeaderChallengeInfo{}, fmt.Errorf("failed to get L2 header challenge: %w", err)
+	}
+
+	return contracts.L2HeaderChallengeInfo{
+		Header:       res.Header,
+		PrevHeader:   res.PrevHeader,
+		ChallengeEnd: res.ChallengeEnd,
+		Challenger:   res.Challenger,
+		Status:       res.Status,
+	}, nil
+}
+
+func (e *EthereumClient) DefendL2Header(blockHash, rootHash, headerHash common.Hash) (*types.Transaction, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	return e.ws.challenge.DefendL2Header(transactor, blockHash, rootHash, headerHash)
+}
+
 func (e *EthereumClient) ProvideShares(rblock common.Hash, proof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error) {
 	transactor, err := e.transactor()
 	if err != nil {
@@ -486,6 +524,30 @@ func (e *EthereumClient) ProvideLegacyTx(rblock common.Hash, shareData [][]byte,
 
 	e.http.opts.Logger.Debug("ProvideTx", "sharekey", fmt.Sprintf("%x", sharekey), "ranges", pointer.Ranges)
 	return e.http.chainLoader.ProvideLegacyTx(transactor, sharekey, ranges)
+}
+
+func (e *EthereumClient) AlreadyProvidedShares(rblock common.Hash, shareData [][]byte) (bool, error) {
+	sharekey, err := e.http.chainLoader.ShareKey(nil, rblock, shareData)
+	if err != nil {
+		return false, fmt.Errorf("failed to get share key: %w", err)
+	}
+
+	// check shares are found
+	s, err := e.http.chainLoader.Shares(nil, sharekey, big.NewInt(0))
+	if err != nil {
+		return false, fmt.Errorf("failed checking shares were deployed: %w", err)
+	}
+
+	return len(s) > 0, nil
+}
+
+func (e *EthereumClient) AlreadyProvidedHeader(l2Hash common.Hash) (bool, error) {
+	h, err := e.http.chainLoader.GetHeader(nil, l2Hash)
+	if err != nil {
+		return false, fmt.Errorf("failed to get header: %w", err)
+	}
+
+	return h.Number.Uint64() > 0, nil
 }
 
 func (e *EthereumClient) GetPublisher() (common.Address, error) {

@@ -139,7 +139,7 @@ func (n *Node) FetchRollupBlock(rblock common.Hash) (*canonicalstatechain.Canoni
 		ShareLen:   header.CelestiaShareLen,
 	}
 
-	shares, err := n.Celestia.GetShares(pointer)
+	shares, err := n.Celestia.GetSharesByNamespace(pointer)
 	if err != nil {
 		return nil, nil, err
 	}

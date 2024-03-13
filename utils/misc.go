@@ -39,9 +39,9 @@ func formatValueText(v reflect.Value, indent int, indentChar string) string {
 				continue
 			}
 
-			if isStruct(fieldValue) {
-				sb.WriteString("\n")
-			}
+			// if isStruct(fieldValue) {
+			// 	sb.WriteString("\n")
+			// }
 			sb.WriteString(strings.Repeat(indentChar, indent))
 			sb.WriteString(formatFieldName(field))
 			sb.WriteString(": ")
@@ -52,11 +52,13 @@ func formatValueText(v reflect.Value, indent int, indentChar string) string {
 				continue
 			}
 
+			// otherwise if struct, print as nested struct
 			if fieldValue.Kind() == reflect.Struct || (fieldValue.Kind() == reflect.Ptr && !fieldValue.IsNil() && fieldValue.Elem().Kind() == reflect.Struct) {
 				sb.WriteString("\n")
 				sb.WriteString(formatValueText(fieldValue, indent+1, indentChar)) // Increment indent for nested structs
 			} else {
-				sb.WriteString(fmt.Sprintf("%v\n", formatIndividualValue(fieldValue)))
+				// otherwise print as individual value
+				sb.WriteString(fmt.Sprintf("%v", formatValueText(fieldValue, indent, indentChar)))
 			}
 		}
 
@@ -72,8 +74,10 @@ func formatValueText(v reflect.Value, indent int, indentChar string) string {
 		if v.Type().Elem().Kind() == reflect.Uint8 {
 			sb.WriteString(fmt.Sprintf("%v\n", formatIndividualValue(v)))
 		} else {
+			sb.WriteString("\n")
 			for i := 0; i < v.Len(); i++ {
-				sb.WriteString(formatValueText(v.Index(i), indent, indentChar))
+				sb.WriteString(strings.Repeat(indentChar, indent+1))
+				sb.WriteString(formatValueText(v.Index(i), indent+1, indentChar))
 			}
 		}
 
@@ -83,7 +87,8 @@ func formatValueText(v reflect.Value, indent int, indentChar string) string {
 			sb.WriteString(fmt.Sprintf("%v\n", formatIndividualValue(v)))
 		} else {
 			for i := 0; i < v.Len(); i++ {
-				sb.WriteString(formatValueText(v.Index(i), indent, indentChar))
+				sb.WriteString(strings.Repeat(indentChar, indent+1))
+				sb.WriteString(formatValueText(v.Index(i), indent+1, indentChar))
 			}
 		}
 

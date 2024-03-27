@@ -328,7 +328,7 @@ func (e *EthereumClient) ChallengeDataRootInclusion(index uint64) (*types.Transa
 
 // GetBlobstreamCommitment returns the commitment for the given celestia height.
 // see https://docs.celestia.org/developers/blobstream-proof-queries
-func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStoredIterator, error) {
+func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStored, error) {
 	latestBlock, err := e.GetHeight()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
@@ -348,7 +348,7 @@ func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXCont
 	for events.Next() {
 		e := events.Event
 		if int64(e.StartBlock) <= height && height < int64(e.EndBlock) {
-			return events, nil
+			return e, nil
 		}
 	}
 	if err := events.Error(); err != nil {

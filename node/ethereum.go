@@ -54,6 +54,7 @@ type Ethereum interface {
 	GetL2HeaderChallengeHash(common.Hash, *big.Int) (common.Hash, error)
 	GetL2HeaderChallenge(common.Hash) (contracts.L2HeaderChallengeInfo, error)
 	FilterL2HeaderChallengeUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeL2HeaderChallengeUpdateIterator, error)
+	GetChallengeWindow() (*big.Int, error)
 
 	// Data Loading
 	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
@@ -393,6 +394,10 @@ func (e *EthereumClient) FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHa
 
 func (e *EthereumClient) FilterL2HeaderChallengeUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeL2HeaderChallengeUpdateIterator, error) {
 	return e.ws.challenge.FilterL2HeaderChallengeUpdate(opts, _blockHash, _blockIndex, _status)
+}
+
+func (e *EthereumClient) GetChallengeWindow() (*big.Int, error) {
+	return e.http.challenge.ChallengeWindow(nil)
 }
 
 func (e *EthereumClient) GetL2HeaderChallengeHash(rblockHash common.Hash, l2Num *big.Int) (common.Hash, error) {

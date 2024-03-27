@@ -55,6 +55,7 @@ type Ethereum interface {
 	GetL2HeaderChallenge(common.Hash) (contracts.L2HeaderChallengeInfo, error)
 	FilterL2HeaderChallengeUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeL2HeaderChallengeUpdateIterator, error)
 	GetChallengeWindow() (*big.Int, error)
+	GetChallengeWindowBlockRanges() [][]uint64
 
 	// Data Loading
 	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
@@ -95,6 +96,7 @@ type EthereumHTTPClientOpts struct {
 	Logger                     *slog.Logger
 	DryRun                     bool
 	GasPriceIncreasePercent    *big.Int
+	BlockTime                  int
 }
 
 type EthereumWSClient struct {
@@ -331,14 +333,54 @@ func (e *EthereumClient) ChallengeDataRootInclusion(index uint64) (*types.Transa
 	return tx, blockHash, nil
 }
 
+// GetBlobstreamCommitment returns the commitment for the given celestia height.
+// see https://docs.celestia.org/developers/blobstream-proof-queries
+func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStoredIterator, error) {
+	scanRanges := e.GetChallengeWindowBlockRanges()
+
+	for i := 0; i < len(scanRanges); i++ {
+		if len(scanRanges[i]) != 2 {
+			return nil, fmt.Errorf("invalid block range")
+		}
+
+		// get all events
+		events, err := e.http.blobstreamX.FilterDataCommitmentStored(&bind.FilterOpts{
+			Context: context.Background(),
+			Start:   scanRanges[i][0],
+			End:     &scanRanges[i][1],
+		}, nil, nil, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to filter events: %w", err)
+		}
+		defer events.Close()
+
+		for events.Next() {
+			e := events.Event
+			if int64(e.StartBlock) <= height && height < int64(e.EndBlock) {
+				return events, nil
+			}
+		}
+		if err := events.Error(); err != nil {
+			return nil, err
+		}
+	}
+
+	return nil, fmt.Errorf("no commitment found for height %d", height)
+}
+
 func (e *EthereumClient) DefendDataRootInclusion(blockHash common.Hash, proof *CelestiaProof) (*types.Transaction, error) {
 	transactor, err := e.transactor()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 
+	commit, err := e.GetBlobstreamCommitment(proof.Tuple.Height.Int64())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blobstream commitment: %w", err)
+	}
+
 	tx, err := e.http.challenge.DefendDataRootInclusion(transactor, blockHash, challengeContract.ChallengeDataAvailabilityChallengeDAProof{
-		RootNonce: proof.Nonce,
+		RootNonce: commit.Event.ProofNonce,
 		DataRootTuple: challengeContract.DataRootTuple{
 			Height:   proof.Tuple.Height,
 			DataRoot: proof.Tuple.DataRoot,
@@ -562,6 +604,43 @@ func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
 		NumLeaves: proof.WrappedProof.NumLeaves,
 	}
 	return e.http.blobstreamX.VerifyAttestation(nil, proof.Nonce, *proof.Tuple, wrappedProof)
+}
+
+// Returns the block range required to log scan for open challenges.
+// Useful for scanning logs for pending challenges due to eth_getLogs
+// range limitations. Ranges are split into 10k block chunks to avoid
+// hitting the eth_getLogs limit.
+func (e *EthereumClient) GetChallengeWindowBlockRanges() [][]uint64 {
+	window, err := e.GetChallengeWindow() // seconds
+	if err != nil {
+		e.http.opts.Logger.Error("error getting challenge window", "error", err)
+	}
+
+	// divide window by the optimistic average block time
+	// to find the number of L1 blocks we need to scan
+	numBlocksToScan := window.Div(window, big.NewInt(int64(e.http.opts.BlockTime)))
+
+	// get the current block number
+	currentBlock, err := e.GetHeight()
+	if err != nil {
+		e.http.opts.Logger.Error("error getting current block number", "error", err)
+	}
+
+	// subtract the number of blocks we need to scan from the current block
+	// to find the block where the challenge window has closed
+	startBlock := currentBlock - numBlocksToScan.Uint64()
+
+	// fill array with ranges of blocks to scan
+	var blockRanges [][]uint64
+
+	blockSize := uint64(10000)
+	for startBlock+blockSize < currentBlock {
+		blockRanges = append(blockRanges, []uint64{startBlock, startBlock + blockSize})
+		startBlock += blockSize + 1
+	}
+	blockRanges = append(blockRanges, []uint64{startBlock, currentBlock})
+
+	return blockRanges
 }
 
 // MOCK CLIENT FOR TESTING

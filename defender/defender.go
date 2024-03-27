@@ -48,7 +48,7 @@ func (d *Defender) startDefender() error {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		scanRanges := d.getChallengeWindowBlockRanges()
+		scanRanges := d.Ethereum.GetChallengeWindowBlockRanges()
 
 		for i := 0; i < len(scanRanges); i++ {
 			if len(scanRanges[i]) != 2 {
@@ -89,6 +89,7 @@ func (d *Defender) getDAChallenges(startblock, endblock uint64, status uint8) (*
 	if err != nil {
 		return nil, err
 	}
+	defer challenges.Close()
 
 	log.Debug("Finished log scan for historic pending DA challenges")
 	return challenges, nil
@@ -189,6 +190,7 @@ func (d *Defender) getL2HeaderChallenges(startblock, endblock uint64, status uin
 	if err != nil {
 		return nil, err
 	}
+	defer challenges.Close()
 
 	log.Debug("Finished log scan for historic pending L2 header challenges")
 	return challenges, nil
@@ -397,41 +399,4 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 
 	// Finally, provide the transaction
 	return d.Ethereum.ProvideLegacyTx(rblock, shareProof.Data, *sharePointer)
-}
-
-// Returns the block range required to log scan for open challenges.
-// Useful for scanning logs for pending challenges due to eth_getLogs
-// range limitations. Ranges are split into 10k block chunks to avoid
-// hitting the eth_getLogs limit.
-func (d *Defender) getChallengeWindowBlockRanges() [][]uint64 {
-	window, err := d.Ethereum.GetChallengeWindow() // seconds
-	if err != nil {
-		d.Opts.Logger.Error("error getting challenge window", "error", err)
-	}
-
-	// divide window by the optimistic average block time
-	// to find the number of L1 blocks we need to scan
-	numBlocksToScan := window.Div(window, big.NewInt(10))
-
-	// get the current block number
-	currentBlock, err := d.Ethereum.GetHeight()
-	if err != nil {
-		d.Opts.Logger.Error("error getting current block number", "error", err)
-	}
-
-	// subtract the number of blocks we need to scan from the current block
-	// to find the block where the challenge window has closed
-	startBlock := currentBlock - numBlocksToScan.Uint64()
-
-	// fill array with ranges of blocks to scan
-	var blockRanges [][]uint64
-
-	blockSize := uint64(10000)
-	for startBlock+blockSize < currentBlock {
-		blockRanges = append(blockRanges, []uint64{startBlock, startBlock + blockSize})
-		startBlock += blockSize + 1
-	}
-	blockRanges = append(blockRanges, []uint64{startBlock, currentBlock})
-
-	return blockRanges
 }

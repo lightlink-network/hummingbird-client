@@ -15,6 +15,7 @@ ethereum:
   chainOracle: "0xF8B2550012118F7dE60EA6d03129c4B482477aE1"
   blobstreamX: "0xc3e209eb245Fd59c8586777b499d6A665DF3ABD2"
   gasPriceIncreasePercent: 10 # Gas price increase percent e.g 10% increase from current gas price
+  blockTime: 15 # block time in seconds, used to calculate number of blocks to scan logs
 lightlink:
   endpoint: https://replicator.pegasus.lightlink.io/rpc/v1 # Lightlink endpoint
   delay: 500 # Delay in ms between each request

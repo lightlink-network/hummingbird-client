@@ -23,6 +23,8 @@ import (
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
 )
 
+const blobstreamXScanSize = 90_000
+
 // Ethereum is an ethereum client.
 // It Provides access to the Ethereum Network and methods for
 // interacting with important contracts on the network including:
@@ -322,6 +324,38 @@ func (e *EthereumClient) ChallengeDataRootInclusion(index uint64) (*types.Transa
 	}
 
 	return tx, blockHash, nil
+}
+
+// GetBlobstreamCommitment returns the commitment for the given celestia height.
+// see https://docs.celestia.org/developers/blobstream-proof-queries
+func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStoredIterator, error) {
+	latestBlock, err := e.GetHeight()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
+	}
+
+	// get all events
+	events, err := e.http.blobstreamX.FilterDataCommitmentStored(&bind.FilterOpts{
+		Context: context.Background(),
+		Start:   latestBlock - blobstreamXScanSize,
+		End:     &latestBlock,
+	}, nil, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to filter events: %w", err)
+	}
+	defer events.Close()
+
+	for events.Next() {
+		e := events.Event
+		if int64(e.StartBlock) <= height && height < int64(e.EndBlock) {
+			return events, nil
+		}
+	}
+	if err := events.Error(); err != nil {
+		return nil, err
+	}
+
+	return nil, fmt.Errorf("no commitment found for height %d", height)
 }
 
 func (e *EthereumClient) DefendDataRootInclusion(blockHash common.Hash, proof *CelestiaProof) (*types.Transaction, error) {

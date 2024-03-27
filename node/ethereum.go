@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	tendTypes "github.com/tendermint/tendermint/types"
 
+	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
 	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 	chainoracleContract "hummingbird/node/contracts/ChainOracle.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
@@ -41,9 +42,6 @@ type Ethereum interface {
 	Wait(txHash common.Hash) (*types.Receipt, error)                                                          // Wait for a transaction to be mined.
 	GetPublisher() (common.Address, error)                                                                    // Get the address of the publisher of the CanonicalStateChain.sol contract.
 
-	// DAOracle
-	DAVerify(*CelestiaProof) (bool, error)
-
 	// Check if the data availability layer is verified.
 	// Challenges
 	GetChallengeFee() (*big.Int, error)
@@ -58,6 +56,10 @@ type Ethereum interface {
 	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
 	ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
 	ProvideLegacyTx(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
+
+	// BlobstreamX
+	FilterDataCommitmentStored(opts *bind.FilterOpts, startBlock []uint64, endBlock []uint64, dataCommitment [][32]byte) (*blobstreamXContract.BlobstreamXDataCommitmentStoredIterator, error)
+	DAVerify(*CelestiaProof) (bool, error)
 }
 
 type EthereumClient struct {
@@ -73,6 +75,7 @@ type EthereumHTTPClient struct {
 	daOracle            *daOracleContract.DAOracleContract
 	challenge           *challengeContract.Challenge
 	chainLoader         *chainoracleContract.ChainOracle
+	blobstreamX         *blobstreamXContract.BlobstreamX
 	logger              *slog.Logger
 	opts                *EthereumHTTPClientOpts
 }
@@ -84,6 +87,7 @@ type EthereumHTTPClientOpts struct {
 	DAOracleAddress            common.Address
 	ChallengeAddress           common.Address
 	ChainOracleAddress         common.Address
+	BlobstreamXAddress         common.Address
 	Logger                     *slog.Logger
 	DryRun                     bool
 	GasPriceIncreasePercent    *big.Int
@@ -150,6 +154,11 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		return nil, fmt.Errorf("failed to connect to ChainOracle: %w", err)
 	}
 
+	blobstreamX, err := blobstreamXContract.NewBlobstreamX(opts.BlobstreamXAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to BlobstreamX: %w", err)
+	}
+
 	chainId, err := client.ChainID(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chainId: %w", err)
@@ -170,6 +179,9 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 	if ok, _ := utils.IsContract(client, opts.ChainOracleAddress); !ok {
 		opts.Logger.Warn("contract not found for ChainOracle at given Address", "address", opts.ChainOracleAddress.Hex(), "endpoint", opts.Endpoint)
 	}
+	if ok, _ := utils.IsContract(client, opts.BlobstreamXAddress); !ok {
+		opts.Logger.Warn("contract not found for BlobstreamX at given Address", "address", opts.BlobstreamXAddress.Hex(), "endpoint", opts.Endpoint)
+	}
 
 	return &EthereumHTTPClient{
 		signer:              opts.Signer,
@@ -179,6 +191,7 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		daOracle:            daOracle,
 		challenge:           challenge,
 		chainLoader:         chainLoader,
+		blobstreamX:         blobstreamX,
 		logger:              opts.Logger,
 		opts:                &opts,
 	}, nil
@@ -290,16 +303,6 @@ func (e *EthereumClient) Wait(txHash common.Hash) (*types.Receipt, error) {
 
 	// 3. otherwise, if it is not pending, get the receipt
 	return e.http.client.TransactionReceipt(context.Background(), txHash)
-}
-
-func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
-	// convert proof to daOracle format
-	wrappedProof := daOracleContract.BinaryMerkleProof{
-		SideNodes: proof.WrappedProof.SideNodes,
-		Key:       proof.WrappedProof.Key,
-		NumLeaves: proof.WrappedProof.NumLeaves,
-	}
-	return e.http.daOracle.VerifyAttestation(nil, proof.Nonce, *proof.Tuple, wrappedProof)
 }
 
 func (e *EthereumClient) GetChallengeFee() (*big.Int, error) {
@@ -490,6 +493,20 @@ func (e *EthereumClient) ProvideLegacyTx(rblock common.Hash, shareData [][]byte,
 
 func (e *EthereumClient) GetPublisher() (common.Address, error) {
 	return e.http.canonicalStateChain.Publisher(nil)
+}
+
+func (e *EthereumClient) FilterDataCommitmentStored(opts *bind.FilterOpts, startBlock []uint64, endBlock []uint64, dataCommitment [][32]byte) (*blobstreamXContract.BlobstreamXDataCommitmentStoredIterator, error) {
+	return e.http.blobstreamX.FilterDataCommitmentStored(opts, startBlock, endBlock, dataCommitment)
+}
+
+func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
+	// convert proof to daOracle format
+	wrappedProof := blobstreamXContract.BinaryMerkleProof{
+		SideNodes: proof.WrappedProof.SideNodes,
+		Key:       proof.WrappedProof.Key,
+		NumLeaves: proof.WrappedProof.NumLeaves,
+	}
+	return e.http.blobstreamX.VerifyAttestation(nil, proof.Nonce, *proof.Tuple, wrappedProof)
 }
 
 // MOCK CLIENT FOR TESTING

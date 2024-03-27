@@ -10,10 +10,11 @@ celestia:
 ethereum:
   httpEndpoint: https://ethereum-sepolia.publicnode.com # Ethereum HTTP endpoint
   wsEndpoint: wss://ethereum-sepolia.publicnode.com # Ethereum WS endpoint
-  canonicalStateChain: '0x18d00cfb6c7c78CAb803A225F4EE7F6307f22f4C' # Canonical state chain contract address
-  daOracle: '0x3a5cbB6EF4756DA0b3f6DAE7aB6430fD8c46d247' # DA oracle contract address
-  challenge: '0x93c4D996C7808682cfa6Ae6D7a2b0A69eEcb5c0C' # Challenge contract address
-  chainOracle: '0xF8B2550012118F7dE60EA6d03129c4B482477aE1'
+  canonicalStateChain: "0x18d00cfb6c7c78CAb803A225F4EE7F6307f22f4C" # Canonical state chain contract address
+  daOracle: "0x3a5cbB6EF4756DA0b3f6DAE7aB6430fD8c46d247" # DA oracle contract address
+  challenge: "0x93c4D996C7808682cfa6Ae6D7a2b0A69eEcb5c0C" # Challenge contract address
+  chainOracle: "0xF8B2550012118F7dE60EA6d03129c4B482477aE1"
+  blobstreamX: "0xc3e209eb245Fd59c8586777b499d6A665DF3ABD2"
   gasPriceIncreasePercent: 10 # Gas price increase percent e.g 10% increase from current gas price
 lightlink:
   endpoint: https://replicator.pegasus.lightlink.io/rpc/v1 # Lightlink endpoint

@@ -23,8 +23,8 @@ import (
 	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
 	blobstreamtypes "github.com/celestiaorg/celestia-app/x/qgb/types"
 
+	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
-	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
 	"hummingbird/utils"
 )
 
@@ -41,7 +41,7 @@ type CelestiaPointer struct {
 
 type CelestiaProof struct {
 	Nonce        *big.Int
-	Tuple        *daOracleContract.DataRootTuple
+	Tuple        *blobstreamXContract.DataRootTuple
 	WrappedProof *challengeContract.BinaryMerkleProof
 }
 
@@ -249,7 +249,7 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 		return nil, err
 	}
 
-	tuple := daOracleContract.DataRootTuple{
+	tuple := blobstreamXContract.DataRootTuple{
 		Height:   big.NewInt(blockHeight),
 		DataRoot: *(*[32]byte)(blockRes.Block.DataHash),
 	}
@@ -368,7 +368,7 @@ func (c *celestiaMock) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error
 	}
 	return &CelestiaProof{
 		Nonce: big.NewInt(0),
-		Tuple: &daOracleContract.DataRootTuple{
+		Tuple: &blobstreamXContract.DataRootTuple{
 			Height:   new(big.Int).SetUint64(pointer.Height),
 			DataRoot: pointer.Commitment,
 		},

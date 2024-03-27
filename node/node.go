@@ -36,9 +36,9 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	eth, err := NewEthereumRPC(EthereumHTTPClientOpts{
 		Endpoint:                   cfg.Ethereum.HTTPEndpoint,
 		CanonicalStateChainAddress: common.HexToAddress(cfg.Ethereum.CanonicalStateChain),
-		DAOracleAddress:            common.HexToAddress(cfg.Ethereum.DaOracle),
 		ChallengeAddress:           common.HexToAddress(cfg.Ethereum.Challenge),
 		ChainOracleAddress:         common.HexToAddress(cfg.Ethereum.ChainOracle),
+		BlobstreamXAddress:         common.HexToAddress(cfg.Ethereum.BlobstreamX),
 		Signer:                     ethKey,
 		Logger:                     logger.With("ctx", "ethereum-http"),
 		DryRun:                     cfg.DryRun,

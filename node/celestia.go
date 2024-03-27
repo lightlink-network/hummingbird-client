@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
-	"strings"
 	"time"
 
 	cosmosmath "cosmossdk.io/math"
@@ -15,9 +14,7 @@ import (
 	"github.com/celestiaorg/celestia-node/share"
 	gosquare "github.com/celestiaorg/go-square/square"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tendermint/tendermint/rpc/client/http"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -27,8 +24,8 @@ import (
 	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
 	blobstreamtypes "github.com/celestiaorg/celestia-app/x/qgb/types"
 
+	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
-	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
 	"hummingbird/utils"
 )
 
@@ -45,7 +42,7 @@ type CelestiaPointer struct {
 
 type CelestiaProof struct {
 	Nonce        *big.Int
-	Tuple        *daOracleContract.DataRootTuple
+	Tuple        *blobstreamXContract.DataRootTuple
 	WrappedProof *challengeContract.BinaryMerkleProof
 }
 
@@ -175,105 +172,20 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 	return pointer, nil
 }
 
-func (c *CelestiaClient) waitForTxInclusion(ctx context.Context, h common.Hash) (*ctypes.ResultTx, error) {
-	txHash := []byte{}
-	maxRetries := 1000
-	retryInterval := 10 * time.Second
-
-	c.logger.Debug("Waiting for tx inclusion", "blob_hash", h.Hex())
-
-	// Scan the mempool every 'retryInterval' until 'maxRetries' is reached or the tx is not found in the mempool
-	// Scanning the pool gives us the tx hash
-	for i := 0; i < maxRetries; i++ {
-		txns, err := c.trpc.UnconfirmedTxs(ctx, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		found := false
-		for _, tx := range txns.Txs {
-			blobtx, isBlob := types.UnmarshalBlobTx(tx)
-			if !isBlob {
-				c.logger.Info("waitForTxInclusion: discovered tx is not a blob")
-				continue
-			}
-			if len(blobtx.Blobs) == 0 {
-				return nil, fmt.Errorf("waitForTxInclusion: discovered tx has no blobs")
-			}
-			// Check if the data hash of the tx matches the hash of the data we submitted
-			if crypto.Keccak256Hash(blobtx.Blobs[0].Data) == h {
-				txHash = tx.Hash()
-				c.logger.Debug("Tx found in mempool", "tx", h.Hex())
-				found = true
-				break // if the tx is found in the mempool, break the inner loop as it is not included in a block yet
-			}
-		}
-
-		if !found {
-			break // if the tx is not found in the mempool, break the outer loop as it is already included in a block
-		}
-
-		time.Sleep(retryInterval)
-	}
-
-	if len(txHash) == 0 {
-		return nil, fmt.Errorf("waitForTxInclusion: tx not found after max retries:  %v", maxRetries)
-	}
-
-	// Get the tx with block inclusion info
-	for i := 0; i < maxRetries; i++ {
-		time.Sleep(retryInterval)
-
-		tx, err := c.trpc.Tx(ctx, txHash, true)
-		if err != nil {
-			// Sometimes the tx is not in the mempool, but not found in the block yet
-			// We need to wait for it to be included in a block
-			if strings.Contains(err.Error(), "not found") {
-				continue
-			} else {
-				return nil, err
-			}
-		}
-		if tx.Height == 0 {
-			c.logger.Debug("Tx found but height is 0, retrying...", "tx", tx.Hash, "height", tx.Height, "index", tx.Index)
-			time.Sleep(retryInterval)
-			continue
-		}
-		c.logger.Debug("Tx found and included in a block", "tx", tx.Hash, "height", tx.Height, "index", tx.Index)
-		return tx, nil
-	}
-
-	return nil, fmt.Errorf("waitForTxInclusion: tx not found after max retries:  %v", maxRetries)
-}
-
 // PostData submits a new transaction with the provided data to the Celestia node.
 func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
-	tx := &ctypes.ResultTx{}
 	response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
 	if err != nil {
-		if strings.Contains(err.Error(), "timed out waiting for tx to be included in a block") {
-			tx, err = c.waitForTxInclusion(ctx, crypto.Keccak256Hash(blobs[0].Data))
-			if err != nil {
-				return nil, fmt.Errorf("submitBlob: failed to wait for tx inclusion: %w", err)
-			}
-			if tx == nil {
-				return nil, fmt.Errorf("submitBlob: failed to wait for tx inclusion: %w", err)
-			}
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 
-	var txHash []byte
-
-	if response != nil {
-		txHash, err = hex.DecodeString(response.TxHash)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		txHash = tx.Hash
+	txHash, err := hex.DecodeString(response.TxHash)
+	if err != nil {
+		return nil, err
 	}
+
+	// Delay here before getting the block to ensure the tx is included
+	time.Sleep(5 * time.Second)
 
 	// Get the block that contains the tx
 	pointer, err := c.GetPointer(common.BytesToHash(txHash))
@@ -321,7 +233,7 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 		return nil, err
 	}
 
-	tuple := daOracleContract.DataRootTuple{
+	tuple := blobstreamXContract.DataRootTuple{
 		Height:   big.NewInt(blockHeight),
 		DataRoot: *(*[32]byte)(blockRes.Block.DataHash),
 	}
@@ -479,7 +391,7 @@ func (c *celestiaMock) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error
 	}
 	return &CelestiaProof{
 		Nonce: big.NewInt(0),
-		Tuple: &daOracleContract.DataRootTuple{
+		Tuple: &blobstreamXContract.DataRootTuple{
 			Height:   new(big.Int).SetUint64(pointer.Height),
 			DataRoot: pointer.Commitment,
 		},

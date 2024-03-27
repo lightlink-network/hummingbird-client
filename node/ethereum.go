@@ -21,16 +21,15 @@ import (
 	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 	chainoracleContract "hummingbird/node/contracts/ChainOracle.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
-	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
 )
 
 // Ethereum is an ethereum client.
 // It Provides access to the Ethereum Network and methods for
 // interacting with important contracts on the network including:
-// - CanonicalStateChain.sol With with methods for getting and pushing
-// - DAOracle.sol With methods for verifying data availability
-// - Challenge.sol With methods for challenging data availability etc d
-// rollup block headers.
+// - CanonicalStateChain.sol With with methods for getting and pushing rollup block headers.
+// - Challenge.sol With methods for challenging data availability etc
+// - ChainOracle.sol With methods for providing shares and headers
+// - BlobstreamX.sol With methods for verifying data availability
 type Ethereum interface {
 	// CanonicalStateChain
 	GetRollupHeight() (uint64, error)                                                                         // Get the current rollup block height.
@@ -72,7 +71,6 @@ type EthereumHTTPClient struct {
 	client              *ethclient.Client
 	chainId             *big.Int
 	canonicalStateChain *canonicalStateChainContract.CanonicalStateChain
-	daOracle            *daOracleContract.DAOracleContract
 	challenge           *challengeContract.Challenge
 	chainLoader         *chainoracleContract.ChainOracle
 	blobstreamX         *blobstreamXContract.BlobstreamX
@@ -84,7 +82,6 @@ type EthereumHTTPClientOpts struct {
 	Signer                     *ecdsa.PrivateKey
 	Endpoint                   string
 	CanonicalStateChainAddress common.Address
-	DAOracleAddress            common.Address
 	ChallengeAddress           common.Address
 	ChainOracleAddress         common.Address
 	BlobstreamXAddress         common.Address
@@ -139,11 +136,6 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		return nil, fmt.Errorf("failed to connect to CanonicalStateChain: %w", err)
 	}
 
-	daOracle, err := daOracleContract.NewDAOracleContract(opts.DAOracleAddress, client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to DAOracle: %w", err)
-	}
-
 	challenge, err := challengeContract.NewChallenge(opts.ChallengeAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Challenge: %w", err)
@@ -170,9 +162,6 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 	if ok, _ := utils.IsContract(client, opts.CanonicalStateChainAddress); !ok {
 		opts.Logger.Warn("contract not found for CanonicalStateChain at given Address", "address", opts.CanonicalStateChainAddress.Hex(), "endpoint", opts.Endpoint)
 	}
-	if ok, _ := utils.IsContract(client, opts.DAOracleAddress); !ok {
-		opts.Logger.Warn("contract not found for DAOracle at given Address", "address", opts.DAOracleAddress.Hex(), "endpoint", opts.Endpoint)
-	}
 	if ok, _ := utils.IsContract(client, opts.ChallengeAddress); !ok {
 		opts.Logger.Warn("contract not found for Challenge at given Address", "address", opts.ChallengeAddress.Hex(), "endpoint", opts.Endpoint)
 	}
@@ -188,7 +177,6 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		client:              client,
 		chainId:             chainId,
 		canonicalStateChain: canonicalStateChain,
-		daOracle:            daOracle,
 		challenge:           challenge,
 		chainLoader:         chainLoader,
 		blobstreamX:         blobstreamX,
@@ -500,7 +488,7 @@ func (e *EthereumClient) FilterDataCommitmentStored(opts *bind.FilterOpts, start
 }
 
 func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
-	// convert proof to daOracle format
+	// convert proof to blobstreamX format
 	wrappedProof := blobstreamXContract.BinaryMerkleProof{
 		SideNodes: proof.WrappedProof.SideNodes,
 		Key:       proof.WrappedProof.Key,

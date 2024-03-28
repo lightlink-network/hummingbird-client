@@ -618,7 +618,8 @@ func (e *EthereumClient) GetChallengeWindowBlockRanges() [][]uint64 {
 
 	// divide window by the optimistic average block time
 	// to find the number of L1 blocks we need to scan
-	numBlocksToScan := window.Div(window, big.NewInt(int64(e.http.opts.BlockTime)))
+	windowsMs := window.Mul(window, big.NewInt(1000))
+	numBlocksToScan := window.Div(windowsMs, big.NewInt(int64(e.http.opts.BlockTime)))
 
 	// get the current block number
 	currentBlock, err := e.GetHeight()

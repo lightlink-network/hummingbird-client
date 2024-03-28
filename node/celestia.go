@@ -22,7 +22,6 @@ import (
 	"github.com/celestiaorg/celestia-app/pkg/appconsts"
 	"github.com/celestiaorg/celestia-app/pkg/shares"
 	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
-	blobstreamtypes "github.com/celestiaorg/celestia-app/x/qgb/types"
 
 	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
@@ -50,7 +49,7 @@ type CelestiaProof struct {
 type Celestia interface {
 	Namespace() string
 	PublishBundle(blocks Bundle) (*CelestiaPointer, error)
-	GetProof(pointer *CelestiaPointer) (*CelestiaProof, error)
+	GetProof(pointer *CelestiaPointer, startBlock uint64, endBlock uint64, proofNonce big.Int) (*CelestiaProof, error)
 	GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error)
 	GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error)
 	GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error)
@@ -196,7 +195,7 @@ func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gas
 	return pointer, err
 }
 
-func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error) {
+func (c *CelestiaClient) GetProof(pointer *CelestiaPointer, startBlock uint64, endBlock uint64, proofNonce big.Int) (*CelestiaProof, error) {
 	ctx := context.Background()
 
 	blockHeight := int64(pointer.Height)
@@ -218,17 +217,8 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 		return nil, err
 	}
 
-	// New gRPC query client
-	queryClient := blobstreamtypes.NewQueryClient(c.grcp)
-
-	// Get the data commitment range for the block height
-	resp, err := queryClient.DataCommitmentRangeForHeight(ctx, &blobstreamtypes.QueryDataCommitmentRangeForHeightRequest{Height: uint64(blockHeight)})
-	if err != nil {
-		return nil, err
-	}
-
 	// Get the data root inclusion proof
-	dcProof, err := c.trpc.DataRootInclusionProof(ctx, uint64(blockHeight), resp.DataCommitment.BeginBlock, resp.DataCommitment.EndBlock)
+	dcProof, err := c.trpc.DataRootInclusionProof(ctx, uint64(blockHeight), startBlock, endBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +239,7 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 	}
 
 	proof := &CelestiaProof{
-		Nonce:        big.NewInt(int64(resp.DataCommitment.Nonce)),
+		Nonce:        &proofNonce,
 		Tuple:        &tuple,
 		WrappedProof: &wrappedProof,
 	}
@@ -385,7 +375,7 @@ func (c *celestiaMock) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
 }
 
 // returns a mock proof, cannot be used for verification
-func (c *celestiaMock) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error) {
+func (c *celestiaMock) GetProof(pointer *CelestiaPointer, startBlock uint64, endBlock uint64, proofNonce big.Int) (*CelestiaProof, error) {
 	if !c.fakeProof {
 		return nil, fmt.Errorf("failed")
 	}

@@ -168,7 +168,11 @@ func (d *Defender) GetDAProof(block common.Hash) (*node.CelestiaProof, error) {
 	if pointer == nil {
 		return nil, fmt.Errorf("no Celestia pointer found")
 	}
-	return d.Celestia.GetProof(pointer)
+	commit, err := d.Ethereum.GetBlobstreamCommitment(int64(pointer.Height))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blobstream commitment: %w", err)
+	}
+	return d.Celestia.GetProof(pointer, commit.StartBlock, commit.EndBlock, *commit.ProofNonce)
 }
 
 // Gets L2 Header challenge events from Challenge.sol for the given block range and status.

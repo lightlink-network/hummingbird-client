@@ -122,7 +122,10 @@ var (
 				shareProof, err := n.Celestia.GetSharesProof(celPointer, pointer)
 				panicErr(err, "failed to get share proof")
 
-				celProof, err := n.Celestia.GetProof(celPointer)
+				commitment, err := n.Ethereum.GetBlobstreamCommitment(int64(celPointer.Height))
+				panicErr(err, "failed to get blobstream commitment")
+
+				celProof, err := n.Celestia.GetProof(celPointer, commitment.StartBlock, commitment.EndBlock, *commitment.ProofNonce)
 				panicErr(err, "failed to get celestia proof")
 
 				attestationProof := chainoracleContract.AttestationProof{

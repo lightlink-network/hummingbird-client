@@ -67,6 +67,7 @@ type Ethereum interface {
 	// BlobstreamX
 	FilterDataCommitmentStored(opts *bind.FilterOpts, startBlock []uint64, endBlock []uint64, dataCommitment [][32]byte) (*blobstreamXContract.BlobstreamXDataCommitmentStoredIterator, error)
 	DAVerify(*CelestiaProof) (bool, error)
+	GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStored, error)
 }
 
 type EthereumClient struct {
@@ -335,7 +336,7 @@ func (e *EthereumClient) ChallengeDataRootInclusion(index uint64) (*types.Transa
 
 // GetBlobstreamCommitment returns the commitment for the given celestia height.
 // see https://docs.celestia.org/developers/blobstream-proof-queries
-func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStoredIterator, error) {
+func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStored, error) {
 	scanRanges := e.GetChallengeWindowBlockRanges()
 
 	for i := 0; i < len(scanRanges); i++ {
@@ -357,7 +358,7 @@ func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXCont
 		for events.Next() {
 			e := events.Event
 			if int64(e.StartBlock) <= height && height < int64(e.EndBlock) {
-				return events, nil
+				return e, nil
 			}
 		}
 		if err := events.Error(); err != nil {
@@ -374,13 +375,8 @@ func (e *EthereumClient) DefendDataRootInclusion(blockHash common.Hash, proof *C
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 
-	commit, err := e.GetBlobstreamCommitment(proof.Tuple.Height.Int64())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get blobstream commitment: %w", err)
-	}
-
 	tx, err := e.http.challenge.DefendDataRootInclusion(transactor, blockHash, challengeContract.ChallengeDataAvailabilityChallengeDAProof{
-		RootNonce: commit.Event.ProofNonce,
+		RootNonce: proof.Nonce,
 		DataRootTuple: challengeContract.DataRootTuple{
 			Height:   proof.Tuple.Height,
 			DataRoot: proof.Tuple.DataRoot,

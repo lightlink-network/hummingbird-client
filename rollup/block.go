@@ -28,3 +28,15 @@ func (b *Block) L2Blocks() []*types.Block {
 	}
 	return blocks
 }
+
+func (b *Block) GetCelestiaPointers() []*node.CelestiaPointer {
+	ps := make([]*node.CelestiaPointer, 0)
+	for _, pointer := range b.CelestiaPointers {
+		ps = append(ps, &node.CelestiaPointer{
+			Height:     pointer.Height,
+			ShareStart: pointer.ShareStart.Uint64(),
+			ShareLen:   uint64(pointer.ShareLen),
+		})
+	}
+	return ps
+}

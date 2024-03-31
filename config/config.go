@@ -24,6 +24,7 @@ type Config struct {
 		Challenge               string `mapstructure:"challenge"`
 		ChainOracle             string `mapstructure:"chainOracle"`
 		BlobstreamX             string `mapstructure:"blobstreamX"`
+		BlockTime               int    `mapstructure:"blockTime"`
 	} `mapstructure:"ethereum"`
 	LightLink struct {
 		Endpoint string `mapstructure:"endpoint"`

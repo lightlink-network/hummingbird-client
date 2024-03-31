@@ -53,17 +53,26 @@ type Ethereum interface {
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
 	WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate) (event.Subscription, error)
 	FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error)
+	DefendL2Header(common.Hash, common.Hash, common.Hash) (*types.Transaction, error)
+	GetL2HeaderChallengeHash(common.Hash, *big.Int) (common.Hash, error)
+	GetL2HeaderChallenge(common.Hash) (contracts.L2HeaderChallengeInfo, error)
+	FilterL2HeaderChallengeUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeL2HeaderChallengeUpdateIterator, error)
+	GetChallengeWindow() (*big.Int, error)
+	GetChallengeWindowBlockRanges() [][]uint64
 
 	// Data Loading
 	ProvideShares(rblock common.Hash, pointerIndex uint8, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
 	ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
 	ProvideLegacyTx(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
+	AlreadyProvidedShares(rblock common.Hash, shareData [][]byte) (bool, error)
+	AlreadyProvidedHeader(l2Hash common.Hash) (bool, error)
 
 	// Utils
 	HashHeader(*canonicalStateChainContract.CanonicalStateChainHeader) (common.Hash, error)
 	// BlobstreamX
 	FilterDataCommitmentStored(opts *bind.FilterOpts, startBlock []uint64, endBlock []uint64, dataCommitment [][32]byte) (*blobstreamXContract.BlobstreamXDataCommitmentStoredIterator, error)
 	DAVerify(*CelestiaProof) (bool, error)
+	GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStored, error)
 }
 
 type EthereumClient struct {
@@ -93,6 +102,7 @@ type EthereumHTTPClientOpts struct {
 	Logger                     *slog.Logger
 	DryRun                     bool
 	GasPriceIncreasePercent    *big.Int
+	BlockTime                  int
 }
 
 type EthereumWSClient struct {
@@ -332,30 +342,33 @@ func (e *EthereumClient) ChallengeDataRootInclusion(index uint64, pointerIndex u
 // GetBlobstreamCommitment returns the commitment for the given celestia height.
 // see https://docs.celestia.org/developers/blobstream-proof-queries
 func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStored, error) {
-	latestBlock, err := e.GetHeight()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get latest block: %w", err)
-	}
+	scanRanges := e.GetChallengeWindowBlockRanges()
 
-	// get all events
-	events, err := e.http.blobstreamX.FilterDataCommitmentStored(&bind.FilterOpts{
-		Context: context.Background(),
-		Start:   latestBlock - blobstreamXScanSize,
-		End:     &latestBlock,
-	}, nil, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to filter events: %w", err)
-	}
-	defer events.Close()
-
-	for events.Next() {
-		e := events.Event
-		if int64(e.StartBlock) <= height && height < int64(e.EndBlock) {
-			return e, nil
+	for i := 0; i < len(scanRanges); i++ {
+		if len(scanRanges[i]) != 2 {
+			return nil, fmt.Errorf("invalid block range")
 		}
-	}
-	if err := events.Error(); err != nil {
-		return nil, err
+
+		// get all events
+		events, err := e.http.blobstreamX.FilterDataCommitmentStored(&bind.FilterOpts{
+			Context: context.Background(),
+			Start:   scanRanges[i][0],
+			End:     &scanRanges[i][1],
+		}, nil, nil, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to filter events: %w", err)
+		}
+		defer events.Close()
+
+		for events.Next() {
+			e := events.Event
+			if int64(e.StartBlock) <= height && height < int64(e.EndBlock) {
+				return e, nil
+			}
+		}
+		if err := events.Error(); err != nil {
+			return nil, err
+		}
 	}
 
 	return nil, fmt.Errorf("no commitment found for height %d", height)
@@ -420,6 +433,42 @@ func (e *EthereumClient) WatchChallengesDA(c chan<- *challengeContract.Challenge
 
 func (e *EthereumClient) FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error) {
 	return e.ws.challenge.FilterChallengeDAUpdate(opts, _blockHash, _blockIndex, _status)
+}
+
+func (e *EthereumClient) FilterL2HeaderChallengeUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeL2HeaderChallengeUpdateIterator, error) {
+	return e.ws.challenge.FilterL2HeaderChallengeUpdate(opts, _blockHash, _blockIndex, _status)
+}
+
+func (e *EthereumClient) GetChallengeWindow() (*big.Int, error) {
+	return e.http.challenge.ChallengeWindow(nil)
+}
+
+func (e *EthereumClient) GetL2HeaderChallengeHash(rblockHash common.Hash, l2Num *big.Int) (common.Hash, error) {
+	return e.ws.challenge.L2HeaderChallengeHash(nil, rblockHash, l2Num)
+}
+
+func (e *EthereumClient) GetL2HeaderChallenge(challengeHash common.Hash) (contracts.L2HeaderChallengeInfo, error) {
+	res, err := e.ws.challenge.L2HeaderChallenges(nil, challengeHash)
+	if err != nil {
+		return contracts.L2HeaderChallengeInfo{}, fmt.Errorf("failed to get L2 header challenge: %w", err)
+	}
+
+	return contracts.L2HeaderChallengeInfo{
+		Header:       res.Header,
+		PrevHeader:   res.PrevHeader,
+		ChallengeEnd: res.ChallengeEnd,
+		Challenger:   res.Challenger,
+		Status:       res.Status,
+	}, nil
+}
+
+func (e *EthereumClient) DefendL2Header(blockHash, rootHash, headerHash common.Hash) (*types.Transaction, error) {
+	transactor, err := e.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	return e.ws.challenge.DefendL2Header(transactor, blockHash, rootHash, headerHash)
 }
 
 func (e *EthereumClient) ProvideShares(rblock common.Hash, pointerIndex uint8, proof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error) {
@@ -516,6 +565,30 @@ func (e *EthereumClient) ProvideLegacyTx(rblock common.Hash, shareData [][]byte,
 	return e.http.chainLoader.ProvideLegacyTx(transactor, sharekey, ranges)
 }
 
+func (e *EthereumClient) AlreadyProvidedShares(rblock common.Hash, shareData [][]byte) (bool, error) {
+	sharekey, err := e.http.chainLoader.ShareKey(nil, rblock, shareData)
+	if err != nil {
+		return false, fmt.Errorf("failed to get share key: %w", err)
+	}
+
+	// check shares are found
+	s, err := e.http.chainLoader.Shares(nil, sharekey, big.NewInt(0))
+	if err != nil {
+		return false, fmt.Errorf("failed checking shares were deployed: %w", err)
+	}
+
+	return len(s) > 0, nil
+}
+
+func (e *EthereumClient) AlreadyProvidedHeader(l2Hash common.Hash) (bool, error) {
+	h, err := e.http.chainLoader.GetHeader(nil, l2Hash)
+	if err != nil {
+		return false, fmt.Errorf("failed to get header: %w", err)
+	}
+
+	return h.Number.Uint64() > 0, nil
+}
+
 func (e *EthereumClient) GetPublisher() (common.Address, error) {
 	return e.http.canonicalStateChain.Publisher(nil)
 }
@@ -536,6 +609,44 @@ func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
 		NumLeaves: proof.WrappedProof.NumLeaves,
 	}
 	return e.http.blobstreamX.VerifyAttestation(nil, proof.Nonce, *proof.Tuple, wrappedProof)
+}
+
+// Returns the block range required to log scan for open challenges.
+// Useful for scanning logs for pending challenges due to eth_getLogs
+// range limitations. Ranges are split into 10k block chunks to avoid
+// hitting the eth_getLogs limit.
+func (e *EthereumClient) GetChallengeWindowBlockRanges() [][]uint64 {
+	window, err := e.GetChallengeWindow() // seconds
+	if err != nil {
+		e.http.opts.Logger.Error("error getting challenge window", "error", err)
+	}
+
+	// divide window by the optimistic average block time
+	// to find the number of L1 blocks we need to scan
+	windowsMs := window.Mul(window, big.NewInt(1000))
+	numBlocksToScan := window.Div(windowsMs, big.NewInt(int64(e.http.opts.BlockTime)))
+
+	// get the current block number
+	currentBlock, err := e.GetHeight()
+	if err != nil {
+		e.http.opts.Logger.Error("error getting current block number", "error", err)
+	}
+
+	// subtract the number of blocks we need to scan from the current block
+	// to find the block where the challenge window has closed
+	startBlock := currentBlock - numBlocksToScan.Uint64()
+
+	// fill array with ranges of blocks to scan
+	var blockRanges [][]uint64
+
+	blockSize := uint64(10000)
+	for startBlock+blockSize < currentBlock {
+		blockRanges = append(blockRanges, []uint64{startBlock, startBlock + blockSize})
+		startBlock += blockSize + 1
+	}
+	blockRanges = append(blockRanges, []uint64{startBlock, currentBlock})
+
+	return blockRanges
 }
 
 // MOCK CLIENT FOR TESTING

@@ -43,6 +43,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		Logger:                     logger.With("ctx", "ethereum-http"),
 		DryRun:                     cfg.DryRun,
 		GasPriceIncreasePercent:    big.NewInt(int64(cfg.Ethereum.GasPriceIncreasePercent)),
+		BlockTime:                  cfg.Ethereum.BlockTime,
 	}, EthereumWSClientOpts{
 		Endpoint:         cfg.Ethereum.WSEndpoint,
 		ChallengeAddress: common.HexToAddress(cfg.Ethereum.Challenge),
@@ -133,7 +134,7 @@ func (n *Node) FetchRollupBlock(rblock common.Hash) (*canonicalstatechain.Canoni
 			ShareLen:   uint64(header.CelestiaPointers[i].ShareLen),
 		}
 
-		shares, err := n.Celestia.GetShares(pointer)
+		shares, err := n.Celestia.GetSharesByNamespace(pointer)
 		if err != nil {
 			return nil, nil, err
 		}

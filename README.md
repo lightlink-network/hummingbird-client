@@ -15,7 +15,8 @@ Documentation & deployed contract addresses can be found [here](https://docs.lig
 
 ## Usage
 
-```bash rollup info  # Get the current rollup state
+```bash
+hb rollup info  # Get the current rollup state
 hb rollup info --num <rblock_number> --bundle # View the bundled L2 block hashes in an L1 rblock
 hb rollup next  # [Publisher Only] Generate the next rollup block
 hb rollup start # [Publisher Only] Start the rollup loop to generate and submit bundles

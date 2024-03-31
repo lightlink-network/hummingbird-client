@@ -75,7 +75,7 @@ var RollupInfoCmd = &cobra.Command{
 			// if showBundle flag is set, get showBundle info
 			if showBundle, _ := cmd.Flags().GetBool("bundle"); showBundle {
 				for _, p := range info.CanonicalStateChainHeader.CelestiaPointers {
-					s, err := r.Celestia.GetShares(&node.CelestiaPointer{
+					s, err := r.Celestia.GetSharesByNamespace(&node.CelestiaPointer{
 						Height:     p.Height,
 						ShareStart: p.ShareStart.Uint64(),
 						ShareLen:   uint64(p.ShareLen),

@@ -24,7 +24,7 @@ func init() {
 var DefenderProveDaCmd = &cobra.Command{
 	Use:   "prove-da",
 	Short: "prove-da will prove a data availability batch",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.MinimumNArgs(2),
 	ArgAliases: []string{
 		"block",
 		"pointerIndex",
@@ -42,7 +42,11 @@ var DefenderProveDaCmd = &cobra.Command{
 		})
 
 		blockHash := common.HexToHash(args[0])
-		pointerIndex, _ := strconv.Atoi(args[1])
+		pointerIndex, err := strconv.Atoi(args[1])
+		if err != nil {
+			logger.Error("Failed to parse pointer index", "err", err)
+			utils.NoErr(err)
+		}
 
 		proof, err := d.GetDAProof(blockHash, uint8(pointerIndex))
 		if err != nil {

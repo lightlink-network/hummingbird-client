@@ -240,3 +240,23 @@ func (b *Bundle) FindTxShares(hash common.Hash, namespace string) (*SharePointer
 	// TODO: this code repeats the same logic as FindHeaderShares, we should refactor it
 	// to avoid code duplication. `FindBytesShares` ?
 }
+
+func FindHeaderSharesInBundles(bundles []*Bundle, hash common.Hash, namespace string) (*SharePointer, uint8, error) {
+	for i, bundle := range bundles {
+		pointer, err := bundle.FindHeaderShares(hash, namespace)
+		if err == nil {
+			return pointer, uint8(i), nil
+		}
+	}
+	return nil, 0, fmt.Errorf("header not found in any bundle")
+}
+
+func FindTxSharesInBundles(bundles []*Bundle, hash common.Hash, namespace string) (*SharePointer, uint8, error) {
+	for i, bundle := range bundles {
+		pointer, err := bundle.FindTxShares(hash, namespace)
+		if err == nil {
+			return pointer, uint8(i), nil
+		}
+	}
+	return nil, 0, fmt.Errorf("tx not found in any bundle")
+}

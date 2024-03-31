@@ -18,19 +18,21 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	tendTypes "github.com/tendermint/tendermint/types"
 
+	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
 	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 	chainoracleContract "hummingbird/node/contracts/ChainOracle.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
-	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
 )
+
+const blobstreamXScanSize = 90_000
 
 // Ethereum is an ethereum client.
 // It Provides access to the Ethereum Network and methods for
 // interacting with important contracts on the network including:
-// - CanonicalStateChain.sol With with methods for getting and pushing
-// - DAOracle.sol With methods for verifying data availability
-// - Challenge.sol With methods for challenging data availability etc d
-// rollup block headers.
+// - CanonicalStateChain.sol With with methods for getting and pushing rollup block headers.
+// - Challenge.sol With methods for challenging data availability etc
+// - ChainOracle.sol With methods for providing shares and headers
+// - BlobstreamX.sol With methods for verifying data availability
 type Ethereum interface {
 	// CanonicalStateChain
 	GetRollupHeight() (uint64, error)                                                                         // Get the current rollup block height.
@@ -41,9 +43,6 @@ type Ethereum interface {
 	GetRollupHeaderByHash(hash common.Hash) (canonicalStateChainContract.CanonicalStateChainHeader, error)    // Get the rollup block header with the given hash from the CanonicalStateChain.sol contract.
 	Wait(txHash common.Hash) (*types.Receipt, error)                                                          // Wait for a transaction to be mined.
 	GetPublisher() (common.Address, error)                                                                    // Get the address of the publisher of the CanonicalStateChain.sol contract.
-
-	// DAOracle
-	DAVerify(*CelestiaProof) (bool, error)
 
 	// Check if the data availability layer is verified.
 	// Challenges
@@ -62,6 +61,9 @@ type Ethereum interface {
 
 	// Utils
 	HashHeader(*canonicalStateChainContract.CanonicalStateChainHeader) (common.Hash, error)
+	// BlobstreamX
+	FilterDataCommitmentStored(opts *bind.FilterOpts, startBlock []uint64, endBlock []uint64, dataCommitment [][32]byte) (*blobstreamXContract.BlobstreamXDataCommitmentStoredIterator, error)
+	DAVerify(*CelestiaProof) (bool, error)
 }
 
 type EthereumClient struct {
@@ -74,9 +76,9 @@ type EthereumHTTPClient struct {
 	client              *ethclient.Client
 	chainId             *big.Int
 	canonicalStateChain *canonicalStateChainContract.CanonicalStateChain
-	daOracle            *daOracleContract.DAOracleContract
 	challenge           *challengeContract.Challenge
 	chainLoader         *chainoracleContract.ChainOracle
+	blobstreamX         *blobstreamXContract.BlobstreamX
 	logger              *slog.Logger
 	opts                *EthereumHTTPClientOpts
 }
@@ -85,9 +87,9 @@ type EthereumHTTPClientOpts struct {
 	Signer                     *ecdsa.PrivateKey
 	Endpoint                   string
 	CanonicalStateChainAddress common.Address
-	DAOracleAddress            common.Address
 	ChallengeAddress           common.Address
 	ChainOracleAddress         common.Address
+	BlobstreamXAddress         common.Address
 	Logger                     *slog.Logger
 	DryRun                     bool
 	GasPriceIncreasePercent    *big.Int
@@ -139,11 +141,6 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		return nil, fmt.Errorf("failed to connect to CanonicalStateChain: %w", err)
 	}
 
-	daOracle, err := daOracleContract.NewDAOracleContract(opts.DAOracleAddress, client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to DAOracle: %w", err)
-	}
-
 	challenge, err := challengeContract.NewChallenge(opts.ChallengeAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Challenge: %w", err)
@@ -152,6 +149,11 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 	chainLoader, err := chainoracleContract.NewChainOracle(opts.ChainOracleAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to ChainOracle: %w", err)
+	}
+
+	blobstreamX, err := blobstreamXContract.NewBlobstreamX(opts.BlobstreamXAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to BlobstreamX: %w", err)
 	}
 
 	chainId, err := client.ChainID(context.TODO())
@@ -165,14 +167,14 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 	if ok, _ := utils.IsContract(client, opts.CanonicalStateChainAddress); !ok {
 		opts.Logger.Warn("contract not found for CanonicalStateChain at given Address", "address", opts.CanonicalStateChainAddress.Hex(), "endpoint", opts.Endpoint)
 	}
-	if ok, _ := utils.IsContract(client, opts.DAOracleAddress); !ok {
-		opts.Logger.Warn("contract not found for DAOracle at given Address", "address", opts.DAOracleAddress.Hex(), "endpoint", opts.Endpoint)
-	}
 	if ok, _ := utils.IsContract(client, opts.ChallengeAddress); !ok {
 		opts.Logger.Warn("contract not found for Challenge at given Address", "address", opts.ChallengeAddress.Hex(), "endpoint", opts.Endpoint)
 	}
 	if ok, _ := utils.IsContract(client, opts.ChainOracleAddress); !ok {
 		opts.Logger.Warn("contract not found for ChainOracle at given Address", "address", opts.ChainOracleAddress.Hex(), "endpoint", opts.Endpoint)
+	}
+	if ok, _ := utils.IsContract(client, opts.BlobstreamXAddress); !ok {
+		opts.Logger.Warn("contract not found for BlobstreamX at given Address", "address", opts.BlobstreamXAddress.Hex(), "endpoint", opts.Endpoint)
 	}
 
 	return &EthereumHTTPClient{
@@ -180,9 +182,9 @@ func NewEthereumHTTP(opts EthereumHTTPClientOpts) (*EthereumHTTPClient, error) {
 		client:              client,
 		chainId:             chainId,
 		canonicalStateChain: canonicalStateChain,
-		daOracle:            daOracle,
 		challenge:           challenge,
 		chainLoader:         chainLoader,
+		blobstreamX:         blobstreamX,
 		logger:              opts.Logger,
 		opts:                &opts,
 	}, nil
@@ -296,16 +298,6 @@ func (e *EthereumClient) Wait(txHash common.Hash) (*types.Receipt, error) {
 	return e.http.client.TransactionReceipt(context.Background(), txHash)
 }
 
-func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
-	// convert proof to daOracle format
-	wrappedProof := daOracleContract.BinaryMerkleProof{
-		SideNodes: proof.WrappedProof.SideNodes,
-		Key:       proof.WrappedProof.Key,
-		NumLeaves: proof.WrappedProof.NumLeaves,
-	}
-	return e.http.daOracle.VerifyAttestation(nil, proof.Nonce, *proof.Tuple, wrappedProof)
-}
-
 func (e *EthereumClient) GetChallengeFee() (*big.Int, error) {
 	return e.http.challenge.ChallengeFee(nil)
 }
@@ -335,6 +327,38 @@ func (e *EthereumClient) ChallengeDataRootInclusion(index uint64, pointerIndex u
 	}
 
 	return tx, blockHash, nil
+}
+
+// GetBlobstreamCommitment returns the commitment for the given celestia height.
+// see https://docs.celestia.org/developers/blobstream-proof-queries
+func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStored, error) {
+	latestBlock, err := e.GetHeight()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
+	}
+
+	// get all events
+	events, err := e.http.blobstreamX.FilterDataCommitmentStored(&bind.FilterOpts{
+		Context: context.Background(),
+		Start:   latestBlock - blobstreamXScanSize,
+		End:     &latestBlock,
+	}, nil, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to filter events: %w", err)
+	}
+	defer events.Close()
+
+	for events.Next() {
+		e := events.Event
+		if int64(e.StartBlock) <= height && height < int64(e.EndBlock) {
+			return e, nil
+		}
+	}
+	if err := events.Error(); err != nil {
+		return nil, err
+	}
+
+	return nil, fmt.Errorf("no commitment found for height %d", height)
 }
 
 func (e *EthereumClient) DefendDataRootInclusion(blockHash common.Hash, proof *CelestiaProof) (*types.Transaction, error) {
@@ -498,6 +522,20 @@ func (e *EthereumClient) GetPublisher() (common.Address, error) {
 
 func (e *EthereumClient) HashHeader(header *canonicalStateChainContract.CanonicalStateChainHeader) (common.Hash, error) {
 	return e.http.canonicalStateChain.CalculateHeaderHash(nil, *header)
+}
+
+func (e *EthereumClient) FilterDataCommitmentStored(opts *bind.FilterOpts, startBlock []uint64, endBlock []uint64, dataCommitment [][32]byte) (*blobstreamXContract.BlobstreamXDataCommitmentStoredIterator, error) {
+	return e.http.blobstreamX.FilterDataCommitmentStored(opts, startBlock, endBlock, dataCommitment)
+}
+
+func (e *EthereumClient) DAVerify(proof *CelestiaProof) (bool, error) {
+	// convert proof to blobstreamX format
+	wrappedProof := blobstreamXContract.BinaryMerkleProof{
+		SideNodes: proof.WrappedProof.SideNodes,
+		Key:       proof.WrappedProof.Key,
+		NumLeaves: proof.WrappedProof.NumLeaves,
+	}
+	return e.http.blobstreamX.VerifyAttestation(nil, proof.Nonce, *proof.Tuple, wrappedProof)
 }
 
 // MOCK CLIENT FOR TESTING

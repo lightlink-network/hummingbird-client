@@ -23,6 +23,7 @@ type Config struct {
 		GasPriceIncreasePercent int    `mapstructure:"gasPriceIncreasePercent"`
 		Challenge               string `mapstructure:"challenge"`
 		ChainOracle             string `mapstructure:"chainOracle"`
+		BlobstreamX             string `mapstructure:"blobstreamX"`
 	} `mapstructure:"ethereum"`
 	LightLink struct {
 		Endpoint string `mapstructure:"endpoint"`

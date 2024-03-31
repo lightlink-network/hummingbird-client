@@ -2,7 +2,6 @@ package rollup
 
 import (
 	"fmt"
-	"hummingbird/node/contracts"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -37,7 +36,7 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	}
 
 	// hash latest rollup head
-	latestRollupHash, err := contracts.HashCanonicalStateChainHeader(&latestRollupHead)
+	latestRollupHash, err := r.Ethereum.HashHeader(&latestRollupHead)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash rollup head: %w", err)
 	}
@@ -118,7 +117,7 @@ func (r *Rollup) GetBlockInfo(hash common.Hash) (*RollupBlockInfo, error) {
 	}
 
 	// hash rollup header
-	hash, err = contracts.HashCanonicalStateChainHeader(&header)
+	hash, err = r.Ethereum.HashHeader(&header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash rollup header: %w", err)
 	}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"hummingbird/config"
 	"hummingbird/node"
-	"hummingbird/node/contracts"
 	"hummingbird/rollup"
 	"hummingbird/utils"
 	"time"
@@ -60,7 +59,7 @@ var RollupInfoCmd = &cobra.Command{
 		if useNum {
 			h, err := r.Ethereum.GetRollupHeader(num)
 			utils.NoErr(err)
-			blockHash, err = contracts.HashCanonicalStateChainHeader(&h)
+			blockHash, err = r.Ethereum.HashHeader(&h)
 			utils.NoErr(err)
 		}
 		if useHash {

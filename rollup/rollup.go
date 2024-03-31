@@ -3,7 +3,6 @@ package rollup
 import (
 	"fmt"
 	"hummingbird/node"
-	"hummingbird/node/contracts"
 	"hummingbird/utils"
 	"log/slog"
 	"math/big"
@@ -87,7 +86,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	}
 
 	// 4. calc prevHash from the last rollup header
-	prevHash, err := contracts.HashCanonicalStateChainHeader(&head)
+	prevHash, err := r.Ethereum.HashHeader(&head)
 	if err != nil {
 		return nil, fmt.Errorf("createNextBlock: Failed to get current prevHash: %w", err)
 	}
@@ -123,7 +122,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	}
 
 	// 8. calculate the hash of the header
-	hash, err := contracts.HashCanonicalStateChainHeader(header)
+	hash, err := r.Ethereum.HashHeader(header)
 	if err != nil {
 		return nil, fmt.Errorf("createNextBlock: Failed to hash header: %w", err)
 	}
@@ -146,7 +145,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	// }
 	// TODO: FIX THIS ^ ITS NEEDED
 
-	return &Block{header, bundle}, nil
+	return &Block{CanonicalStateChainHeader: header, Bundles: []*node.Bundle{bundle}}, nil
 }
 
 func (b *Rollup) SubmitBlock(block *Block) (*types.Transaction, error) {
@@ -198,7 +197,7 @@ func (r *Rollup) CreateAndSubmitNextBlock() (*Block, uint64, error) {
 		return nil, 0, err
 	}
 
-	log.Info("Rollup chain updated", "rollup_l2height", block.L2Height, "bundle_size", len(block.Blocks), "rollup_height", h, "epoch", block.Epoch, "tx", receipt.TxHash.Hex(), "gas_used", receipt.GasUsed)
+	log.Info("Rollup chain updated", "rollup_l2height", block.L2Height, "bundle_size", len(block.L2Blocks()), "rollup_height", h, "epoch", block.Epoch, "tx", receipt.TxHash.Hex(), "gas_used", receipt.GasUsed)
 	return block, h, nil
 }
 
@@ -238,7 +237,7 @@ func (r *Rollup) Run() error {
 			log.Error("Failed to create next block", "error", err)
 			return err
 		}
-		log.Info("Created candidate rollup block", "epoch", block.Epoch, "l2Height", block.L2Height, "celestiaHeight", block.CelestiaHeights(), "l2_blocks", len(block.Blocks))
+		log.Info("Created candidate rollup block", "epoch", block.Epoch, "l2Height", block.L2Height, "celestiaHeight", block.CelestiaHeights(), "l2_blocks", len(block.L2Blocks()))
 
 		// 4. submit the block to the rollup contract
 		tx, err := r.SubmitBlock(block)
@@ -247,7 +246,7 @@ func (r *Rollup) Run() error {
 			return err
 		}
 
-		hash, _ := contracts.HashCanonicalStateChainHeader(block.CanonicalStateChainHeader)
+		hash, _ := r.Ethereum.HashHeader(block.CanonicalStateChainHeader)
 		log.Info("Submitted rollup block",
 			"tx", tx.Hash().Hex(),
 			"hash", hash,
@@ -255,7 +254,7 @@ func (r *Rollup) Run() error {
 			"l2Height", block.L2Height,
 			"celestiaHeight", block.CelestiaHeights(),
 			// "daTx", block.CelestiaPointer.TxHash.Hex(),
-			"l2_blocks", len(block.Blocks),
+			"l2_blocks", len(block.L2Blocks()),
 		)
 
 		time.Sleep(r.Opts.L1PollDelay)

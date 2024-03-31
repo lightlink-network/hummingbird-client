@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"hummingbird/config"
 	"hummingbird/node"
-	"hummingbird/node/contracts"
 	"hummingbird/rollup"
 	"hummingbird/utils"
 	"time"
@@ -62,7 +61,7 @@ var RollupNextCmd = &cobra.Command{
 			panic(err)
 		}
 
-		hash, err := contracts.HashCanonicalStateChainHeader(b.CanonicalStateChainHeader)
+		hash, err := r.Ethereum.HashHeader(b.CanonicalStateChainHeader)
 		utils.NoErr(err)
 
 		// Print out the rollup block.
@@ -73,9 +72,9 @@ var RollupNextCmd = &cobra.Command{
 		fmt.Println("	PrevHash:", common.BytesToHash(b.PrevHash[:]).Hex())
 		fmt.Println("	StateRoot:", common.BytesToHash(b.CanonicalStateChainHeader.StateRoot[:]).Hex())
 		fmt.Println("	Hash:", hash.Hex())
-		fmt.Println("	Bundle Size:", len(b.Bundle.Blocks))
+		fmt.Println("	Bundle Size:", len(b.L2Blocks()))
 		for i, p := range b.CanonicalStateChainHeader.CelestiaPointers {
-			fmt.Printf("	Celestia Pointer #%d :\n", i)
+			fmt.Printf("	Celestia Pointer #%d:\n", i)
 			fmt.Println("		Height:", p.Height)
 			fmt.Println("		Share Start:", p.ShareStart)
 			fmt.Println("		Share Len:", p.ShareLen)
@@ -90,6 +89,5 @@ var RollupNextCmd = &cobra.Command{
 		}
 
 		logger.Info("Rollup block submitted to L1 rollup contract", "tx_hash", tx.Hash().Hex())
-
 	},
 }

@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto"
 	"crypto/ecdsa"
 	"fmt"
 	"hummingbird/node/contracts"
@@ -58,6 +59,9 @@ type Ethereum interface {
 	ProvideShares(rblock common.Hash, pointerIndex uint8, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
 	ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
 	ProvideLegacyTx(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
+
+	// Utils
+	HashHeader(*canonicalStateChainContract.CanonicalStateChainHeader) (common.Hash, error)
 }
 
 type EthereumClient struct {
@@ -492,6 +496,10 @@ func (e *EthereumClient) GetPublisher() (common.Address, error) {
 	return e.http.canonicalStateChain.Publisher(nil)
 }
 
+func (e *EthereumClient) HashHeader(header *canonicalStateChainContract.CanonicalStateChainHeader) (common.Hash, error) {
+	return e.http.canonicalStateChain.CalculateHeaderHash(nil, *header)
+}
+
 // MOCK CLIENT FOR TESTING
 
 type ethereumMock struct {
@@ -527,10 +535,7 @@ func (e *ethereumMock) GetRollupHead() (canonicalStateChainContract.CanonicalSta
 func (e *ethereumMock) PushRollupHead(header *canonicalStateChainContract.CanonicalStateChainHeader) (*types.Transaction, error) {
 	index := e.head + 1
 
-	hash, err := contracts.HashCanonicalStateChainHeader(header)
-	if err != nil {
-		return nil, err
-	}
+	hash := randHash()
 
 	e.height++
 	e.head = index
@@ -570,4 +575,10 @@ func (e *ethereumMock) DAVerify(proof *CelestiaProof) (bool, error) {
 
 func (e *ethereumMock) SimulateHeight(height uint64) {
 	e.height = height
+}
+
+func randHash() common.Hash {
+	hasher := crypto.SHA256.New()
+	hasher.Write([]byte(time.Now().String()))
+	return common.BytesToHash(hasher.Sum(nil))
 }

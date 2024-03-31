@@ -6,6 +6,7 @@ import (
 	"hummingbird/node/contracts"
 	"hummingbird/utils"
 	"log/slog"
+	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -108,15 +109,17 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 
 	// 7. create the rollup header
 	header := &canonicalStateChainContract.CanonicalStateChainHeader{
-		Epoch:              epoch,
-		L2Height:           bundle.Height(),
-		PrevHash:           prevHash,
-		TxRoot:             bundle.TxRoot(),
-		BlockRoot:          bundle.BlockRoot(),
-		StateRoot:          bundle.StateRoot(),
-		CelestiaHeight:     pointer.Height,
-		CelestiaShareStart: pointer.ShareStart,
-		CelestiaShareLen:   pointer.ShareLen,
+		Epoch:     epoch,
+		L2Height:  bundle.Height(),
+		PrevHash:  prevHash,
+		StateRoot: bundle.StateRoot(),
+		CelestiaPointers: []canonicalStateChainContract.CanonicalStateChainCelestiaPointer{
+			{
+				Height:     pointer.Height,
+				ShareStart: big.NewInt(int64(pointer.ShareStart)),
+				ShareLen:   uint16(pointer.ShareLen),
+			},
+		},
 	}
 
 	// 8. calculate the hash of the header
@@ -135,14 +138,15 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 
 	// 10. Optionally store the Celestia pointer in the local database
 	// Required for the Celestia proof.
-	if r.Opts.StoreCelestiaPointers {
-		key := append([]byte("pointer_"), hash[:]...)
-		if err := r.Node.Store.Put(key, utils.MustJsonMarshal(pointer)); err != nil {
-			return nil, fmt.Errorf("createNextBlock: Failed to store Celestia pointer: %w", err)
-		}
-	}
+	// if r.Opts.StoreCelestiaPointers {
+	// 	key := append([]byte("pointer_"), hash[:]...)
+	// 	if err := r.Node.Store.Put(key, utils.MustJsonMarshal(pointer)); err != nil {
+	// 		return nil, fmt.Errorf("createNextBlock: Failed to store Celestia pointer: %w", err)
+	// 	}
+	// }
+	// TODO: FIX THIS ^ ITS NEEDED
 
-	return &Block{header, bundle, pointer}, nil
+	return &Block{header, bundle}, nil
 }
 
 func (b *Rollup) SubmitBlock(block *Block) (*types.Transaction, error) {
@@ -154,7 +158,7 @@ func (b *Rollup) SubmitBlock(block *Block) (*types.Transaction, error) {
 		return nil, err
 	}
 
-	log.Info("Submitted rollup block", "tx", tx.Hash().Hex(), "epoch", block.Epoch, "l2Height", block.L2Height, "celestiaHeight", block.CelestiaHeight)
+	log.Info("Submitted rollup block", "tx", tx.Hash().Hex(), "epoch", block.Epoch, "l2Height", block.L2Height, "celestiaHeights", block.CelestiaHeights())
 	return tx, nil
 }
 
@@ -234,7 +238,7 @@ func (r *Rollup) Run() error {
 			log.Error("Failed to create next block", "error", err)
 			return err
 		}
-		log.Info("Created candidate rollup block", "epoch", block.Epoch, "l2Height", block.L2Height, "celestiaHeight", block.CelestiaHeight, "daTx", block.CelestiaPointer.TxHash.Hex(), "l2_blocks", len(block.Blocks))
+		log.Info("Created candidate rollup block", "epoch", block.Epoch, "l2Height", block.L2Height, "celestiaHeight", block.CelestiaHeights(), "l2_blocks", len(block.Blocks))
 
 		// 4. submit the block to the rollup contract
 		tx, err := r.SubmitBlock(block)
@@ -249,8 +253,8 @@ func (r *Rollup) Run() error {
 			"hash", hash,
 			"epoch", block.Epoch,
 			"l2Height", block.L2Height,
-			"celestiaHeight", block.CelestiaHeight,
-			"daTx", block.CelestiaPointer.TxHash.Hex(),
+			"celestiaHeight", block.CelestiaHeights(),
+			// "daTx", block.CelestiaPointer.TxHash.Hex(),
 			"l2_blocks", len(block.Blocks),
 		)
 

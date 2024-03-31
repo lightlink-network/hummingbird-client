@@ -116,7 +116,7 @@ func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChall
 	log.Info("Pending DA challenge log event found")
 
 	// attempt to defend the challenge by submitting a tx to the Challenge contract
-	tx, err := d.DefendDA(challenge.BlockHash)
+	tx, err := d.DefendDA(challenge.BlockHash, uint8(challenge.PointerIndex.Uint64()))
 	if err != nil {
 		if strings.Contains(err.Error(), ErrNoDataCommitment) {
 			log.Info("Pending DA challenge is awaiting data commitment from Celestia validators, will retry later")
@@ -133,8 +133,8 @@ func (d *Defender) handleDAChallenge(challenge *challengeContract.ChallengeChall
 // Attempts to defend a DA challenge for the given block hash.
 //
 // Queries Celestia for a proof of data availability and submits a tx to the Challenge contract.
-func (d *Defender) DefendDA(block common.Hash) (*types.Transaction, error) {
-	proof, err := d.GetDAProof(block)
+func (d *Defender) DefendDA(block common.Hash, pointerIndex uint8) (*types.Transaction, error) {
+	proof, err := d.GetDAProof(block, pointerIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prove data availability: %w", err)
 	}
@@ -143,25 +143,28 @@ func (d *Defender) DefendDA(block common.Hash) (*types.Transaction, error) {
 
 // Gets the Celestia pointer for the given block hash and queries Celestia for a proof
 // of data availability.
-func (d *Defender) GetDAProof(block common.Hash) (*node.CelestiaProof, error) {
-	pointer, err := d.GetDAPointer(block)
+func (d *Defender) GetDAProof(block common.Hash, pointerIndex uint8) (*node.CelestiaProof, error) {
+	pointers, err := d.GetDAPointer(block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Celestia pointer: %w", err)
 	}
-	if pointer == nil {
+	if pointers == nil {
 		return nil, fmt.Errorf("no Celestia pointer found")
 	}
-	return d.Celestia.GetProof(pointer)
+	return d.Celestia.GetProof(pointers[pointerIndex])
 }
 
-func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skipShares bool) (*types.Transaction, error) {
+func (d *Defender) ProvideL2Header(rblock common.Hash, pointerIndex uint8, l2Block common.Hash, skipShares bool) (*types.Transaction, error) {
 
 	// Download the rollup block and bundle from L1 and
 	// Celestia
-	rheader, bundle, err := d.Node.FetchRollupBlock(rblock)
+	rheader, bundles, err := d.Node.FetchRollupBlock(rblock)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching rollup block: %w", err)
 	}
+
+	// Get the bundle that contains the header
+	bundle := bundles[pointerIndex]
 
 	// Get a pointer to the shares that contain the header
 	sharePointer, err := bundle.FindHeaderShares(l2Block, d.Namespace())
@@ -171,23 +174,23 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 
 	// Get proof the shares are in the bundle
 	shareProof, err := d.Celestia.GetSharesProof(&node.CelestiaPointer{
-		Height:     rheader.CelestiaHeight,
-		ShareStart: rheader.CelestiaShareStart,
-		ShareLen:   rheader.CelestiaShareLen,
+		Height:     rheader.CelestiaPointers[pointerIndex].Height,
+		ShareStart: rheader.CelestiaPointers[pointerIndex].ShareStart.Uint64(),
+		ShareLen:   uint64(rheader.CelestiaPointers[pointerIndex].ShareLen),
 	}, sharePointer)
 	if err != nil {
 		return nil, fmt.Errorf("error getting share proof: %w", err)
 	}
 
 	// Get proof the data is available
-	celProof, err := d.GetDAProof(rblock)
+	celProof, err := d.GetDAProof(rblock, pointerIndex)
 	if err != nil {
 		return nil, fmt.Errorf("error proving data availability: %w", err)
 	}
 
 	// Provide the shares
 	if !skipShares {
-		tx, err := d.Ethereum.ProvideShares(rblock, shareProof, celProof)
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, shareProof, celProof)
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}
@@ -203,14 +206,17 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 	return d.Ethereum.ProvideHeader(rblock, shareProof.Data, *sharePointer)
 }
 
-func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares bool) (*types.Transaction, error) {
+func (d *Defender) ProvideL2Tx(rblock common.Hash, pointerIndex uint8, l2Tx common.Hash, skipShares bool) (*types.Transaction, error) {
 
 	// Download the rollup block and bundle from L1 and
 	// Celestia
-	rheader, bundle, err := d.Node.FetchRollupBlock(rblock)
+	rheader, bundles, err := d.Node.FetchRollupBlock(rblock)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching rollup block: %w", err)
 	}
+
+	// Get the bundle that contains the transaction
+	bundle := bundles[pointerIndex]
 
 	// Get a pointer to the shares that contain the transaction
 	sharePointer, err := bundle.FindTxShares(l2Tx, d.Namespace())
@@ -220,23 +226,23 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 
 	// Get proof the shares are in the bundle
 	shareProof, err := d.Celestia.GetSharesProof(&node.CelestiaPointer{
-		Height:     rheader.CelestiaHeight,
-		ShareStart: rheader.CelestiaShareStart,
-		ShareLen:   rheader.CelestiaShareLen,
+		Height:     rheader.CelestiaPointers[pointerIndex].Height,
+		ShareStart: rheader.CelestiaPointers[pointerIndex].ShareStart.Uint64(),
+		ShareLen:   uint64(rheader.CelestiaPointers[pointerIndex].ShareLen),
 	}, sharePointer)
 	if err != nil {
 		return nil, fmt.Errorf("error getting share proof: %w", err)
 	}
 
 	// Get proof the data is available
-	celProof, err := d.GetDAProof(rblock)
+	celProof, err := d.GetDAProof(rblock, pointerIndex)
 	if err != nil {
 		return nil, fmt.Errorf("error proving data availability: %w", err)
 	}
 
 	// Provide the shares
 	if !skipShares {
-		tx, err := d.Ethereum.ProvideShares(rblock, shareProof, celProof)
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, shareProof, celProof)
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}

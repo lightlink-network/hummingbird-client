@@ -6,6 +6,7 @@ import (
 	"hummingbird/defender"
 	"hummingbird/node"
 	"hummingbird/utils"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -23,6 +24,7 @@ var DefenderProvideCmd = &cobra.Command{
 	Short: "provide will download data from Celestia and provide it to Layer 1",
 	Aliases: []string{
 		"rblock",
+		"pointerIndex",
 		"hash",
 	},
 	Args: cobra.MinimumNArgs(2),
@@ -32,12 +34,11 @@ var DefenderProvideCmd = &cobra.Command{
 		ethKey := getEthKey()
 
 		rblockHash := common.HexToHash(args[0])
+		pointerIndex, _ := strconv.Atoi(args[1])
+		targetHash := common.HexToHash(args[2])
 
 		n, err := node.NewFromConfig(cfg, logger, ethKey)
 		utils.NoErr(err)
-
-		// allow block hash or number
-		targetHash := common.HexToHash(args[1])
 
 		d := defender.NewDefender(n, &defender.Opts{
 			Logger: logger.With("ctx", "Defender"),
@@ -55,14 +56,14 @@ var DefenderProvideCmd = &cobra.Command{
 		switch t {
 		case "header":
 			logger.Info("Providing L2 Header...")
-			tx, err = d.ProvideL2Header(rblockHash, targetHash, skipShares)
+			tx, err = d.ProvideL2Header(rblockHash, uint8(pointerIndex), targetHash, skipShares)
 			if err != nil {
 				logger.Error("Defender.Provide header failed", "err", err)
 				return
 			}
 		case "tx":
 			logger.Info("Providing L2 Tx...")
-			tx, err = d.ProvideL2Tx(rblockHash, targetHash, skipShares)
+			tx, err = d.ProvideL2Tx(rblockHash, uint8(pointerIndex), targetHash, skipShares)
 			if err != nil {
 				logger.Error("Defender.Provide tx failed", "err", err)
 				return

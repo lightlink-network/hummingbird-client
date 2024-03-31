@@ -9,5 +9,12 @@ import (
 type Block struct {
 	*canonicalStateChainContract.CanonicalStateChainHeader
 	*node.Bundle
-	*node.CelestiaPointer
+}
+
+func (b *Block) CelestiaHeights() []uint64 {
+	heights := make([]uint64, 0)
+	for _, pointer := range b.CelestiaPointers {
+		heights = append(heights, pointer.Height)
+	}
+	return heights
 }

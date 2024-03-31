@@ -72,20 +72,15 @@ var RollupNextCmd = &cobra.Command{
 		fmt.Println("	L2Height:", b.L2Height)
 		fmt.Println("	PrevHash:", common.BytesToHash(b.PrevHash[:]).Hex())
 		fmt.Println("	StateRoot:", common.BytesToHash(b.CanonicalStateChainHeader.StateRoot[:]).Hex())
-		fmt.Println("	BlockRoot:", common.BytesToHash(b.CanonicalStateChainHeader.BlockRoot[:]).Hex())
-		fmt.Println("	TxRoot:", common.BytesToHash(b.CanonicalStateChainHeader.TxRoot[:]).Hex())
 		fmt.Println("	Hash:", hash.Hex())
 		fmt.Println("	Bundle Size:", len(b.Bundle.Blocks))
-		fmt.Println("	Celestia Height:", b.CelestiaHeight)
-		fmt.Println("	Celestia Share Start:", b.CelestiaShareStart)
-		fmt.Println("	Celestia Share Len:", b.CelestiaShareLen)
+		for i, p := range b.CanonicalStateChainHeader.CelestiaPointers {
+			fmt.Printf("	Celestia Pointer #%d :\n", i)
+			fmt.Println("		Height:", p.Height)
+			fmt.Println("		Share Start:", p.ShareStart)
+			fmt.Println("		Share Len:", p.ShareLen)
+		}
 		fmt.Println(" ")
-
-		// If dry run is enabled, exit.
-		// if dryRun {
-		// 	logger.Warn("Dry run enabled, not submitting rollup block to L1 rollup contract")
-		// 	return
-		// }
 
 		logger.Info(("Submitting rollup block to L1 rollup contract"))
 		tx, err := r.SubmitBlock(b)

@@ -95,21 +95,9 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 }
 
 // GetDAPointer gets the Celestia pointer for the given rollup block hash.
-func (n *Node) GetDAPointer(hash common.Hash) (*CelestiaPointer, error) {
-	pointer := &CelestiaPointer{}
+func (n *Node) GetDAPointer(hash common.Hash) ([]*CelestiaPointer, error) {
 
-	if config.Load().Rollup.StoreCelestiaPointers {
-		pointer, err := n.Store.GetDAPointer(hash)
-		// if err is not found, get pointer from header, any other error return
-		if err != nil && err.Error() != "failed to get celestia pointer from store: leveldb: not found" {
-			return nil, err
-		}
-
-		// if pointer is found, return it
-		if pointer != nil {
-			return pointer, nil
-		}
-	}
+	// TODO FETCH FROM LOCAL STORE!
 
 	// pointer is not found in local store so get rollup header
 	header, err := n.GetRollupHeaderByHash(hash)
@@ -118,38 +106,47 @@ func (n *Node) GetDAPointer(hash common.Hash) (*CelestiaPointer, error) {
 	}
 
 	// get pointer from header
-	pointer = &CelestiaPointer{
-		Height:     header.CelestiaHeight,
-		ShareStart: header.CelestiaShareStart,
-		ShareLen:   header.CelestiaShareLen,
+	pointers := make([]*CelestiaPointer, 0)
+	for i := 0; i < len(header.CelestiaPointers); i++ {
+
+		pointers = append(pointers, &CelestiaPointer{
+			Height:     header.CelestiaPointers[i].Height,
+			ShareStart: header.CelestiaPointers[i].ShareStart.Uint64(),
+			ShareLen:   uint64(header.CelestiaPointers[i].ShareLen),
+		})
 	}
 
-	return pointer, nil
+	return pointers, nil
 }
 
-func (n *Node) FetchRollupBlock(rblock common.Hash) (*canonicalstatechain.CanonicalStateChainHeader, *Bundle, error) {
+func (n *Node) FetchRollupBlock(rblock common.Hash) (*canonicalstatechain.CanonicalStateChainHeader, []*Bundle, error) {
 	header, err := n.GetRollupHeaderByHash(rblock)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pointer := &CelestiaPointer{
-		Height:     header.CelestiaHeight,
-		ShareStart: header.CelestiaShareStart,
-		ShareLen:   header.CelestiaShareLen,
+	bundles := make([]*Bundle, 0)
+	for i := 0; i < len(header.CelestiaPointers); i++ {
+		pointer := &CelestiaPointer{
+			Height:     header.CelestiaPointers[i].Height,
+			ShareStart: header.CelestiaPointers[i].ShareStart.Uint64(),
+			ShareLen:   uint64(header.CelestiaPointers[i].ShareLen),
+		}
+
+		shares, err := n.Celestia.GetShares(pointer)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		bundle, err := NewBundleFromShares(shares)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		bundles = append(bundles, bundle)
 	}
 
-	shares, err := n.Celestia.GetShares(pointer)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	bundle, err := NewBundleFromShares(shares)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return &header, bundle, nil
+	return &header, bundles, nil
 }
 
 // Returns true if the given ethKey is the publisher set in CanonicalStateChain

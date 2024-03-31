@@ -19,12 +19,6 @@ type RollupInfo struct {
 		BundleSize                                             uint64      `pretty:"Bundle Size"`
 		*canonicalStateChainContract.CanonicalStateChainHeader `pretty:"Header"`
 	} `pretty:"Latest Rollup Block"`
-
-	DataAvailability struct {
-		CelestiaHeight     uint64 `pretty:"Celestia Height"`
-		CelestiaShareStart uint64 `pretty:"Shares Start"`
-		CelestiaShareLen   uint64 `pretty:"Shares"`
-	} `pretty:"Data Availability"`
 }
 
 func (r *Rollup) GetInfo() (*RollupInfo, error) {
@@ -81,11 +75,6 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	info.LatestRollup.BundleSize = bundleSize
 	info.L2BlocksRolledUp = l2BlocksRolledUp
 	info.L2BlocksTodo = l2BlocksTodo
-
-	// get data availability
-	info.DataAvailability.CelestiaHeight = latestRollupHead.CelestiaHeight
-	info.DataAvailability.CelestiaShareStart = latestRollupHead.CelestiaShareStart
-	info.DataAvailability.CelestiaShareLen = latestRollupHead.CelestiaShareLen
 
 	return info, nil
 }
@@ -155,11 +144,6 @@ func (r *Rollup) GetBlockInfo(hash common.Hash) (*RollupBlockInfo, error) {
 	rbi.Hash = hash
 	rbi.BundleSize = header.L2Height - prevRollupHeader.L2Height
 	rbi.CanonicalStateChainHeader = &header
-
-	// set data availability
-	rbi.DataAvailability.CelestiaHeight = header.CelestiaHeight
-	rbi.DataAvailability.CelestiaShareStart = header.CelestiaShareStart
-	rbi.DataAvailability.CelestiaShareLen = header.CelestiaShareLen
 
 	return rbi, nil
 }

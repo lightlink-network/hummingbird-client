@@ -7,6 +7,7 @@ import (
 	"hummingbird/defender"
 	"hummingbird/node"
 	"hummingbird/utils"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -26,6 +27,7 @@ var DefenderProveDaCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	ArgAliases: []string{
 		"block",
+		"pointerIndex",
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
@@ -40,7 +42,9 @@ var DefenderProveDaCmd = &cobra.Command{
 		})
 
 		blockHash := common.HexToHash(args[0])
-		proof, err := d.GetDAProof(blockHash)
+		pointerIndex, _ := strconv.Atoi(args[1])
+
+		proof, err := d.GetDAProof(blockHash, uint8(pointerIndex))
 		if err != nil {
 			logger.Error("Failed to prove data availability", "err", err)
 			return

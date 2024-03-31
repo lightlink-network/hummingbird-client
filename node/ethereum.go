@@ -48,14 +48,14 @@ type Ethereum interface {
 	// Challenges
 	GetChallengeFee() (*big.Int, error)
 	GetDataRootInclusionChallenge(block common.Hash) (contracts.ChallengeDaInfo, error)
-	ChallengeDataRootInclusion(index uint64) (*types.Transaction, common.Hash, error)
+	ChallengeDataRootInclusion(index uint64, pointerIndex uint8) (*types.Transaction, common.Hash, error)
 	DefendDataRootInclusion(common.Hash, *CelestiaProof) (*types.Transaction, error)
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
 	WatchChallengesDA(c chan<- *challengeContract.ChallengeChallengeDAUpdate) (event.Subscription, error)
 	FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error)
 
 	// Data Loading
-	ProvideShares(rblock common.Hash, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
+	ProvideShares(rblock common.Hash, pointerIndex uint8, shareProof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error)
 	ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
 	ProvideLegacyTx(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error)
 }
@@ -252,12 +252,12 @@ func (e *EthereumClient) PushRollupHead(header *canonicalStateChainContract.Cano
 
 // GetRollupHeader returns the rollup block header at the given index.
 func (e *EthereumClient) GetRollupHeader(index uint64) (canonicalStateChainContract.CanonicalStateChainHeader, error) {
-	return e.http.canonicalStateChain.GetBlock(nil, big.NewInt(int64(index)))
+	return e.http.canonicalStateChain.GetHeaderByNum(nil, big.NewInt(int64(index)))
 }
 
 // GetRollupHeaderByHash returns the rollup block header with the given hash.
 func (e *EthereumClient) GetRollupHeaderByHash(hash common.Hash) (canonicalStateChainContract.CanonicalStateChainHeader, error) {
-	return e.http.canonicalStateChain.Headers(nil, hash)
+	return e.http.canonicalStateChain.GetHeaderByHash(nil, hash)
 }
 
 // GetRollupHeight returns the current rollup block height.
@@ -306,7 +306,7 @@ func (e *EthereumClient) GetChallengeFee() (*big.Int, error) {
 	return e.http.challenge.ChallengeFee(nil)
 }
 
-func (e *EthereumClient) ChallengeDataRootInclusion(index uint64) (*types.Transaction, common.Hash, error) {
+func (e *EthereumClient) ChallengeDataRootInclusion(index uint64, pointerIndex uint8) (*types.Transaction, common.Hash, error) {
 	transactor, err := e.transactor()
 	if err != nil {
 		return nil, common.Hash{}, fmt.Errorf("failed to create transactor: %w", err)
@@ -325,7 +325,7 @@ func (e *EthereumClient) ChallengeDataRootInclusion(index uint64) (*types.Transa
 		return nil, common.Hash{}, fmt.Errorf("failed to get hash for block %d: %w", index, err)
 	}
 
-	tx, err := e.http.challenge.ChallengeDataRootInclusion(transactor, big.NewInt(int64(index)))
+	tx, err := e.http.challenge.ChallengeDataRootInclusion(transactor, big.NewInt(int64(index)), pointerIndex)
 	if err != nil {
 		return nil, common.Hash{}, fmt.Errorf("failed to challenge data root inclusion: %w", err)
 	}
@@ -394,7 +394,7 @@ func (e *EthereumClient) FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHa
 	return e.ws.challenge.FilterChallengeDAUpdate(opts, _blockHash, _blockIndex, _status)
 }
 
-func (e *EthereumClient) ProvideShares(rblock common.Hash, proof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error) {
+func (e *EthereumClient) ProvideShares(rblock common.Hash, pointerIndex uint8, proof *tendTypes.ShareProof, celProof *CelestiaProof) (*types.Transaction, error) {
 	transactor, err := e.transactor()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
@@ -418,7 +418,7 @@ func (e *EthereumClient) ProvideShares(rblock common.Hash, proof *tendTypes.Shar
 		return nil, fmt.Errorf("failed to convert proof: %w", err)
 	}
 
-	return e.http.chainLoader.ProvideShares(transactor, rblock, *p)
+	return e.http.chainLoader.ProvideShares(transactor, rblock, pointerIndex, *p)
 }
 
 func (e *EthereumClient) ProvideHeader(rblock common.Hash, shareData [][]byte, pointer SharePointer) (*types.Transaction, error) {

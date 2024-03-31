@@ -33,6 +33,7 @@ type Config struct {
 		L1PollDelay           int    `mapstructure:"l1pollDelay"`
 		L2PollDelay           int    `mapstructure:"l2pollDelay"`
 		BundleSize            uint64 `mapstructure:"bundleSize"`
+		BundleCount           uint64 `mapstructure:"bundleCount"`
 		StoreCelestiaPointers bool   `mapstructure:"storeCelestiaPointers"`
 		StoreHeaders          bool   `mapstructure:"storeHeaders"`
 	} `mapstructure:"rollup"`

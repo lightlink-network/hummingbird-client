@@ -14,6 +14,7 @@ import (
 )
 
 type Opts struct {
+	BundleCount uint64        // BundleCount is the number of bundles to include in each rollup block.
 	BundleSize  uint64        // BundleSize is the number of blocks to include in each bundle.
 	L1PollDelay time.Duration // PollDelay is the time to wait between polling for new blocks on the L1 rollup contract.
 	L2PollDelay time.Duration // PollDelay is the time to wait between polling for new blocks on the L2 lightlink network.

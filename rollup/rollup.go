@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
@@ -291,4 +292,34 @@ func (r *Rollup) awaitL2Height(h uint64) error {
 
 		time.Sleep(r.Opts.L2PollDelay)
 	}
+}
+
+func (r *Rollup) GetBlockByHash(hash common.Hash) (*Block, error) {
+	header, err := r.Ethereum.GetRollupHeaderByHash(hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rollup header: %w", err)
+	}
+
+	bundles := make([]*node.Bundle, 0)
+	for i := 0; i < len(header.CelestiaPointers); i++ {
+		pointer := &node.CelestiaPointer{
+			Height:     header.CelestiaPointers[i].Height,
+			ShareStart: header.CelestiaPointers[i].ShareStart.Uint64(),
+			ShareLen:   uint64(header.CelestiaPointers[i].ShareLen),
+		}
+
+		shares, err := r.Celestia.GetSharesByPointer(pointer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get shares by pointer: %w", err)
+		}
+
+		bundle, err := node.NewBundleFromShares(shares)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create bundle from shares: %w", err)
+		}
+
+		bundles = append(bundles, bundle)
+	}
+
+	return &Block{CanonicalStateChainHeader: &header, Bundles: bundles}, nil
 }

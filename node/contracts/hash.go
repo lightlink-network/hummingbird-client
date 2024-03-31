@@ -16,6 +16,7 @@ var (
 	addressType, _ = abi.NewType("address", "address", nil)
 )
 
+// DEPRECATED: This is not the correct hash use canonicalStateChainContract.CalculateHeaderHash instead
 func HashCanonicalStateChainHeader(header *canonicalStateChainContract.CanonicalStateChainHeader) (common.Hash, error) {
 	args := abi.Arguments{
 		{Type: uint64Type},  // epoch
@@ -29,7 +30,7 @@ func HashCanonicalStateChainHeader(header *canonicalStateChainContract.Canonical
 		{Type: uint64Type},  // celestiaShareLen
 	}
 
-	enc, err := args.Pack(header.Epoch, header.L2Height, header.PrevHash, header.TxRoot, header.BlockRoot, header.StateRoot, header.CelestiaHeight, header.CelestiaShareStart, header.CelestiaShareLen)
+	enc, err := args.Pack(header.Epoch, header.L2Height, header.PrevHash, header.StateRoot)
 	if err != nil {
 		return common.Hash{}, err
 	}

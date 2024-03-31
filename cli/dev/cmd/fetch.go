@@ -13,6 +13,7 @@ import (
 	"hummingbird/node"
 	"hummingbird/node/contracts"
 	chainoracleContract "hummingbird/node/contracts/ChainOracle.sol"
+	"hummingbird/rollup"
 	"hummingbird/utils"
 )
 
@@ -54,42 +55,36 @@ var (
 			// 1. make node
 			n, log, err := makeNode()
 			panicErr(err, "failed to create node")
+			r := rollup.NewRollup(n, &rollup.Opts{
+				Logger: log.With("ctx", "Rollup"),
+			})
 
 			// 2. Get rblock and celestia pointer
-			rblock, err := n.Ethereum.GetRollupHeaderByHash(rblockHash)
-			panicErr(err, "failed to get rollup header")
-			celPointer := &node.CelestiaPointer{
-				Height:     rblock.CelestiaHeight,
-				ShareStart: rblock.CelestiaShareStart,
-				ShareLen:   rblock.CelestiaShareLen,
-			}
+			rblock, err := r.GetBlockByHash(rblockHash)
+			panicErr(err, "failed to get rollup block")
 			log.Debug("✔️  Got Rollup Block", "hash", rblockHash)
 
-			// 3. Download the rollup bundle bundleShares
-			bundleShares, err := n.Celestia.GetSharesByNamespace(celPointer)
-			panicErr(err, "failed to get shares")
-			log.Debug("✔️  Got Shares", "count", len(bundleShares))
-			bundle, err := node.NewBundleFromShares(bundleShares)
-			panicErr(err, "failed to decode bundle")
-			log.Debug("✔️  Decoded Bundle", "blocks", len(bundle.Blocks))
-
-			// 4. Fetch the item
+			// 3. Fetch the item
 			var item any
-			var pointer *node.SharePointer
+			var sharePointer *node.SharePointer
+			var celPointer *node.CelestiaPointer
+			var pointerIndex uint8
 
 			switch dataType {
 			case "header":
-				pointer, err = bundle.FindHeaderShares(dataHash, n.Namespace())
+				sharePointer, pointerIndex, err = node.FindHeaderSharesInBundles(rblock.Bundles, dataHash, n.Namespace())
+				celPointer = rblock.GetCelestiaPointers()[int(pointerIndex)]
 				panicErr(err, "failed to find header shares")
 				h := &types.Header{}
-				err = rlp.DecodeBytes(pointer.Bytes(), h)
+				err = rlp.DecodeBytes(sharePointer.Bytes(), h)
 				panicErr(err, "failed to decode header")
 				item = &h
 			case "tx":
-				pointer, err = bundle.FindTxShares(dataHash, n.Namespace())
+				sharePointer, pointerIndex, err = node.FindTxSharesInBundles(rblock.Bundles, dataHash, n.Namespace())
+				celPointer = rblock.GetCelestiaPointers()[int(pointerIndex)]
 				panicErr(err, "failed to find tx shares")
 				tx := &types.Transaction{}
-				err = rlp.DecodeBytes(pointer.Bytes(), tx)
+				err = rlp.DecodeBytes(sharePointer.Bytes(), tx)
 				panicErr(err, "failed to decode tx")
 				item = &tx
 			default:
@@ -119,7 +114,7 @@ var (
 			// 5. Generate proofs
 			var proof *chainoracleContract.SharesProof
 			if withProof {
-				shareProof, err := n.Celestia.GetSharesProof(celPointer, pointer)
+				shareProof, err := n.Celestia.GetSharesProof(celPointer, sharePointer)
 				panicErr(err, "failed to get share proof")
 
 				commitment, err := n.Ethereum.GetBlobstreamCommitment(int64(celPointer.Height))
@@ -150,7 +145,7 @@ var (
 					panicErr(err, "failed to convert proof to shares")
 					switch dataType {
 					case "header":
-						decH, err := sharesToHeader(ss, pointer.Ranges)
+						decH, err := sharesToHeader(ss, sharePointer.Ranges)
 						panicErr(err, "failed to convert shares to header")
 
 						decH.Extra = common.Hex2Bytes("0x")
@@ -168,7 +163,7 @@ var (
 
 			// 5. Generate output
 			ranges := []chainoracleContract.ChainOracleShareRange{}
-			for _, r := range pointer.Ranges {
+			for _, r := range sharePointer.Ranges {
 				ranges = append(ranges, chainoracleContract.ChainOracleShareRange{
 					Start: big.NewInt(int64(r.Start)),
 					End:   big.NewInt(int64(r.End)),
@@ -176,7 +171,7 @@ var (
 			}
 
 			shareBytes := [][]byte{}
-			for _, s := range pointer.Shares() {
+			for _, s := range sharePointer.Shares() {
 				shareBytes = append(shareBytes, s.ToBytes())
 			}
 

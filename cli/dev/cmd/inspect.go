@@ -2,12 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"hummingbird/node"
-	"hummingbird/node/contracts"
-	canonicalstatechain "hummingbird/node/contracts/CanonicalStateChain.sol"
-	"hummingbird/utils"
-	"strconv"
-	"strings"
+	"hummingbird/rollup"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -35,6 +30,10 @@ var InspectCmd = &cobra.Command{
 		n, log, err := makeNode()
 		panicErr(err, "failed to create node")
 
+		r := rollup.NewRollup(n, &rollup.Opts{
+			Logger: log.With("ctx", "Rollup"),
+		})
+
 		// 0. parse flags
 		showHeader, _ := cmd.Flags().GetBool("header")
 		showBundle, _ := cmd.Flags().GetBool("bundle")
@@ -42,65 +41,33 @@ var InspectCmd = &cobra.Command{
 		showShares, _ := cmd.Flags().GetBool("shares")
 		showTxns, _ := cmd.Flags().GetBool("txns")
 
-		// 1. get the rollup header
-		var hash common.Hash
-		var header canonicalstatechain.CanonicalStateChainHeader
-
-		// - If the first argument is a hash, get the header by hash
-		if strings.HasPrefix(args[0], "0x") {
-			hash = common.HexToHash(args[0])
-			panicErr(err, "invalid block hash")
-			log.Info("Fetching Rollup Block", "hash", hash)
-			header, err = n.Ethereum.GetRollupHeaderByHash(hash)
-			panicErr(err, "failed to get rollup header")
-			hash, _ = contracts.HashCanonicalStateChainHeader(&header)
-
-			// - Otherwise, get the header by number
-		} else {
-			index, err := strconv.ParseUint(args[0], 10, 64)
-			panicErr(err, "invalid block number")
-			log.Info("Fetching Rollup Block", "index", hash)
-			header, err = n.Ethereum.GetRollupHeader(index)
-			panicErr(err, "failed to get rollup header")
-			hash, _ = contracts.HashCanonicalStateChainHeader(&header)
-		}
-
-		// 2. download the rollup bundles shares
-		log.Debug("Downloading shares...", "source", "Celestia")
-		shares, err := n.Celestia.GetSharesByNamespace(&node.CelestiaPointer{
-			Height:     header.CelestiaHeight,
-			ShareStart: header.CelestiaShareStart,
-			ShareLen:   header.CelestiaShareLen,
-		})
-		panicErr(err, "failed to get shares")
-		log.Debug("✔️  Got Shares", "count", len(shares))
-
-		// 3. decode the rollup bundle
-		log.Debug("Decoding bundle...")
-		data := utils.ExtractDataFromShares(shares)
-		b := &node.Bundle{}
-		err = b.DecodeRLP(data)
-		panicErr(err, "failed to decode bundle")
-		log.Debug("✔️ Got Bundle", "blocks", len(b.Blocks))
+		// 1. get the rollup block
+		hash := common.HexToHash(args[0])
+		panicErr(err, "invalid block hash")
+		log.Info("Fetching Rollup Block", "hash", hash)
+		rblock, err := r.GetBlockByHash(hash)
+		panicErr(err, "failed to get rollup block")
 
 		// 4. print the rollup block
 		if showHeader {
 			fmt.Println("\n---- Rollup Block Header ----")
 			fmt.Printf("Block %s\n", hash.Hex())
-			printPretty(&header)
+			printPretty(&rblock.CanonicalStateChainHeader)
 		}
 
 		if showBundle {
 			fmt.Println("\n---- Rollup Block Bundle ----")
-			for i, block := range b.Blocks {
-				fmt.Printf("Block #%4d, hash: %s, number: %d, txns: %d\n", i, hashWithoutExtraData(block).Hex(), block.NumberU64(), len(block.Transactions()))
-
+			for i, bundle := range rblock.Bundles {
+				fmt.Printf("Bundle #%4d\n", i)
+				for j, block := range bundle.Blocks {
+					fmt.Printf("Block #%4d, hash: %s, number: %d, txns: %d\n", i+j, hashWithoutExtraData(block).Hex(), block.NumberU64(), len(block.Transactions()))
+				}
 			}
 		}
 
 		if showTxns {
 			fmt.Println("\n---- Rollup Block Transactions ----")
-			for i, block := range b.Blocks {
+			for i, block := range rblock.L2Blocks() {
 				if len(block.Transactions()) > 0 {
 					fmt.Printf("Block #%4d, hash: %s, number: %d\n", i, hashWithoutExtraData(block).Hex(), block.NumberU64())
 					for j, tx := range block.Transactions() {
@@ -112,24 +79,28 @@ var InspectCmd = &cobra.Command{
 
 		if showShares {
 			fmt.Println("\n---- Rollup Block Shares ----")
-			for i, share := range shares {
-				fmt.Printf("Share #%4d: 0x%x\n", i, share.ToBytes())
+			for i, bundle := range rblock.Bundles {
+				fmt.Printf("Bundle #%4d Shares\n", i)
+				ss, _ := bundle.Shares(n.Namespace())
+				for j, share := range ss {
+					fmt.Printf("Share #%4d: 0x%x\n", j, share.ToBytes())
+				}
 			}
 		}
 
 		if showStats {
 			txs := []*types.Transaction{}
-			for _, block := range b.Blocks {
+			for _, block := range rblock.L2Blocks() {
 				txs = append(txs, block.Transactions()...)
 			}
 
 			fmt.Println("\n---- Rollup Block Stats ----")
-			fmt.Printf("Bundle Size: %d bytes\n", len(data))
-			fmt.Printf("Shares Count: %d\n", len(shares))
-			fmt.Printf("Block Count: %d\n", len(b.Blocks))
-			fmt.Printf("Avg. Block Size: %d bytes\n", len(data)/len(b.Blocks))
+			// fmt.Printf("Bundle Size: %d bytes\n", len(rblock))
+			// fmt.Printf("Shares Count: %d\n", len(shares))
+			fmt.Printf("Block Count: %d\n", len(rblock.L2Blocks()))
+			// fmt.Printf("Avg. Block Size: %d bytes\n", len(data)/len(rblock.L2Blocks()))
 			fmt.Printf("Tx Count: %d\n", len(txs))
-			fmt.Printf("Avg. Tx Count: %d\n", len(txs)/len(b.Blocks))
+			fmt.Printf("Avg. Tx Count: %d\n", len(txs)/len(rblock.L2Blocks()))
 		}
 	},
 }

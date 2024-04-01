@@ -344,6 +344,7 @@ func (e *EthereumClient) ChallengeDataRootInclusion(index uint64, pointerIndex u
 func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStored, error) {
 	scanRanges := e.GetChallengeWindowBlockRanges()
 
+	lastCommitHeight := uint64(0)
 	for i := 0; i < len(scanRanges); i++ {
 		if len(scanRanges[i]) != 2 {
 			return nil, fmt.Errorf("invalid block range")
@@ -362,6 +363,10 @@ func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXCont
 
 		for events.Next() {
 			e := events.Event
+			if e.EndBlock > lastCommitHeight {
+				lastCommitHeight = e.EndBlock
+			}
+
 			if int64(e.StartBlock) <= height && height < int64(e.EndBlock) {
 				return e, nil
 			}
@@ -371,7 +376,7 @@ func (e *EthereumClient) GetBlobstreamCommitment(height int64) (*blobstreamXCont
 		}
 	}
 
-	return nil, fmt.Errorf("no commitment found for height %d", height)
+	return nil, fmt.Errorf("no commitment found for height %d (last commitment is for %d)", height, lastCommitHeight)
 }
 
 func (e *EthereumClient) DefendDataRootInclusion(blockHash common.Hash, proof *CelestiaProof) (*types.Transaction, error) {

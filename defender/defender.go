@@ -109,7 +109,7 @@ func (d *Defender) defendDAChallenges(c challengeContract.ChallengeChallengeDAUp
 // Defends a DA challenge event.
 func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpdate) error {
 	// ensure the challenge is in the correct status to be defended
-	challengeInfo, err := d.Ethereum.GetDataRootInclusionChallenge(c.BlockHash)
+	challengeInfo, err := d.Ethereum.GetDataRootInclusionChallenge(c.BlockHash, uint8(c.PointerIndex.Uint64()))
 	if err != nil {
 		return fmt.Errorf("error getting data root inclusion challenge: %w", err)
 	}

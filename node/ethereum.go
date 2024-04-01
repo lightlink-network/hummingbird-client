@@ -47,7 +47,7 @@ type Ethereum interface {
 	// Check if the data availability layer is verified.
 	// Challenges
 	GetChallengeFee() (*big.Int, error)
-	GetDataRootInclusionChallenge(block common.Hash) (contracts.ChallengeDaInfo, error)
+	GetDataRootInclusionChallenge(block common.Hash, pointerIndex uint8) (contracts.ChallengeDaInfo, error)
 	ChallengeDataRootInclusion(index uint64, pointerIndex uint8) (*types.Transaction, common.Hash, error)
 	DefendDataRootInclusion(common.Hash, *CelestiaProof) (*types.Transaction, error)
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
@@ -414,8 +414,13 @@ func (e *EthereumClient) SettleDataRootInclusion(blockHash common.Hash) (*types.
 	return tx, nil
 }
 
-func (e *EthereumClient) GetDataRootInclusionChallenge(blockHash common.Hash) (contracts.ChallengeDaInfo, error) {
-	res, err := e.http.challenge.DaChallenges(nil, blockHash)
+func (e *EthereumClient) GetDataRootInclusionChallenge(blockHash common.Hash, pointerIndex uint8) (contracts.ChallengeDaInfo, error) {
+	key, err := e.http.challenge.DataRootInclusionChallengeKey(nil, blockHash, pointerIndex)
+	if err != nil {
+		return contracts.ChallengeDaInfo{}, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
+	}
+
+	res, err := e.http.challenge.DaChallenges(nil, key)
 	if err != nil {
 		return contracts.ChallengeDaInfo{}, fmt.Errorf("failed to get data root inclusion challenge: %w", err)
 	}

@@ -82,9 +82,9 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	}
 
 	// 3. calculate bundle size
-	bundleSize := r.Opts.BundleSize
-	if llHeight-head.L2Height < bundleSize {
-		bundleSize = llHeight - head.L2Height
+	blocksToFetch := r.Opts.BundleSize * r.Opts.BundleCount
+	if llHeight-head.L2Height < blocksToFetch {
+		blocksToFetch = llHeight - head.L2Height
 	}
 
 	// 4. calc prevHash from the last rollup header
@@ -93,34 +93,52 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 		return nil, fmt.Errorf("createNextBlock: Failed to get current prevHash: %w", err)
 	}
 
-	// 5. fetch the next bundle of blocks from ll
-	l2blocks, err := r.LightLink.GetBlocks(head.L2Height, head.L2Height+bundleSize)
-	if err != nil {
-		return nil, fmt.Errorf("createNextBlock: Failed to get l2blocks: %w", err)
+	// 5. fetch the next bundles of blocks from ll
+	fetchTarget := head.L2Height + blocksToFetch
+	fetched := head.L2Height
+	bundles := make([]*node.Bundle, 0)
+	r.Opts.Logger.Info("Fetching L2 blocks from LightLink", "start", fetched, "fetch_target", fetchTarget, "fetch_size", blocksToFetch, "ll_height", llHeight)
+	for fetched < fetchTarget && uint64(len(bundles)) < r.Opts.BundleCount {
+		from := fetched
+		to := fetched + r.Opts.BundleSize
+		if to > fetchTarget {
+			to = fetchTarget
+		}
+		l2blocks, err := r.LightLink.GetBlocks(from, to)
+		if err != nil {
+			return nil, fmt.Errorf("createNextBlock: Failed to get l2blocks: %w", err)
+		}
+		bundles = append(bundles, &node.Bundle{Blocks: l2blocks})
+		fetched = to
 	}
-	bundle := &node.Bundle{Blocks: l2blocks}
 
-	r.Opts.Logger.Info("Publishing bundle to Celestia", "bundle_size", len(bundle.Blocks), "ll_height", llHeight, "ll_epoch", epoch)
-
+	r.Opts.Logger.Info("Publishing bundles to Celestia", "bundles", len(bundles), "bundles_size", fetched-head.L2Height, "ll_height", llHeight, "ll_epoch", epoch)
 	// 6. upload the bundle to celestia
-	pointer, err := r.Celestia.PublishBundle(*bundle)
-	if err != nil {
-		return nil, fmt.Errorf("createNextBlock: Failed to publish bundle: %w", err)
+	pointers := make([]canonicalStateChainContract.CanonicalStateChainCelestiaPointer, 0)
+	for i, bundle := range bundles {
+		pointer, err := r.Celestia.PublishBundle(*bundle)
+		r.Opts.Logger.Debug("Published bundle to Celestia", "bundle", i, "bundle_size", bundle.Size(), "celestia_tx", pointer.TxHash.Hex())
+		if err != nil {
+			return nil, fmt.Errorf("createNextBlock: Failed to publish bundle: %w", err)
+		}
+		pointers = append(pointers, canonicalStateChainContract.CanonicalStateChainCelestiaPointer{
+			Height:     pointer.Height,
+			ShareStart: big.NewInt(int64(pointer.ShareStart)),
+			ShareLen:   uint16(pointer.ShareLen),
+		})
+	}
+
+	if len(bundles) == 0 {
+		return nil, fmt.Errorf("createNextBlock: No bundles to publish")
 	}
 
 	// 7. create the rollup header
 	header := &canonicalStateChainContract.CanonicalStateChainHeader{
-		Epoch:     epoch,
-		L2Height:  bundle.Height(),
-		PrevHash:  prevHash,
-		StateRoot: bundle.StateRoot(),
-		CelestiaPointers: []canonicalStateChainContract.CanonicalStateChainCelestiaPointer{
-			{
-				Height:     pointer.Height,
-				ShareStart: big.NewInt(int64(pointer.ShareStart)),
-				ShareLen:   uint16(pointer.ShareLen),
-			},
-		},
+		Epoch:            epoch,
+		L2Height:         bundles[len(bundles)-1].Height(),
+		PrevHash:         prevHash,
+		StateRoot:        bundles[len(bundles)-1].StateRoot(),
+		CelestiaPointers: pointers,
 	}
 
 	// 8. calculate the hash of the header
@@ -147,7 +165,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	// }
 	// TODO: FIX THIS ^ ITS NEEDED
 
-	return &Block{CanonicalStateChainHeader: header, Bundles: []*node.Bundle{bundle}}, nil
+	return &Block{CanonicalStateChainHeader: header, Bundles: bundles}, nil
 }
 
 func (b *Rollup) SubmitBlock(block *Block) (*types.Transaction, error) {

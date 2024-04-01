@@ -20,7 +20,8 @@ lightlink:
   endpoint: https://replicator.pegasus.lightlink.io/rpc/v1 # Lightlink endpoint
   delay: 500 # Delay in ms between each request
 rollup:
-  bundleSize: 10 # Number of transactions to bundle into a single L1 header
+  bundleCount: 2 # Number of bundles in each rollup block.
+  bundleSize: 10 # Number of blocks in each bundle
   l1pollDelay: 30000 # Delay in ms between each L1 poll
   l2pollDelay: 10000 # Delay in ms between each L2 poll
   storeCelestiaPointers: true # Store Celestia pointers in local storage

@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"hummingbird/config"
 	canonicalstatechain "hummingbird/node/contracts/CanonicalStateChain.sol"
+	"hummingbird/node/ethereum"
 	"log/slog"
 	"math/big"
 	"runtime"
@@ -15,7 +16,7 @@ import (
 )
 
 type Node struct {
-	Ethereum
+	ethereum.Ethereum
 	Celestia
 	LightLink
 
@@ -33,7 +34,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	// log config file path
 	logger.Info("Using config file", "path", viper.ConfigFileUsed())
 
-	eth, err := NewEthereumRPC(EthereumHTTPClientOpts{
+	eth, err := ethereum.NewClient(ethereum.ClientOpts{
 		Endpoint:                   cfg.Ethereum.HTTPEndpoint,
 		CanonicalStateChainAddress: common.HexToAddress(cfg.Ethereum.CanonicalStateChain),
 		ChallengeAddress:           common.HexToAddress(cfg.Ethereum.Challenge),
@@ -44,10 +45,6 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		DryRun:                     cfg.DryRun,
 		GasPriceIncreasePercent:    big.NewInt(int64(cfg.Ethereum.GasPriceIncreasePercent)),
 		BlockTime:                  cfg.Ethereum.BlockTime,
-	}, EthereumWSClientOpts{
-		Endpoint:         cfg.Ethereum.WSEndpoint,
-		ChallengeAddress: common.HexToAddress(cfg.Ethereum.Challenge),
-		Logger:           logger.With("ctx", "ethereum-ws"),
 	})
 	if err != nil {
 		return nil, err
@@ -101,7 +98,7 @@ func (n *Node) GetDAPointer(hash common.Hash) ([]*CelestiaPointer, error) {
 	// TODO FETCH FROM LOCAL STORE!
 
 	// pointer is not found in local store so get rollup header
-	header, err := n.GetRollupHeaderByHash(hash)
+	header, err := n.Ethereum.GetRollupHeaderByHash(hash)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +118,7 @@ func (n *Node) GetDAPointer(hash common.Hash) ([]*CelestiaPointer, error) {
 }
 
 func (n *Node) FetchRollupBlock(rblock common.Hash) (*canonicalstatechain.CanonicalStateChainHeader, []*Bundle, error) {
-	header, err := n.GetRollupHeaderByHash(rblock)
+	header, err := n.Ethereum.GetRollupHeaderByHash(rblock)
 	if err != nil {
 		return nil, nil, err
 	}

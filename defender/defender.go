@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"hummingbird/node/contracts"
+	chainOracleContract "hummingbird/node/contracts/ChainOracle.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
 )
 
@@ -153,12 +154,16 @@ func (d *Defender) DefendDA(block common.Hash, pointerIndex uint8) (*types.Trans
 	if err != nil {
 		return nil, fmt.Errorf("failed to prove data availability: %w", err)
 	}
-	return d.Ethereum.DefendDataRootInclusion(block, proof)
+	key, err := d.Ethereum.DataRootInclusionChallengeKey(nil, block, pointerIndex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
+	}
+	return d.Ethereum.DefendDataRootInclusion(key, *proof)
 }
 
 // Gets the Celestia pointer for the given block hash and queries Celestia for a proof
 // of data availability.
-func (d *Defender) GetDAProof(block common.Hash, pointerIndex uint8) (*node.CelestiaProof, error) {
+func (d *Defender) GetDAProof(block common.Hash, pointerIndex uint8) (*challengeContract.ChallengeDataAvailabilityChallengeDAProof, error) {
 	pointers, err := d.GetDAPointer(block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Celestia pointer: %w", err)
@@ -170,7 +175,24 @@ func (d *Defender) GetDAProof(block common.Hash, pointerIndex uint8) (*node.Cele
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blobstream commitment: %w", err)
 	}
-	return d.Celestia.GetProof(pointers[pointerIndex], commit.StartBlock, commit.EndBlock, *commit.ProofNonce)
+	proof, err := d.Celestia.GetProof(pointers[pointerIndex], commit.StartBlock, commit.EndBlock, *commit.ProofNonce)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get proof: %w", err)
+	}
+
+	p := &challengeContract.ChallengeDataAvailabilityChallengeDAProof{
+		RootNonce: commit.ProofNonce,
+		DataRootTuple: challengeContract.DataRootTuple{
+			Height:   big.NewInt(int64(pointers[pointerIndex].Height)),
+			DataRoot: proof.Tuple.DataRoot,
+		},
+		Proof: challengeContract.BinaryMerkleProof{
+			SideNodes: proof.WrappedProof.SideNodes,
+			Key:       proof.WrappedProof.Key,
+			NumLeaves: proof.WrappedProof.NumLeaves,
+		},
+	}
+	return p, nil
 }
 
 // Gets L2 Header challenge events from Challenge.sol for the given block range and status.
@@ -334,9 +356,27 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 	// check if the shares are already provided
 	provided, _ := d.Ethereum.AlreadyProvidedShares(rblock, shareProof.Data)
 
+	attestationProof := chainOracleContract.AttestationProof{
+		TupleRootNonce: celProof.RootNonce,
+		Tuple: chainOracleContract.DataRootTuple{
+			Height:   celProof.DataRootTuple.Height,
+			DataRoot: celProof.DataRootTuple.DataRoot,
+		},
+		Proof: chainOracleContract.BinaryMerkleProof{
+			SideNodes: celProof.Proof.SideNodes,
+			Key:       celProof.Proof.Key,
+			NumLeaves: celProof.Proof.NumLeaves,
+		},
+	}
+
+	sp, err := contracts.NewShareProof(shareProof, attestationProof)
+	if err != nil {
+		return nil, fmt.Errorf("error creating share proof: %w", err)
+	}
+
 	// Provide the shares
 	if !skipShares && !provided {
-		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, shareProof, celProof)
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, attestationProof)
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}
@@ -349,8 +389,16 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 		d.Ethereum.Wait(tx.Hash())
 	}
 
+	ranges := make([]chainOracleContract.ChainOracleShareRange, len(sharePointer.Ranges))
+	for i, r := range sharePointer.Ranges {
+		ranges[i] = chainOracleContract.ChainOracleShareRange{
+			Start: big.NewInt(int64(r.Start)),
+			End:   big.NewInt(int64(r.End)),
+		}
+	}
+
 	// Finally, provide the header
-	return d.Ethereum.ProvideHeader(rblock, shareProof.Data, *sharePointer)
+	return d.Ethereum.ProvideHeader(rblock, shareProof.Data, ranges)
 }
 
 func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares bool) (*types.Transaction, error) {
@@ -383,9 +431,27 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 		return nil, fmt.Errorf("error proving data availability: %w", err)
 	}
 
+	attestationProof := chainOracleContract.AttestationProof{
+		TupleRootNonce: celProof.RootNonce,
+		Tuple: chainOracleContract.DataRootTuple{
+			Height:   celProof.DataRootTuple.Height,
+			DataRoot: celProof.DataRootTuple.DataRoot,
+		},
+		Proof: chainOracleContract.BinaryMerkleProof{
+			SideNodes: celProof.Proof.SideNodes,
+			Key:       celProof.Proof.Key,
+			NumLeaves: celProof.Proof.NumLeaves,
+		},
+	}
+
+	sp, err := contracts.NewShareProof(shareProof, attestationProof)
+	if err != nil {
+		return nil, fmt.Errorf("error creating share proof: %w", err)
+	}
+
 	// Provide the shares
 	if !skipShares {
-		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, shareProof, celProof)
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, attestationProof)
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}
@@ -397,6 +463,14 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 		time.Sleep(10 * time.Second)
 	}
 
+	ranges := make([]chainOracleContract.ChainOracleShareRange, len(sharePointer.Ranges))
+	for i, r := range sharePointer.Ranges {
+		ranges[i] = chainOracleContract.ChainOracleShareRange{
+			Start: big.NewInt(int64(r.Start)),
+			End:   big.NewInt(int64(r.End)),
+		}
+	}
+
 	// Finally, provide the transaction
-	return d.Ethereum.ProvideLegacyTx(rblock, shareProof.Data, *sharePointer)
+	return d.Ethereum.ProvideLegacyTx(rblock, shareProof.Data, ranges)
 }

@@ -117,10 +117,10 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	pointers := make([]canonicalStateChainContract.CanonicalStateChainCelestiaPointer, 0)
 	for i, bundle := range bundles {
 		pointer, err := r.Celestia.PublishBundle(*bundle)
-		r.Opts.Logger.Debug("Published bundle to Celestia", "bundle", i, "bundle_size", bundle.Size(), "celestia_tx", pointer.TxHash.Hex())
 		if err != nil {
 			return nil, fmt.Errorf("createNextBlock: Failed to publish bundle: %w", err)
 		}
+		r.Opts.Logger.Debug("Published bundle to Celestia", "bundle", i, "bundle_size", bundle.Size(), "celestia_tx", pointer.TxHash.Hex())
 		pointers = append(pointers, canonicalStateChainContract.CanonicalStateChainCelestiaPointer{
 			Height:     pointer.Height,
 			ShareStart: big.NewInt(int64(pointer.ShareStart)),

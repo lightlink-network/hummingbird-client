@@ -20,10 +20,10 @@ hb rollup info  # Get the current rollup state
 hb rollup info --num <rblock_number> --bundle # View the bundled L2 block hashes in an L1 rblock
 hb rollup next  # [Publisher Only] Generate the next rollup block
 hb rollup start # [Publisher Only] Start the rollup loop to generate and submit bundles
-hb challenger challenge-da <rblock_number> # Challenge data availability
-hb defender defend-da <rblock_hash> # Defend data availability
-hb defender info-da <rblock_hash> # Provides info on an existing challenge
-hb defender prove-da <rblock_hash> # Prove data availability
+hb challenger challenge-da <rblock_number> <bundle_number> # Challenge data availability
+hb defender defend-da <rblock_hash> <bundle_number> # Defend data availability
+hb defender info-da <rblock_hash> <bundle_number> # Provides info on an existing challenge
+hb defender prove-da <rblock_hash> <bundle_number> # Prove data availability
 hb defender start # Start the defender loop to watch and defend challenges
 hb defender provide --type=header <rblock_hash> <l2_block_hash> # Provide will download header for the given <l2_block_hash> from Celestia and provide it to Layer 1 ChainOracle
 hb defender provide --type=tx <rblock_hash> <l2_tx_hash> # Provide will download tx for the given <l2_tx_hash> from Celestia and provide it to Layer 1 ChainOracle

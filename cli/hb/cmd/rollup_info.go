@@ -74,7 +74,7 @@ var RollupInfoCmd = &cobra.Command{
 
 			// if showBundle flag is set, get showBundle info
 			if showBundle, _ := cmd.Flags().GetBool("bundle"); showBundle {
-				for _, p := range info.CanonicalStateChainHeader.CelestiaPointers {
+				for i, p := range info.CanonicalStateChainHeader.CelestiaPointers {
 					s, err := r.Celestia.GetSharesByNamespace(&node.CelestiaPointer{
 						Height:     p.Height,
 						ShareStart: p.ShareStart.Uint64(),
@@ -85,7 +85,7 @@ var RollupInfoCmd = &cobra.Command{
 					bundle, err := node.NewBundleFromShares(s)
 					utils.NoErr(err)
 
-					printBundle(bundle)
+					printBundle(bundle, i)
 				}
 			}
 			return
@@ -116,9 +116,9 @@ func printInfo(info any, useJson bool) {
 	fmt.Println(" ")
 }
 
-func printBundle(bundle *node.Bundle) {
+func printBundle(bundle *node.Bundle, index int) {
 	fmt.Println(" ")
-	fmt.Println("Bundle:")
+	fmt.Println("Bundle:", index)
 	fmt.Println(" Blocks:", len(bundle.Blocks))
 	for _, b := range bundle.Blocks {
 		fmt.Println("  →", "Index:", b.Number(), "Hash:", utils.HashWithoutExtraData(b).Hex())

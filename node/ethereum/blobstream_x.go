@@ -27,24 +27,26 @@ func (c *Client) DAVerify(proofNonce *big.Int, tuple blobstreamXContract.DataRoo
 // GetBlobstreamCommitment returns the commitment for the given celestia height.
 // see https://docs.celestia.org/developers/blobstream-proof-queries
 func (c *Client) GetBlobstreamCommitment(height int64) (*blobstreamXContract.BlobstreamXDataCommitmentStored, error) {
-	scanRanges := c.GetChallengeWindowBlockRanges()
+	scanRanges, err := c.GetChallengeWindowBlockRanges()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get challenge window block ranges: %w", err)
+	}
 
 	lastCommitHeight := uint64(0)
-	for i := 0; i < len(scanRanges); i++ {
-		if len(scanRanges[i]) != 2 {
+	for _, scanRange := range scanRanges {
+		if len(scanRange) != 2 {
 			return nil, fmt.Errorf("invalid block range")
 		}
 
 		// get all events
 		events, err := c.blobstreamX.FilterDataCommitmentStored(&bind.FilterOpts{
 			Context: context.Background(),
-			Start:   scanRanges[i][0],
-			End:     &scanRanges[i][1],
+			Start:   scanRange[0],
+			End:     &scanRange[1],
 		}, nil, nil, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to filter events: %w", err)
 		}
-		defer events.Close()
 
 		for events.Next() {
 			e := events.Event

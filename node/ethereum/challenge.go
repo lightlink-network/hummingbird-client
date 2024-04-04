@@ -23,7 +23,7 @@ type Challenge interface {
 	GetL2HeaderChallenge(common.Hash) (contracts.L2HeaderChallengeInfo, error)
 	FilterL2HeaderChallengeUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeL2HeaderChallengeUpdateIterator, error)
 	GetChallengeWindow() (*big.Int, error)
-	GetChallengeWindowBlockRanges() [][]uint64
+	GetChallengeWindowBlockRanges() ([][]uint64, error)
 	DataRootInclusionChallengeKey(opts *bind.CallOpts, blockHash common.Hash, pointerIndex uint8) (common.Hash, error)
 }
 
@@ -157,10 +157,10 @@ func (c *Client) DataRootInclusionChallengeKey(opts *bind.CallOpts, blockHash co
 // Useful for scanning logs for pending challenges due to eth_getLogs
 // range limitations. Ranges are split into 10k block chunks to avoid
 // hitting the eth_getLogs limit.
-func (c *Client) GetChallengeWindowBlockRanges() [][]uint64 {
+func (c *Client) GetChallengeWindowBlockRanges() ([][]uint64, error) {
 	window, err := c.GetChallengeWindow() // seconds
 	if err != nil {
-		c.opts.Logger.Error("error getting challenge window", "error", err)
+		return nil, fmt.Errorf("failed to get challenge window: %w", err)
 	}
 
 	// divide window by the optimistic average block time
@@ -171,7 +171,7 @@ func (c *Client) GetChallengeWindowBlockRanges() [][]uint64 {
 	// get the current block number
 	currentBlock, err := c.GetHeight()
 	if err != nil {
-		c.opts.Logger.Error("error getting current block number", "error", err)
+		return nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
 
 	// subtract the number of blocks we need to scan from the current block
@@ -188,5 +188,5 @@ func (c *Client) GetChallengeWindowBlockRanges() [][]uint64 {
 	}
 	blockRanges = append(blockRanges, []uint64{startBlock, currentBlock})
 
-	return blockRanges
+	return blockRanges, nil
 }

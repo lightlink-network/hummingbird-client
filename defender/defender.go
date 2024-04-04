@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	ErrNoDataCommitment = "no data commitment has been generated for the provided height"
+	ErrNoDataCommitment  = "no commitment found for height"
+	ErrNotInCorrectState = "challenge is not in the challenger initiated state"
 )
 
 type Opts struct {
@@ -49,24 +50,40 @@ func (d *Defender) startDefender() error {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		scanRanges := d.Ethereum.GetChallengeWindowBlockRanges()
+		scanRanges, err := d.Ethereum.GetChallengeWindowBlockRanges()
+		if err != nil {
+			return fmt.Errorf("failed to get challenge window block ranges: %w", err)
+		}
 
-		for i := 0; i < len(scanRanges); i++ {
-			if len(scanRanges[i]) != 2 {
+		startBlock := scanRanges[0][0]
+		endBlock := scanRanges[len(scanRanges)-1][1]
+		totalBlocks := endBlock - startBlock
+
+		log := d.Opts.Logger.With(
+			"startBlock", startBlock,
+			"endBlock", endBlock,
+			"totalBlocks", totalBlocks)
+
+		log.Info("Starting log scan for pending challenges...")
+
+		for _, scanRange := range scanRanges {
+			if len(scanRange) != 2 {
 				return fmt.Errorf("invalid block range")
 			}
-			daChallenges, err := d.getDAChallenges(scanRanges[i][0], scanRanges[i][1], contracts.ChallengeDAStatusChallengerInitiated)
+			daChallenges, err := d.getDAChallenges(scanRange[0], scanRange[1], contracts.ChallengeDAStatusChallengerInitiated)
 			if err != nil {
 				return fmt.Errorf("error getting DA challenges: %w", err)
 			}
 			d.defendDAChallenges(*daChallenges)
 
-			l2HeaderChallenges, err := d.getL2HeaderChallenges(scanRanges[i][0], scanRanges[i][1], contracts.ChallengeL2HeaderStatusChallengerInitiated)
+			l2HeaderChallenges, err := d.getL2HeaderChallenges(scanRange[0], scanRange[1], contracts.ChallengeL2HeaderStatusChallengerInitiated)
 			if err != nil {
 				return fmt.Errorf("error getting L2 header challenges: %w", err)
 			}
 			d.defendL2HeaderChallenges(*l2HeaderChallenges)
 		}
+
+		log.Info("Finished log scan for pending challenges")
 	}
 	return nil
 }
@@ -90,7 +107,6 @@ func (d *Defender) getDAChallenges(startblock, endblock uint64, status uint8) (*
 	if err != nil {
 		return nil, err
 	}
-	defer challenges.Close()
 
 	log.Debug("Finished log scan for historic pending DA challenges")
 	return challenges, nil
@@ -101,7 +117,7 @@ func (d *Defender) getDAChallenges(startblock, endblock uint64, status uint8) (*
 func (d *Defender) defendDAChallenges(c challengeContract.ChallengeChallengeDAUpdateIterator) {
 	for c.Next() {
 		err := d.defendDAChallenge(*c.Event)
-		if err != nil {
+		if err != nil && err.Error() != ErrNotInCorrectState {
 			d.Opts.Logger.Error("error defending DA challenge", "error", err)
 		}
 	}
@@ -115,7 +131,7 @@ func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpd
 		return fmt.Errorf("error getting data root inclusion challenge: %w", err)
 	}
 	if challengeInfo.Status != contracts.ChallengeDAStatusChallengerInitiated {
-		return fmt.Errorf("challenge is not pending")
+		return fmt.Errorf(ErrNotInCorrectState)
 	}
 
 	blockHash := common.BytesToHash(c.BlockHash[:])
@@ -214,7 +230,6 @@ func (d *Defender) getL2HeaderChallenges(startblock, endblock uint64, status uin
 	if err != nil {
 		return nil, err
 	}
-	defer challenges.Close()
 
 	log.Debug("Finished log scan for historic pending L2 header challenges")
 	return challenges, nil
@@ -225,7 +240,7 @@ func (d *Defender) getL2HeaderChallenges(startblock, endblock uint64, status uin
 func (d *Defender) defendL2HeaderChallenges(c challengeContract.ChallengeL2HeaderChallengeUpdateIterator) {
 	for c.Next() {
 		err := d.defendL2HeaderChallenge(*c.Event)
-		if err != nil {
+		if err != nil && err.Error() != ErrNotInCorrectState {
 			d.Opts.Logger.Error("error defending L2 header challenge", "error", err)
 		}
 	}
@@ -239,7 +254,7 @@ func (d *Defender) defendL2HeaderChallenge(c challengeContract.ChallengeL2Header
 		return fmt.Errorf("error getting L2 header challenge: %w", err)
 	}
 	if challengeInfo.Status != contracts.ChallengeL2HeaderStatusChallengerInitiated {
-		return fmt.Errorf("challenge is not pending")
+		return fmt.Errorf(ErrNotInCorrectState)
 	}
 
 	rblock := common.BytesToHash(c.Rblock[:])

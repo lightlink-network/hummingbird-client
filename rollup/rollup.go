@@ -293,7 +293,7 @@ func (r *Rollup) nextRollupTarget() (uint64, error) {
 	}
 
 	// get the next rollup target
-	return head.L2Height + r.Opts.BundleSize, nil
+	return head.L2Height + r.Opts.BundleSize*r.Opts.BundleCount, nil
 }
 
 func (r *Rollup) awaitL2Height(h uint64) error {

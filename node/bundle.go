@@ -88,14 +88,14 @@ func (b *Bundle) StateRoot() common.Hash {
 }
 
 // check if the bundle is under the celestia tx size
-// limit of 1962441 bytes - 20000 bytes for tx overhead
+// limit of 1962441 bytes - 196245 bytes (10%) for tx overhead
 func (b *Bundle) IsUnderTxLimit() (bool, uint64, uint64, error) {
 	bundleEncoded, err := b.EncodeRLP()
 	if err != nil {
 		return false, 0, 0, err
 	}
 	bundleEncodedSize := uint64(len(bundleEncoded))
-	bundleSizeLimit := TxSizeLimit - 20000
+	bundleSizeLimit := TxSizeLimit - 196245
 	if bundleEncodedSize > bundleSizeLimit {
 		return false, bundleSizeLimit, bundleEncodedSize, nil
 	}

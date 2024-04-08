@@ -25,8 +25,21 @@ hb defender defend-da <rblock_hash> <bundle_number> # Defend data availability
 hb defender info-da <rblock_hash> <bundle_number> # Provides info on an existing challenge
 hb defender prove-da <rblock_hash> <bundle_number> # Prove data availability
 hb defender start # Start the defender loop to watch and defend challenges
-hb defender provide --type=header <rblock_hash> <l2_block_hash> # Provide will download header for the given <l2_block_hash> from Celestia and provide it to Layer 1 ChainOracle
-hb defender provide --type=tx <rblock_hash> <l2_tx_hash> # Provide will download tx for the given <l2_tx_hash> from Celestia and provide it to Layer 1 ChainOracle
+hb defender provide --type=header <rblock_hash> <l2_block_hash> # Get header for <l2_block_hash> from Celestia and provide it to L1 ChainOracle
+hb defender provide --type=tx <rblock_hash> <l2_tx_hash> # Get tx for <l2_tx_hash> from Celestia and provide it to L1 ChainOracle
+```
+
+## Dev Commands
+
+```bash
+hbdev fetch header <rblock_hash> <l2block_hash> # Fetch and decode an L2 block header from Celesta
+hbdev fetch header <rblock_hash> <l2block_hash> --proof # Fetch and return celestia DA proof for an L2 block header
+hbdev fetch header <rblock_hash> <l2block_hash> --proof --check-proof # Verify the proof returned by Celestia
+hbdev fetch tx <tx_hash> # Fetch and decode an L2 transaction from Celestia
+hbdev fetch tx <tx_hash> --proof # Fetch and return celestia DA proof for an L2 transaction
+hbdev fetch tx <tx_hash> --proof --check-proof # Verify the proof returned by Celestia
+hbdev inspect <rblock_hash> --header --bundle --stats --shares --txns # Inspect will inspect a rollup block
+hbdev pointer <rblock_hash> --format=pretty --verify # Pointer finds the Celestia data pointer for a given hash
 ```
 
 The following root flags are available for all commands:

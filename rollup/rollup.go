@@ -100,7 +100,13 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 		return nil, fmt.Errorf("createNextBlock: Failed to fetch bundles: %w", err)
 	}
 
-	// 6. upload the bundle to celestia
+	// 6. validate the bundles
+	err = ValidateBundles(bundles, head.L2Height)
+	if err != nil {
+		return nil, fmt.Errorf("createNextBlock: Failed to validate bundles: %w", err)
+	}
+
+	// 7. upload the bundle to celestia
 	r.Opts.Logger.Info("Publishing bundles to Celestia", "bundles", len(bundles), "bundles_size", fetchStart-head.L2Height-1, "ll_height", llHeight, "ll_epoch", epoch)
 	pointers := make([]canonicalStateChainContract.CanonicalStateChainCelestiaPointer, 0)
 	for i, bundle := range bundles {
@@ -123,7 +129,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 		return nil, fmt.Errorf("createNextBlock: No bundles to publish")
 	}
 
-	// 7. create the rollup header
+	// 8. create the rollup header
 	header := &canonicalStateChainContract.CanonicalStateChainHeader{
 		Epoch:            epoch,
 		L2Height:         bundles[len(bundles)-1].Height(),
@@ -132,13 +138,13 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 		CelestiaPointers: pointers,
 	}
 
-	// 8. calculate the hash of the header
+	// 9. calculate the hash of the header
 	hash, err := r.Ethereum.HashHeader(header)
 	if err != nil {
 		return nil, fmt.Errorf("createNextBlock: Failed to hash header: %w", err)
 	}
 
-	// 9. Optionally store the header in the local database
+	// 10. Optionally store the header in the local database
 	if r.Opts.Store {
 		key := append([]byte("rheader_"), hash[:]...)
 		if err := r.Node.Store.Put(key, utils.MustJsonMarshal(header)); err != nil {
@@ -146,7 +152,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 		}
 	}
 
-	// 10. Optionally store the Celestia pointer in the local database
+	// 11. Optionally store the Celestia pointer in the local database
 	// Required for the Celestia proof.
 	// if r.Opts.StoreCelestiaPointers {
 	// 	key := append([]byte("pointer_"), hash[:]...)
@@ -383,4 +389,33 @@ func (r *Rollup) fetchBundle(from, to uint64) (*node.Bundle, error) {
 	}
 
 	return bundle, nil
+}
+
+func ValidateBundles(bundles []*node.Bundle, head uint64) error {
+	// check if the bundles are empty
+	if len(bundles) == 0 {
+		return fmt.Errorf("bundles are empty")
+	}
+	for i, bundle := range bundles {
+		// check if the bundle is empty
+		if bundle.Size() == 0 {
+			return fmt.Errorf("bundle %d is empty", i)
+		}
+		// check the first block in the first bundle is the correct height
+		if i == 0 && bundle.Blocks[0].Number().Uint64() != head+1 {
+			return fmt.Errorf("first block in bundle %d is not the correct height", i)
+		}
+		// validate the blocks in the bundle
+		for j, block := range bundle.Blocks {
+			// check if the block is nil
+			if block == nil {
+				return fmt.Errorf("block %d in bundle %d is nil", j, i)
+			}
+			// check if the block.number is previous block.number + 1
+			if j > 0 && block.Number().Uint64() != bundle.Blocks[j-1].Number().Uint64()+1 {
+				return fmt.Errorf("block %d in bundle %d is not sequential", j, i)
+			}
+		}
+	}
+	return nil
 }

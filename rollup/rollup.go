@@ -114,6 +114,9 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 			ShareStart: big.NewInt(int64(pointer.ShareStart)),
 			ShareLen:   uint16(pointer.ShareLen),
 		})
+
+		// Delay between publishing bundles to Celestia to mitigate 'incorrect account sequence' errors
+		time.Sleep(20 * time.Second)
 	}
 
 	if len(bundles) == 0 {

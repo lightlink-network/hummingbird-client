@@ -22,8 +22,7 @@ type Opts struct {
 	Logger      *slog.Logger
 	DryRun      bool // DryRun indicates whether or not to actually submit the block to the L1 rollup contract.
 
-	StoreCelestiaPointers bool // StoreCelestiaPointers indicates whether or not to store the Celestia pointers in the local database.
-	StoreHeaders          bool // StoreHeaders indicates whether or not to store the rollup headers in the local database.
+	Store bool // StoreBundles indicates whether or not to store pointer, headers & bundles in the local database.
 }
 
 type Rollup struct {
@@ -49,8 +48,7 @@ func NewRollup(n *node.Node, opts *Opts) *Rollup {
 		disableStorage = true
 	}
 	if disableStorage {
-		opts.StoreCelestiaPointers = false
-		opts.StoreHeaders = false
+		opts.Store = false
 	}
 
 	return &Rollup{Node: n, Opts: opts}
@@ -96,24 +94,14 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	// 5. fetch the next bundles of blocks from ll
 	fetchTarget := head.L2Height + blocksToFetch
 	fetchStart := head.L2Height + 1
-	bundles := make([]*node.Bundle, 0)
-	r.Opts.Logger.Info("Fetching L2 blocks from LightLink", "start", fetchStart, "fetch_target", fetchTarget, "fetch_size", blocksToFetch, "ll_height", llHeight)
-	for fetchStart < fetchTarget && uint64(len(bundles)) < r.Opts.BundleCount {
-		from := fetchStart
-		to := fetchStart + r.Opts.BundleSize - 1
-		if to > fetchTarget {
-			to = fetchTarget
-		}
-		l2blocks, err := r.LightLink.GetBlocks(from, to)
-		if err != nil {
-			return nil, fmt.Errorf("createNextBlock: Failed to get l2blocks: %w", err)
-		}
-		bundles = append(bundles, &node.Bundle{Blocks: l2blocks})
-		fetchStart = to + 1
+
+	bundles, err := r.fetchBundles(fetchStart, fetchTarget)
+	if err != nil {
+		return nil, fmt.Errorf("createNextBlock: Failed to fetch bundles: %w", err)
 	}
 
-	r.Opts.Logger.Info("Publishing bundles to Celestia", "bundles", len(bundles), "bundles_size", fetchStart-head.L2Height-1, "ll_height", llHeight, "ll_epoch", epoch)
 	// 6. upload the bundle to celestia
+	r.Opts.Logger.Info("Publishing bundles to Celestia", "bundles", len(bundles), "bundles_size", fetchStart-head.L2Height-1, "ll_height", llHeight, "ll_epoch", epoch)
 	pointers := make([]canonicalStateChainContract.CanonicalStateChainCelestiaPointer, 0)
 	for i, bundle := range bundles {
 		pointer, err := r.Celestia.PublishBundle(*bundle)
@@ -148,7 +136,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	}
 
 	// 9. Optionally store the header in the local database
-	if r.Opts.StoreHeaders {
+	if r.Opts.Store {
 		key := append([]byte("rheader_"), hash[:]...)
 		if err := r.Node.Store.Put(key, utils.MustJsonMarshal(header)); err != nil {
 			return nil, fmt.Errorf("createNextBlock: Failed to store header: %w", err)
@@ -340,4 +328,56 @@ func (r *Rollup) GetBlockByHash(hash common.Hash) (*Block, error) {
 	}
 
 	return &Block{CanonicalStateChainHeader: &header, Bundles: bundles}, nil
+}
+
+func (r *Rollup) fetchBundles(fetchStart, fetchTarget uint64) ([]*node.Bundle, error) {
+	bundles := make([]*node.Bundle, 0)
+
+	for fetchStart < fetchTarget && uint64(len(bundles)) < r.Opts.BundleCount {
+		from := fetchStart
+		to := fetchStart + r.Opts.BundleSize - 1
+		if to > fetchTarget {
+			to = fetchTarget
+		}
+
+		bundle, err := r.fetchBundle(from, to)
+		if err != nil {
+			r.Opts.Logger.Error("Failed to fetch bundle", "from", from, "to", to, "error", err)
+		} else {
+			bundles = append(bundles, bundle)
+		}
+
+		fetchStart = to + 1
+	}
+
+	return bundles, nil
+}
+
+func (r *Rollup) fetchBundle(from, to uint64) (*node.Bundle, error) {
+	if r.Opts.Store {
+		bundle, err := r.Node.Store.GetBundle(from, to)
+		if err == nil {
+			r.Opts.Logger.Info("Fetched bundle from local database", "from", from, "to", to, "bundle_size", bundle.Size())
+			return bundle, nil
+		}
+		r.Opts.Logger.Info("Failed to get bundle from local database, attempting to pull via RPC", "error", err)
+	}
+
+	l2blocks, err := r.LightLink.GetBlocks(from, to)
+	if err != nil {
+		return nil, fmt.Errorf("createNextBlock: Failed to get l2blocks: %w", err)
+	}
+
+	bundle := &node.Bundle{Blocks: l2blocks}
+
+	if r.Opts.Store {
+		err := r.Node.Store.PutBundle(bundle)
+		if err != nil {
+			r.Opts.Logger.Info("Failed to store bundle in local database", "from", from, "to", to, "error", err)
+		} else {
+			r.Opts.Logger.Info("Stored bundle in local database", "from", from, "to", to, "bundle_size", len(l2blocks))
+		}
+	}
+
+	return bundle, nil
 }

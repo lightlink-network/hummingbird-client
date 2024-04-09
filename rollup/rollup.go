@@ -95,12 +95,12 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 
 	// 5. fetch the next bundles of blocks from ll
 	fetchTarget := head.L2Height + blocksToFetch
-	fetched := head.L2Height
+	fetchStart := head.L2Height + 1
 	bundles := make([]*node.Bundle, 0)
-	r.Opts.Logger.Info("Fetching L2 blocks from LightLink", "start", fetched, "fetch_target", fetchTarget, "fetch_size", blocksToFetch, "ll_height", llHeight)
-	for fetched < fetchTarget && uint64(len(bundles)) < r.Opts.BundleCount {
-		from := fetched
-		to := fetched + r.Opts.BundleSize
+	r.Opts.Logger.Info("Fetching L2 blocks from LightLink", "start", fetchStart, "fetch_target", fetchTarget, "fetch_size", blocksToFetch, "ll_height", llHeight)
+	for fetchStart < fetchTarget && uint64(len(bundles)) < r.Opts.BundleCount {
+		from := fetchStart
+		to := fetchStart + r.Opts.BundleSize - 1
 		if to > fetchTarget {
 			to = fetchTarget
 		}
@@ -109,10 +109,10 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 			return nil, fmt.Errorf("createNextBlock: Failed to get l2blocks: %w", err)
 		}
 		bundles = append(bundles, &node.Bundle{Blocks: l2blocks})
-		fetched = to
+		fetchStart = to + 1
 	}
 
-	r.Opts.Logger.Info("Publishing bundles to Celestia", "bundles", len(bundles), "bundles_size", fetched-head.L2Height, "ll_height", llHeight, "ll_epoch", epoch)
+	r.Opts.Logger.Info("Publishing bundles to Celestia", "bundles", len(bundles), "bundles_size", fetchStart-head.L2Height-1, "ll_height", llHeight, "ll_epoch", epoch)
 	// 6. upload the bundle to celestia
 	pointers := make([]canonicalStateChainContract.CanonicalStateChainCelestiaPointer, 0)
 	for i, bundle := range bundles {

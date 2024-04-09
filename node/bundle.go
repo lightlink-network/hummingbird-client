@@ -42,7 +42,7 @@ func (b *Bundle) Size() uint64 {
 }
 
 func (b *Bundle) Height() uint64 {
-	return b.Blocks[len(b.Blocks)-1].Number().Uint64() + 1
+	return b.Blocks[len(b.Blocks)-1].Number().Uint64()
 }
 
 func (b *Bundle) EncodeRLP() ([]byte, error) {

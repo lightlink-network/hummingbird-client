@@ -270,8 +270,12 @@ func (d *Defender) defendL2HeaderChallenge(c challengeContract.ChallengeL2Header
 
 	tx, err := d.DefendL2Header(rblock, l2BlockNum)
 	if err != nil {
-		log.Error("Error defending L2 header challenge", "error", err)
-		return fmt.Errorf("error defending L2 header challenge: %w", err)
+		if strings.Contains(err.Error(), ErrNoDataCommitment) {
+			log.Info("Pending L2 header challenge is awaiting data commitment from Celestia validators, will retry later")
+			return nil
+		} else {
+			return fmt.Errorf("error defending L2 header challenge: %w", err)
+		}
 	}
 
 	log.Info("Pending L2 header challenge defended successfully", "tx", tx.Hash().Hex())

@@ -75,7 +75,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 
 	var store *LDBStore
 
-	if cfg.Rollup.StoreHeaders || cfg.Rollup.StoreCelestiaPointers {
+	if cfg.Rollup.Store {
 		store, err = NewLDBStore(cfg.StorePath)
 		if err != nil {
 			return nil, err

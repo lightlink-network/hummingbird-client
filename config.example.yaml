@@ -23,7 +23,6 @@ rollup:
   bundleSize: 10 # Number of blocks in each bundle
   l1pollDelay: 30000 # Delay in ms between each L1 poll
   l2pollDelay: 10000 # Delay in ms between each L2 poll
-  storeCelestiaPointers: true # Store Celestia pointers in local storage
-  storeHeaders: true # Store L1 headers in L2 headers in local storage
+  store: true # Store pointers, headers and bundles in local storage
 defender:
   workerDelay: 60000 # Delay in ms between each Defender worker run

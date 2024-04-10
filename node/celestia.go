@@ -162,6 +162,9 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 		c.logger.Warn("Failed to submit blob, retrying", "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
 
 		i++
+
+		// Delay between publishing bundles to Celestia to mitigate 'incorrect account sequence' errors
+		time.Sleep(30 * time.Second)
 	}
 
 	if err != nil {

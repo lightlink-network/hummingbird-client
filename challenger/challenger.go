@@ -22,6 +22,6 @@ func NewChallenger(node *node.Node, opts *Opts) *Challenger {
 	return &Challenger{Node: node, Opts: opts}
 }
 
-func (c *Challenger) ChallengeDA(index uint64) (*types.Transaction, common.Hash, error) {
-	return c.Ethereum.ChallengeDataRootInclusion(index)
+func (c *Challenger) ChallengeDA(index uint64, pointerIndex uint8) (*types.Transaction, common.Hash, error) {
+	return c.Ethereum.ChallengeDataRootInclusion(index, pointerIndex)
 }

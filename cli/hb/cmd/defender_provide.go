@@ -32,12 +32,10 @@ var DefenderProvideCmd = &cobra.Command{
 		ethKey := getEthKey()
 
 		rblockHash := common.HexToHash(args[0])
+		targetHash := common.HexToHash(args[1])
 
 		n, err := node.NewFromConfig(cfg, logger, ethKey)
 		utils.NoErr(err)
-
-		// allow block hash or number
-		targetHash := common.HexToHash(args[1])
 
 		d := defender.NewDefender(n, &defender.Opts{
 			Logger: logger.With("ctx", "Defender"),

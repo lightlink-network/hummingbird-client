@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"hummingbird/config"
 	"hummingbird/node"
-	"hummingbird/node/contracts"
 	"hummingbird/rollup"
 	"hummingbird/utils"
 	"time"
@@ -35,12 +34,11 @@ var RollupInfoCmd = &cobra.Command{
 		utils.NoErr(err)
 
 		r := rollup.NewRollup(n, &rollup.Opts{
-			L1PollDelay:           time.Duration(cfg.Rollup.L1PollDelay) * time.Millisecond,
-			L2PollDelay:           time.Duration(cfg.Rollup.L2PollDelay) * time.Millisecond,
-			BundleSize:            cfg.Rollup.BundleSize,
-			StoreCelestiaPointers: cfg.Rollup.StoreCelestiaPointers,
-			StoreHeaders:          cfg.Rollup.StoreHeaders,
-			Logger:                logger.With("ctx", "Rollup"),
+			L1PollDelay: time.Duration(cfg.Rollup.L1PollDelay) * time.Millisecond,
+			L2PollDelay: time.Duration(cfg.Rollup.L2PollDelay) * time.Millisecond,
+			BundleSize:  cfg.Rollup.BundleSize,
+			Store:       cfg.Rollup.Store,
+			Logger:      logger.With("ctx", "Rollup"),
 		})
 
 		var useHash bool
@@ -60,7 +58,7 @@ var RollupInfoCmd = &cobra.Command{
 		if useNum {
 			h, err := r.Ethereum.GetRollupHeader(num)
 			utils.NoErr(err)
-			blockHash, err = contracts.HashCanonicalStateChainHeader(&h)
+			blockHash, err = r.Ethereum.HashHeader(&h)
 			utils.NoErr(err)
 		}
 		if useHash {
@@ -73,19 +71,21 @@ var RollupInfoCmd = &cobra.Command{
 			utils.NoErr(err)
 			printInfo(info, useJson)
 
-			// if bundle flag is set, get bundle info
-			if bundle, _ := cmd.Flags().GetBool("bundle"); bundle {
-				s, err := r.Celestia.GetShares(&node.CelestiaPointer{
-					Height:     info.CanonicalStateChainHeader.CelestiaHeight,
-					ShareStart: info.CanonicalStateChainHeader.CelestiaShareStart,
-					ShareLen:   info.CanonicalStateChainHeader.CelestiaShareLen,
-				})
-				utils.NoErr(err)
+			// if showBundle flag is set, get showBundle info
+			if showBundle, _ := cmd.Flags().GetBool("bundle"); showBundle {
+				for i, p := range info.CanonicalStateChainHeader.CelestiaPointers {
+					s, err := r.Celestia.GetSharesByNamespace(&node.CelestiaPointer{
+						Height:     p.Height,
+						ShareStart: p.ShareStart.Uint64(),
+						ShareLen:   uint64(p.ShareLen),
+					})
+					utils.NoErr(err)
 
-				bundle, err := node.NewBundleFromShares(s)
-				utils.NoErr(err)
+					bundle, err := node.NewBundleFromShares(s)
+					utils.NoErr(err)
 
-				printBundle(bundle)
+					printBundle(bundle, i)
+				}
 			}
 			return
 		}
@@ -115,9 +115,9 @@ func printInfo(info any, useJson bool) {
 	fmt.Println(" ")
 }
 
-func printBundle(bundle *node.Bundle) {
+func printBundle(bundle *node.Bundle, index int) {
 	fmt.Println(" ")
-	fmt.Println("Bundle:")
+	fmt.Println("Bundle:", index)
 	fmt.Println(" Blocks:", len(bundle.Blocks))
 	for _, b := range bundle.Blocks {
 		fmt.Println("  →", "Index:", b.Number(), "Hash:", utils.HashWithoutExtraData(b).Hex())

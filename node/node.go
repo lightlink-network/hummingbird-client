@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"hummingbird/config"
 	canonicalstatechain "hummingbird/node/contracts/CanonicalStateChain.sol"
+	"hummingbird/node/ethereum"
 	"log/slog"
 	"math/big"
 	"runtime"
@@ -15,7 +16,7 @@ import (
 )
 
 type Node struct {
-	Ethereum
+	ethereum.Ethereum
 	Celestia
 	LightLink
 
@@ -33,20 +34,17 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	// log config file path
 	logger.Info("Using config file", "path", viper.ConfigFileUsed())
 
-	eth, err := NewEthereumRPC(EthereumHTTPClientOpts{
+	eth, err := ethereum.NewClient(ethereum.ClientOpts{
 		Endpoint:                   cfg.Ethereum.HTTPEndpoint,
 		CanonicalStateChainAddress: common.HexToAddress(cfg.Ethereum.CanonicalStateChain),
-		DAOracleAddress:            common.HexToAddress(cfg.Ethereum.DaOracle),
 		ChallengeAddress:           common.HexToAddress(cfg.Ethereum.Challenge),
 		ChainOracleAddress:         common.HexToAddress(cfg.Ethereum.ChainOracle),
+		BlobstreamXAddress:         common.HexToAddress(cfg.Ethereum.BlobstreamX),
 		Signer:                     ethKey,
 		Logger:                     logger.With("ctx", "ethereum-http"),
 		DryRun:                     cfg.DryRun,
 		GasPriceIncreasePercent:    big.NewInt(int64(cfg.Ethereum.GasPriceIncreasePercent)),
-	}, EthereumWSClientOpts{
-		Endpoint:         cfg.Ethereum.WSEndpoint,
-		ChallengeAddress: common.HexToAddress(cfg.Ethereum.Challenge),
-		Logger:           logger.With("ctx", "ethereum-ws"),
+		BlockTime:                  cfg.Ethereum.BlockTime,
 	})
 	if err != nil {
 		return nil, err
@@ -77,7 +75,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 
 	var store *LDBStore
 
-	if cfg.Rollup.StoreHeaders || cfg.Rollup.StoreCelestiaPointers {
+	if cfg.Rollup.Store {
 		store, err = NewLDBStore(cfg.StorePath)
 		if err != nil {
 			return nil, err
@@ -95,61 +93,58 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 }
 
 // GetDAPointer gets the Celestia pointer for the given rollup block hash.
-func (n *Node) GetDAPointer(hash common.Hash) (*CelestiaPointer, error) {
-	pointer := &CelestiaPointer{}
+func (n *Node) GetDAPointer(hash common.Hash) ([]*CelestiaPointer, error) {
 
-	if config.Load().Rollup.StoreCelestiaPointers {
-		pointer, err := n.Store.GetDAPointer(hash)
-		// if err is not found, get pointer from header, any other error return
-		if err != nil && err.Error() != "failed to get celestia pointer from store: leveldb: not found" {
-			return nil, err
-		}
-
-		// if pointer is found, return it
-		if pointer != nil {
-			return pointer, nil
-		}
-	}
+	// TODO FETCH FROM LOCAL STORE!
 
 	// pointer is not found in local store so get rollup header
-	header, err := n.GetRollupHeaderByHash(hash)
+	header, err := n.Ethereum.GetRollupHeaderByHash(hash)
 	if err != nil {
 		return nil, err
 	}
 
 	// get pointer from header
-	pointer = &CelestiaPointer{
-		Height:     header.CelestiaHeight,
-		ShareStart: header.CelestiaShareStart,
-		ShareLen:   header.CelestiaShareLen,
+	pointers := make([]*CelestiaPointer, 0)
+	for i := 0; i < len(header.CelestiaPointers); i++ {
+
+		pointers = append(pointers, &CelestiaPointer{
+			Height:     header.CelestiaPointers[i].Height,
+			ShareStart: header.CelestiaPointers[i].ShareStart.Uint64(),
+			ShareLen:   uint64(header.CelestiaPointers[i].ShareLen),
+		})
 	}
 
-	return pointer, nil
+	return pointers, nil
 }
 
-func (n *Node) FetchRollupBlock(rblock common.Hash) (*canonicalstatechain.CanonicalStateChainHeader, *Bundle, error) {
-	header, err := n.GetRollupHeaderByHash(rblock)
+func (n *Node) FetchRollupBlock(rblock common.Hash) (*canonicalstatechain.CanonicalStateChainHeader, []*Bundle, error) {
+	header, err := n.Ethereum.GetRollupHeaderByHash(rblock)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pointer := &CelestiaPointer{
-		Height:     header.CelestiaHeight,
-		ShareStart: header.CelestiaShareStart,
-		ShareLen:   header.CelestiaShareLen,
+	bundles := make([]*Bundle, 0)
+	for i := 0; i < len(header.CelestiaPointers); i++ {
+		pointer := &CelestiaPointer{
+			Height:     header.CelestiaPointers[i].Height,
+			ShareStart: header.CelestiaPointers[i].ShareStart.Uint64(),
+			ShareLen:   uint64(header.CelestiaPointers[i].ShareLen),
+		}
+
+		shares, err := n.Celestia.GetSharesByNamespace(pointer)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		bundle, err := NewBundleFromShares(shares)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		bundles = append(bundles, bundle)
 	}
 
-	shares, err := n.Celestia.GetShares(pointer)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	bundle, err := NewBundleFromShares(shares)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return &header, bundle, nil
+	return &header, bundles, nil
 }
 
 // Returns true if the given ethKey is the publisher set in CanonicalStateChain

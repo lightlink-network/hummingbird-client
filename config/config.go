@@ -23,17 +23,19 @@ type Config struct {
 		GasPriceIncreasePercent int    `mapstructure:"gasPriceIncreasePercent"`
 		Challenge               string `mapstructure:"challenge"`
 		ChainOracle             string `mapstructure:"chainOracle"`
+		BlobstreamX             string `mapstructure:"blobstreamX"`
+		BlockTime               int    `mapstructure:"blockTime"`
 	} `mapstructure:"ethereum"`
 	LightLink struct {
 		Endpoint string `mapstructure:"endpoint"`
 		Delay    int    `mapstructure:"delay"`
 	} `mapstructure:"lightlink"`
 	Rollup struct {
-		L1PollDelay           int    `mapstructure:"l1pollDelay"`
-		L2PollDelay           int    `mapstructure:"l2pollDelay"`
-		BundleSize            uint64 `mapstructure:"bundleSize"`
-		StoreCelestiaPointers bool   `mapstructure:"storeCelestiaPointers"`
-		StoreHeaders          bool   `mapstructure:"storeHeaders"`
+		L1PollDelay int    `mapstructure:"l1pollDelay"`
+		L2PollDelay int    `mapstructure:"l2pollDelay"`
+		BundleSize  uint64 `mapstructure:"bundleSize"`
+		BundleCount uint64 `mapstructure:"bundleCount"`
+		Store       bool   `mapstructure:"store"`
 	} `mapstructure:"rollup"`
 	Defender struct {
 		WorkerDelay int `mapstructure:"workerDelay"`

@@ -37,13 +37,13 @@ var RollupStartCmd = &cobra.Command{
 		}
 
 		r := rollup.NewRollup(n, &rollup.Opts{
-			L1PollDelay:           time.Duration(cfg.Rollup.L1PollDelay) * time.Millisecond,
-			L2PollDelay:           time.Duration(cfg.Rollup.L2PollDelay) * time.Millisecond,
-			BundleSize:            cfg.Rollup.BundleSize,
-			StoreCelestiaPointers: cfg.Rollup.StoreCelestiaPointers,
-			StoreHeaders:          cfg.Rollup.StoreHeaders,
-			Logger:                logger.With("ctx", "Rollup"),
-			DryRun:                dryRun,
+			L1PollDelay: time.Duration(cfg.Rollup.L1PollDelay) * time.Millisecond,
+			L2PollDelay: time.Duration(cfg.Rollup.L2PollDelay) * time.Millisecond,
+			BundleSize:  cfg.Rollup.BundleSize,
+			BundleCount: cfg.Rollup.BundleCount,
+			Store:       cfg.Rollup.Store,
+			Logger:      logger.With("ctx", "Rollup"),
+			DryRun:      dryRun,
 		})
 
 		// If dry run is enabled, swap out celestia with a mock celestia client.

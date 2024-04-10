@@ -7,6 +7,7 @@ import (
 	"hummingbird/defender"
 	"hummingbird/node"
 	"hummingbird/utils"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
@@ -20,8 +21,8 @@ func init() {
 var DefenderInfoDaCmd = &cobra.Command{
 	Use:        "info-da",
 	Short:      "info-da will provide info on an existing challenge",
-	ArgAliases: []string{"block"},
-	Args:       cobra.ExactArgs(1),
+	ArgAliases: []string{"block", "pointerIndex"},
+	Args:       cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
 		logger := GetLogger(viper.GetString("log-type"))
@@ -35,8 +36,13 @@ var DefenderInfoDaCmd = &cobra.Command{
 		})
 
 		blockHash := common.HexToHash(args[0])
+		pointerIndex, err := strconv.Atoi(args[1])
+		if err != nil {
+			logger.Error("Failed to parse pointer index", "err", err)
+			panic(err)
+		}
 
-		info, err := d.InfoDA(blockHash)
+		info, err := d.InfoDA(blockHash, uint8(pointerIndex))
 		if err != nil {
 			logger.Error("Failed to get data availability info", "err", err)
 			panic(err)

@@ -42,7 +42,7 @@ func (b *Bundle) Size() uint64 {
 }
 
 func (b *Bundle) Height() uint64 {
-	return b.Blocks[len(b.Blocks)-1].Number().Uint64() + 1
+	return b.Blocks[len(b.Blocks)-1].Number().Uint64()
 }
 
 func (b *Bundle) EncodeRLP() ([]byte, error) {
@@ -88,14 +88,14 @@ func (b *Bundle) StateRoot() common.Hash {
 }
 
 // check if the bundle is under the celestia tx size
-// limit of 1962441 bytes - 20000 bytes for tx overhead
+// limit of 1962441 bytes - 196245 bytes (10%) for tx overhead
 func (b *Bundle) IsUnderTxLimit() (bool, uint64, uint64, error) {
 	bundleEncoded, err := b.EncodeRLP()
 	if err != nil {
 		return false, 0, 0, err
 	}
 	bundleEncodedSize := uint64(len(bundleEncoded))
-	bundleSizeLimit := TxSizeLimit - 20000
+	bundleSizeLimit := TxSizeLimit - 196245
 	if bundleEncodedSize > bundleSizeLimit {
 		return false, bundleSizeLimit, bundleEncodedSize, nil
 	}
@@ -239,4 +239,24 @@ func (b *Bundle) FindTxShares(hash common.Hash, namespace string) (*SharePointer
 
 	// TODO: this code repeats the same logic as FindHeaderShares, we should refactor it
 	// to avoid code duplication. `FindBytesShares` ?
+}
+
+func FindHeaderSharesInBundles(bundles []*Bundle, hash common.Hash, namespace string) (*SharePointer, uint8, error) {
+	for i, bundle := range bundles {
+		pointer, err := bundle.FindHeaderShares(hash, namespace)
+		if err == nil {
+			return pointer, uint8(i), nil
+		}
+	}
+	return nil, 0, fmt.Errorf("header not found in any bundle")
+}
+
+func FindTxSharesInBundles(bundles []*Bundle, hash common.Hash, namespace string) (*SharePointer, uint8, error) {
+	for i, bundle := range bundles {
+		pointer, err := bundle.FindTxShares(hash, namespace)
+		if err == nil {
+			return pointer, uint8(i), nil
+		}
+	}
+	return nil, 0, fmt.Errorf("tx not found in any bundle")
 }

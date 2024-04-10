@@ -106,7 +106,7 @@ func (l *LightLinkClient) GetBlock(height uint64) (*types.Block, error) {
 func (l *LightLinkClient) GetBlocks(start, end uint64) ([]*types.Block, error) {
 
 	var blocks []*types.Block
-	for i := start; i < end; i++ {
+	for i := start; i <= end; i++ {
 		var block *types.Block
 		var err error
 

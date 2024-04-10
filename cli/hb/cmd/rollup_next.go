@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"hummingbird/config"
 	"hummingbird/node"
-	"hummingbird/node/contracts"
 	"hummingbird/rollup"
 	"hummingbird/utils"
 	"time"
@@ -40,13 +39,13 @@ var RollupNextCmd = &cobra.Command{
 		}
 
 		r := rollup.NewRollup(n, &rollup.Opts{
-			L1PollDelay:           time.Duration(cfg.Rollup.L1PollDelay) * time.Millisecond,
-			L2PollDelay:           time.Duration(cfg.Rollup.L2PollDelay) * time.Millisecond,
-			BundleSize:            cfg.Rollup.BundleSize,
-			StoreCelestiaPointers: cfg.Rollup.StoreCelestiaPointers,
-			StoreHeaders:          cfg.Rollup.StoreHeaders,
-			Logger:                logger.With("ctx", "Rollup"),
-			DryRun:                dryRun,
+			L1PollDelay: time.Duration(cfg.Rollup.L1PollDelay) * time.Millisecond,
+			L2PollDelay: time.Duration(cfg.Rollup.L2PollDelay) * time.Millisecond,
+			BundleSize:  cfg.Rollup.BundleSize,
+			BundleCount: cfg.Rollup.BundleCount,
+			Store:       cfg.Rollup.Store,
+			Logger:      logger.With("ctx", "Rollup"),
+			DryRun:      dryRun,
 		})
 
 		// If dry run is enabled, swap out celestia with a mock celestia client.
@@ -62,7 +61,7 @@ var RollupNextCmd = &cobra.Command{
 			panic(err)
 		}
 
-		hash, err := contracts.HashCanonicalStateChainHeader(b.CanonicalStateChainHeader)
+		hash, err := r.Ethereum.HashHeader(b.CanonicalStateChainHeader)
 		utils.NoErr(err)
 
 		// Print out the rollup block.
@@ -72,20 +71,15 @@ var RollupNextCmd = &cobra.Command{
 		fmt.Println("	L2Height:", b.L2Height)
 		fmt.Println("	PrevHash:", common.BytesToHash(b.PrevHash[:]).Hex())
 		fmt.Println("	StateRoot:", common.BytesToHash(b.CanonicalStateChainHeader.StateRoot[:]).Hex())
-		fmt.Println("	BlockRoot:", common.BytesToHash(b.CanonicalStateChainHeader.BlockRoot[:]).Hex())
-		fmt.Println("	TxRoot:", common.BytesToHash(b.CanonicalStateChainHeader.TxRoot[:]).Hex())
 		fmt.Println("	Hash:", hash.Hex())
-		fmt.Println("	Bundle Size:", len(b.Bundle.Blocks))
-		fmt.Println("	Celestia Height:", b.CelestiaHeight)
-		fmt.Println("	Celestia Share Start:", b.CelestiaShareStart)
-		fmt.Println("	Celestia Share Len:", b.CelestiaShareLen)
+		fmt.Println("	Bundle Size:", len(b.L2Blocks()))
+		for i, p := range b.CanonicalStateChainHeader.CelestiaPointers {
+			fmt.Printf("	Celestia Pointer #%d:\n", i)
+			fmt.Println("		Height:", p.Height)
+			fmt.Println("		Share Start:", p.ShareStart)
+			fmt.Println("		Share Len:", p.ShareLen)
+		}
 		fmt.Println(" ")
-
-		// If dry run is enabled, exit.
-		// if dryRun {
-		// 	logger.Warn("Dry run enabled, not submitting rollup block to L1 rollup contract")
-		// 	return
-		// }
 
 		logger.Info(("Submitting rollup block to L1 rollup contract"))
 		tx, err := r.SubmitBlock(b)
@@ -95,6 +89,5 @@ var RollupNextCmd = &cobra.Command{
 		}
 
 		logger.Info("Rollup block submitted to L1 rollup contract", "tx_hash", tx.Hash().Hex())
-
 	},
 }

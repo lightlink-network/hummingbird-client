@@ -6,28 +6,25 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
-	"strings"
 	"time"
 
 	cosmosmath "cosmossdk.io/math"
 	"github.com/celestiaorg/celestia-node/api/rpc/client"
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/celestiaorg/celestia-node/share"
+	gosquare "github.com/celestiaorg/go-square/square"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tendermint/tendermint/rpc/client/http"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	"github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/celestiaorg/celestia-app/pkg/appconsts"
 	"github.com/celestiaorg/celestia-app/pkg/shares"
-	"github.com/celestiaorg/celestia-app/pkg/square"
 	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
-	blobstreamtypes "github.com/celestiaorg/celestia-app/x/qgb/types"
 
+	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
-	daOracleContract "hummingbird/node/contracts/DAOracle.sol"
 	"hummingbird/utils"
 )
 
@@ -44,7 +41,7 @@ type CelestiaPointer struct {
 
 type CelestiaProof struct {
 	Nonce        *big.Int
-	Tuple        *daOracleContract.DataRootTuple
+	Tuple        *blobstreamXContract.DataRootTuple
 	WrappedProof *challengeContract.BinaryMerkleProof
 }
 
@@ -52,9 +49,11 @@ type CelestiaProof struct {
 type Celestia interface {
 	Namespace() string
 	PublishBundle(blocks Bundle) (*CelestiaPointer, error)
-	GetProof(pointer *CelestiaPointer) (*CelestiaProof, error)
-	GetShares(pointer *CelestiaPointer) ([]shares.Share, error)
+	GetProof(pointer *CelestiaPointer, startBlock uint64, endBlock uint64, proofNonce big.Int) (*CelestiaProof, error)
+	GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error)
+	GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error)
 	GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error)
+	GetPointer(txHash common.Hash) (*CelestiaPointer, error)
 }
 
 type CelestiaClientOpts struct {
@@ -163,6 +162,9 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 		c.logger.Warn("Failed to submit blob, retrying", "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
 
 		i++
+
+		// Delay between publishing bundles to Celestia to mitigate 'incorrect account sequence' errors
+		time.Sleep(30 * time.Second)
 	}
 
 	if err != nil {
@@ -172,133 +174,31 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 	return pointer, nil
 }
 
-func (c *CelestiaClient) waitForTxInclusion(ctx context.Context, h common.Hash) (*ctypes.ResultTx, error) {
-	txHash := []byte{}
-	maxRetries := 1000
-	retryInterval := 10 * time.Second
-
-	c.logger.Debug("Waiting for tx inclusion", "blob_hash", h.Hex())
-
-	// Scan the mempool every 'retryInterval' until 'maxRetries' is reached or the tx is not found in the mempool
-	// Scanning the pool gives us the tx hash
-	for i := 0; i < maxRetries; i++ {
-		txns, err := c.trpc.UnconfirmedTxs(ctx, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		found := false
-		for _, tx := range txns.Txs {
-			blobtx, isBlob := types.UnmarshalBlobTx(tx)
-			if !isBlob {
-				c.logger.Info("waitForTxInclusion: discovered tx is not a blob")
-				continue
-			}
-			if len(blobtx.Blobs) == 0 {
-				return nil, fmt.Errorf("waitForTxInclusion: discovered tx has no blobs")
-			}
-			// Check if the data hash of the tx matches the hash of the data we submitted
-			if crypto.Keccak256Hash(blobtx.Blobs[0].Data) == h {
-				txHash = tx.Hash()
-				c.logger.Debug("Tx found in mempool", "tx", h.Hex())
-				found = true
-				break // if the tx is found in the mempool, break the inner loop as it is not included in a block yet
-			}
-		}
-
-		if !found {
-			break // if the tx is not found in the mempool, break the outer loop as it is already included in a block
-		}
-
-		time.Sleep(retryInterval)
-	}
-
-	if len(txHash) == 0 {
-		return nil, fmt.Errorf("waitForTxInclusion: tx not found after max retries:  %v", maxRetries)
-	}
-
-	// Get the tx with block inclusion info
-	for i := 0; i < maxRetries; i++ {
-		time.Sleep(retryInterval)
-
-		tx, err := c.trpc.Tx(ctx, txHash, true)
-		if err != nil {
-			// Sometimes the tx is not in the mempool, but not found in the block yet
-			// We need to wait for it to be included in a block
-			if strings.Contains(err.Error(), "not found") {
-				continue
-			} else {
-				return nil, err
-			}
-		}
-		if tx.Height == 0 {
-			c.logger.Debug("Tx found but height is 0, retrying...", "tx", tx.Hash, "height", tx.Height, "index", tx.Index)
-			time.Sleep(retryInterval)
-			continue
-		}
-		c.logger.Debug("Tx found and included in a block", "tx", tx.Hash, "height", tx.Height, "index", tx.Index)
-		return tx, nil
-	}
-
-	return nil, fmt.Errorf("waitForTxInclusion: tx not found after max retries:  %v", maxRetries)
-}
-
 // PostData submits a new transaction with the provided data to the Celestia node.
 func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
-	tx := &ctypes.ResultTx{}
 	response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
 	if err != nil {
-		if strings.Contains(err.Error(), "timed out waiting for tx to be included in a block") {
-			tx, err = c.waitForTxInclusion(ctx, crypto.Keccak256Hash(blobs[0].Data))
-			if err != nil {
-				return nil, fmt.Errorf("submitBlob: failed to wait for tx inclusion: %w", err)
-			}
-			if tx == nil {
-				return nil, fmt.Errorf("submitBlob: failed to wait for tx inclusion: %w", err)
-			}
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 
-	var txHash []byte
-	var txHeight int64
-
-	if response != nil {
-		txHash, err = hex.DecodeString(response.TxHash)
-		if err != nil {
-			return nil, err
-		}
-		txHeight = response.Height
-	} else {
-		txHash = tx.Hash
-		txHeight = tx.Height
+	txHash, err := hex.DecodeString(response.TxHash)
+	if err != nil {
+		return nil, err
 	}
+
+	// Delay here before getting the block to ensure the tx is included
+	time.Sleep(5 * time.Second)
 
 	// Get the block that contains the tx
-	blockRes, err := c.trpc.Block(context.Background(), &txHeight)
+	pointer, err := c.GetPointer(common.BytesToHash(txHash))
 	if err != nil {
-		return nil, fmt.Errorf("submitBlob: failed to get celestia block: %w", err)
-	}
-
-	// Get the blob share range inside the block
-	shareRange, err := square.BlobShareRange(blockRes.Block.Data.Txs.ToSliceOfBytes(), int(tx.Index), 0, blockRes.Block.Header.Version.App)
-	if err != nil {
-		return nil, fmt.Errorf("submitBlob: failed to get celestia share range: %w", err)
-	}
-
-	pointer := &CelestiaPointer{
-		Height:     uint64(txHeight),
-		Commitment: common.BytesToHash(blobs[0].Commitment),
-		ShareStart: uint64(shareRange.Start),
-		ShareLen:   uint64(shareRange.End - shareRange.Start),
-		TxHash:     common.BytesToHash(txHash),
+		return nil, err
 	}
 
 	return pointer, err
 }
 
-func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error) {
+func (c *CelestiaClient) GetProof(pointer *CelestiaPointer, startBlock uint64, endBlock uint64, proofNonce big.Int) (*CelestiaProof, error) {
 	ctx := context.Background()
 
 	blockHeight := int64(pointer.Height)
@@ -320,22 +220,13 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 		return nil, err
 	}
 
-	// New gRPC query client
-	queryClient := blobstreamtypes.NewQueryClient(c.grcp)
-
-	// Get the data commitment range for the block height
-	resp, err := queryClient.DataCommitmentRangeForHeight(ctx, &blobstreamtypes.QueryDataCommitmentRangeForHeightRequest{Height: uint64(blockHeight)})
-	if err != nil {
-		return nil, err
-	}
-
 	// Get the data root inclusion proof
-	dcProof, err := c.trpc.DataRootInclusionProof(ctx, uint64(blockHeight), resp.DataCommitment.BeginBlock, resp.DataCommitment.EndBlock)
+	dcProof, err := c.trpc.DataRootInclusionProof(ctx, uint64(blockHeight), startBlock, endBlock)
 	if err != nil {
 		return nil, err
 	}
 
-	tuple := daOracleContract.DataRootTuple{
+	tuple := blobstreamXContract.DataRootTuple{
 		Height:   big.NewInt(blockHeight),
 		DataRoot: *(*[32]byte)(blockRes.Block.DataHash),
 	}
@@ -351,7 +242,7 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 	}
 
 	proof := &CelestiaProof{
-		Nonce:        big.NewInt(int64(resp.DataCommitment.Nonce)),
+		Nonce:        &proofNonce,
 		Tuple:        &tuple,
 		WrappedProof: &wrappedProof,
 	}
@@ -359,28 +250,67 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer) (*CelestiaProof, err
 	return proof, nil
 }
 
-func (c *CelestiaClient) GetShares(pointer *CelestiaPointer) ([]shares.Share, error) {
+// GetPointer returns the pointer to the Celestia header that contains the tx with the given hash
+func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error) {
+	tx, err := c.trpc.Tx(context.Background(), txHash.Bytes(), true)
+	if err != nil {
+		return nil, err
+	}
+	// Get the block that contains the tx
+	blockRes, err := c.trpc.Block(context.Background(), &tx.Height)
+	if err != nil {
+		return nil, err
+	}
+	// Get the blob share range inside the block, using square instead
+	version := blockRes.Block.Header.Version.App
+	maxSquareSize := appconsts.SquareSizeUpperBound(version)
+	subtreeRootThreshold := appconsts.SubtreeRootThreshold(version)
+	blobShareRange, err := gosquare.BlobShareRange(blockRes.Block.Txs.ToSliceOfBytes(), int(tx.Index), int(0), maxSquareSize, subtreeRootThreshold)
+	if err != nil {
+		return nil, err
+	}
+	return &CelestiaPointer{
+		Height:     uint64(tx.Height),
+		Commitment: common.BytesToHash(blockRes.Block.DataHash),
+		ShareStart: uint64(blobShareRange.Start),
+		ShareLen:   uint64(blobShareRange.End - blobShareRange.Start),
+		TxHash:     txHash,
+	}, nil
+}
+
+func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error) {
 	ctx := context.Background()
 
 	// 1. Namespace
 	ns, err := share.NewBlobNamespaceV0([]byte(c.Namespace()))
 	if err != nil {
-		return nil, fmt.Errorf("GetBundle: failed to get namespace: %w", err)
+		return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
 	}
 
 	// 0. Get the header
 	h, err := c.client.Header.GetByHeight(ctx, pointer.Height)
 	if err != nil {
-		return nil, fmt.Errorf("GetBundle: failed to get header: %w", err)
+		return nil, fmt.Errorf("GetShares: failed to get header: %d %w", pointer.Height, err)
 	}
 
 	// 3. Get the shares
 	s, err := c.client.Share.GetSharesByNamespace(ctx, h, ns)
 	if err != nil {
-		return nil, fmt.Errorf("GetBundle: failed to get shares: %w", err)
+		return nil, fmt.Errorf("GetShares: failed to get shares: %w", err)
 	}
 
 	return utils.NSSharesToShares(s), nil
+}
+
+func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error) {
+	ctx := context.Background()
+
+	proof, err := c.trpc.ProveShares(ctx, pointer.Height, pointer.ShareStart, pointer.ShareStart+pointer.ShareLen)
+	if err != nil {
+		return nil, err
+	}
+
+	return utils.BytesToShares(proof.Data)
 }
 
 func (c *CelestiaClient) GetSharesProof(celPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
@@ -448,13 +378,13 @@ func (c *celestiaMock) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
 }
 
 // returns a mock proof, cannot be used for verification
-func (c *celestiaMock) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error) {
+func (c *celestiaMock) GetProof(pointer *CelestiaPointer, startBlock uint64, endBlock uint64, proofNonce big.Int) (*CelestiaProof, error) {
 	if !c.fakeProof {
 		return nil, fmt.Errorf("failed")
 	}
 	return &CelestiaProof{
 		Nonce: big.NewInt(0),
-		Tuple: &daOracleContract.DataRootTuple{
+		Tuple: &blobstreamXContract.DataRootTuple{
 			Height:   new(big.Int).SetUint64(pointer.Height),
 			DataRoot: pointer.Commitment,
 		},
@@ -466,10 +396,18 @@ func (c *celestiaMock) GetProof(pointer *CelestiaPointer) (*CelestiaProof, error
 	}, nil
 }
 
-func (c *celestiaMock) GetShares(pointer *CelestiaPointer) ([]shares.Share, error) {
+func (c *celestiaMock) GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error) {
 	return nil, nil
 }
 
 func (c *celestiaMock) GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
+	return nil, nil
+}
+
+func (c *celestiaMock) GetPointer(txHash common.Hash) (*CelestiaPointer, error) {
+	return c.pointers[txHash], nil
+}
+
+func (c *celestiaMock) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error) {
 	return nil, nil
 }

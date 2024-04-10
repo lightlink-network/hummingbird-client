@@ -6,7 +6,9 @@ import (
 	"hummingbird/config"
 	"hummingbird/defender"
 	"hummingbird/node"
+	blobstreamx "hummingbird/node/contracts/BlobstreamX.sol"
 	"hummingbird/utils"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -23,9 +25,10 @@ func init() {
 var DefenderProveDaCmd = &cobra.Command{
 	Use:   "prove-da",
 	Short: "prove-da will prove a data availability batch",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.MinimumNArgs(2),
 	ArgAliases: []string{
 		"block",
+		"pointerIndex",
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
@@ -40,7 +43,13 @@ var DefenderProveDaCmd = &cobra.Command{
 		})
 
 		blockHash := common.HexToHash(args[0])
-		proof, err := d.GetDAProof(blockHash)
+		pointerIndex, err := strconv.Atoi(args[1])
+		if err != nil {
+			logger.Error("Failed to parse pointer index", "err", err)
+			utils.NoErr(err)
+		}
+
+		proof, err := d.GetDAProof(blockHash, uint8(pointerIndex))
 		if err != nil {
 			logger.Error("Failed to prove data availability", "err", err)
 			return
@@ -53,14 +62,14 @@ var DefenderProveDaCmd = &cobra.Command{
 			return
 		}
 
-		wrappedProof, err := rlp.EncodeToBytes(proof.WrappedProof)
+		wrappedProof, err := rlp.EncodeToBytes(proof.Proof)
 		utils.NoErr(err)
 
 		fmt.Println(" ")
 		fmt.Println("Proof:")
-		fmt.Println("	Nonce:", proof.Nonce)
-		fmt.Println("	Tuple.Height:", proof.Tuple.Height)
-		fmt.Println("	Tuple.DataRoot:", common.Hash(proof.Tuple.DataRoot).Hex())
+		fmt.Println("	Nonce:", proof.RootNonce)
+		fmt.Println("	Tuple.Height:", proof.DataRootTuple.Height)
+		fmt.Println("	Tuple.DataRoot:", common.Hash(proof.DataRootTuple.DataRoot).Hex())
 		fmt.Println("	WrappedProof:", hexutil.Encode(wrappedProof))
 		fmt.Println(" ")
 
@@ -69,7 +78,7 @@ var DefenderProveDaCmd = &cobra.Command{
 		}
 
 		// Verify the proof against the L1 rollup contract.
-		verified, err := n.Ethereum.DAVerify(proof)
+		verified, err := n.Ethereum.DAVerify(proof.RootNonce, blobstreamx.DataRootTuple(proof.DataRootTuple), blobstreamx.BinaryMerkleProof(proof.Proof))
 		if err != nil {
 			logger.Error("Failed to verify proof", "err", err)
 			return

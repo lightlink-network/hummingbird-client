@@ -6,6 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func (d *Defender) InfoDA(block common.Hash) (contracts.ChallengeDaInfo, error) {
-	return d.Ethereum.GetDataRootInclusionChallenge(block)
+func (d *Defender) InfoDA(block common.Hash, pointer uint8) (contracts.ChallengeDaInfo, error) {
+	return d.Ethereum.GetDataRootInclusionChallenge(block, pointer)
 }

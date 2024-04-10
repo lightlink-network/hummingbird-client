@@ -15,8 +15,8 @@ import (
 var ChallengerChallengedaCmd = &cobra.Command{
 	Use:        "challenge-da",
 	Short:      "challengeda will create a challenge to a blocks dataroot inclusion on celestia",
-	ArgAliases: []string{"block"},
-	Args:       cobra.MinimumNArgs(1),
+	ArgAliases: []string{"block", "pointerIndex"},
+	Args:       cobra.MinimumNArgs(2),
 
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
@@ -43,7 +43,13 @@ var ChallengerChallengedaCmd = &cobra.Command{
 			panic(err)
 		}
 
-		tx, blockHash, err := c.ChallengeDA(blockIndex)
+		pointerIndex, err := strconv.Atoi(args[1])
+		if err != nil {
+			logger.Error("Failed to parse pointer index", "err", err)
+			panic(err)
+		}
+
+		tx, blockHash, err := c.ChallengeDA(blockIndex, uint8(pointerIndex))
 		if err != nil {
 			logger.Error("Failed to challenge data availability", "err", err)
 			panic(err)

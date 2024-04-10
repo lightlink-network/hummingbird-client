@@ -34,12 +34,11 @@ var RollupInfoCmd = &cobra.Command{
 		utils.NoErr(err)
 
 		r := rollup.NewRollup(n, &rollup.Opts{
-			L1PollDelay:           time.Duration(cfg.Rollup.L1PollDelay) * time.Millisecond,
-			L2PollDelay:           time.Duration(cfg.Rollup.L2PollDelay) * time.Millisecond,
-			BundleSize:            cfg.Rollup.BundleSize,
-			StoreCelestiaPointers: cfg.Rollup.StoreCelestiaPointers,
-			StoreHeaders:          cfg.Rollup.StoreHeaders,
-			Logger:                logger.With("ctx", "Rollup"),
+			L1PollDelay: time.Duration(cfg.Rollup.L1PollDelay) * time.Millisecond,
+			L2PollDelay: time.Duration(cfg.Rollup.L2PollDelay) * time.Millisecond,
+			BundleSize:  cfg.Rollup.BundleSize,
+			Store:       cfg.Rollup.Store,
+			Logger:      logger.With("ctx", "Rollup"),
 		})
 
 		var useHash bool

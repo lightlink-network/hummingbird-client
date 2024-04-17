@@ -58,9 +58,10 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		Namespace:               cfg.Celestia.Namespace,
 		Logger:                  logger.With("ctx", "celestia"),
 		GasPrice:                cfg.Celestia.GasPrice,
-		GasPriceIncreasePercent: big.NewInt(int64(cfg.Ethereum.GasPriceIncreasePercent)),
+		GasPriceIncreasePercent: big.NewInt(int64(cfg.Celestia.GasPriceIncreasePercent)),
 		GasAPI:                  cfg.Celestia.GasAPI,
 		Retries:                 cfg.Celestia.Retries,
+		RetryDelay:              time.Duration(cfg.Celestia.RetryDelay) * time.Millisecond,
 	})
 	if err != nil {
 		return nil, err

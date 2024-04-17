@@ -71,6 +71,7 @@ type CelestiaClientOpts struct {
 	GasPriceIncreasePercent *big.Int
 	GasAPI                  string
 	Retries                 int
+	RetryDelay              time.Duration
 }
 
 type CelestiaClient struct {
@@ -83,6 +84,7 @@ type CelestiaClient struct {
 	gasPriceIncreasePercent *big.Int
 	gasAPI                  string
 	retries                 int
+	retryDelay              time.Duration
 }
 
 func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
@@ -120,6 +122,7 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		gasPriceIncreasePercent: opts.GasPriceIncreasePercent,
 		gasAPI:                  opts.GasAPI,
 		retries:                 opts.Retries,
+		retryDelay:              opts.RetryDelay,
 	}, nil
 }
 
@@ -175,12 +178,12 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 		gasPrice *= 1.2
 		fee = int64(gasPrice * float64(gasLimit))
 
-		c.logger.Warn("Failed to submit blob, retrying", "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
+		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
 
 		i++
 
 		// Delay between publishing bundles to Celestia to mitigate 'incorrect account sequence' errors
-		time.Sleep(30 * time.Second)
+		time.Sleep(c.retryDelay)
 	}
 
 	if err != nil {

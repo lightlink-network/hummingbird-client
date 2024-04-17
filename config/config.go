@@ -16,6 +16,7 @@ type Config struct {
 		GasPriceIncreasePercent int     `mapstructure:"gasPriceIncreasePercent"`
 		GasAPI                  string  `mapstructure:"gasAPI"`
 		Retries                 int     `mapstructure:"retries"`
+		RetryDelay              int     `mapstructure:"retryDelay"`
 	} `mapstructure:"celestia"`
 	Ethereum struct {
 		HTTPEndpoint            string `mapstructure:"httpEndpoint"`

@@ -61,26 +61,28 @@ type Celestia interface {
 }
 
 type CelestiaClientOpts struct {
-	Endpoint      string
-	Token         string
-	TendermintRPC string
-	GRPC          string
-	Namespace     string
-	Logger        *slog.Logger
-	GasPrice      float64
-	GasAPI        string
-	Retries       int
+	Endpoint                string
+	Token                   string
+	TendermintRPC           string
+	GRPC                    string
+	Namespace               string
+	Logger                  *slog.Logger
+	GasPrice                float64
+	GasPriceIncreasePercent *big.Int
+	GasAPI                  string
+	Retries                 int
 }
 
 type CelestiaClient struct {
-	namespace string
-	client    *client.Client
-	trpc      *thttp.HTTP
-	grcp      *grpc.ClientConn
-	logger    *slog.Logger
-	gasPrice  float64
-	gasAPI    string
-	retries   int
+	namespace               string
+	client                  *client.Client
+	trpc                    *thttp.HTTP
+	grcp                    *grpc.ClientConn
+	logger                  *slog.Logger
+	gasPrice                float64
+	gasPriceIncreasePercent *big.Int
+	gasAPI                  string
+	retries                 int
 }
 
 func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
@@ -109,14 +111,15 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 
 	opts.Logger.Info("Connected to Celestia")
 	return &CelestiaClient{
-		namespace: opts.Namespace,
-		client:    c,
-		trpc:      trpc,
-		grcp:      grcp,
-		logger:    opts.Logger,
-		gasPrice:  opts.GasPrice,
-		gasAPI:    opts.GasAPI,
-		retries:   opts.Retries,
+		namespace:               opts.Namespace,
+		client:                  c,
+		trpc:                    trpc,
+		grcp:                    grcp,
+		logger:                  opts.Logger,
+		gasPrice:                opts.GasPrice,
+		gasPriceIncreasePercent: opts.GasPriceIncreasePercent,
+		gasAPI:                  opts.GasAPI,
+		retries:                 opts.Retries,
 	}, nil
 }
 
@@ -145,6 +148,12 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 
 	// gas price is defined by each node operator. 0.003 is a good default to be accepted
 	gasPrice := c.GasPrice()
+
+	if c.gasPriceIncreasePercent != nil {
+		apiPrice := gasPrice
+		gasPrice *= 1 + float64(c.gasPriceIncreasePercent.Int64())/100
+		c.logger.Info("Gas price increased", "percent", c.gasPriceIncreasePercent, "old_gas_price", apiPrice, "new_gas_price", gasPrice)
+	}
 
 	// estimate gas limit (maximum gas used by the tx)
 	gasLimit := blobtypes.DefaultEstimateGas([]uint32{uint32(b.Size())})

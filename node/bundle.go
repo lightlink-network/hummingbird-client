@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/tendermint/tendermint/crypto/merkle"
 )
 
 // TxSizeLimit is the maximum size of a Celestia tx in bytes
@@ -239,6 +240,16 @@ func (b *Bundle) FindTxShares(hash common.Hash, namespace string) (*SharePointer
 
 	// TODO: this code repeats the same logic as FindHeaderShares, we should refactor it
 	// to avoid code duplication. `FindBytesShares` ?
+}
+
+func (b *Bundle) ShareRoot(namespace string) []byte {
+	s, _ := b.Shares(namespace)
+	shareBytes := make([][]byte, len(s))
+	for i, share := range s {
+		shareBytes[i] = share.ToBytes()
+	}
+
+	return merkle.HashFromByteSlices(shareBytes)
 }
 
 func FindHeaderSharesInBundles(bundles []*Bundle, hash common.Hash, namespace string) (*SharePointer, uint8, error) {

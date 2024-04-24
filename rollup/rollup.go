@@ -323,9 +323,9 @@ func (r *Rollup) GetBlockByHash(hash common.Hash) (*Block, error) {
 			ShareRoot: header.CelestiaPointers[i].ShareRoot,
 		}
 
-		shares, err := r.Celestia.GetSharesByPointer(pointer)
+		shares, err := r.Celestia.GetSharesByNamespace(pointer)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get shares by pointer: %w", err)
+			return nil, fmt.Errorf("failed to get shares by namespace: %w", err)
 		}
 
 		bundle, err := node.NewBundleFromShares(shares)

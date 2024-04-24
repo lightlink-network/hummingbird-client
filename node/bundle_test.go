@@ -14,6 +14,7 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
+	"github.com/tendermint/tendermint/crypto/merkle"
 )
 
 func randAddr() common.Address {
@@ -158,4 +159,21 @@ func sharesPointerToTx(pointer *SharePointer, s []shares.Share) (*ethtypes.Trans
 	tx := &ethtypes.Transaction{}
 	err := rlp.DecodeBytes(data, &tx)
 	return tx, err
+}
+
+func TestBundleShareRoot(t *testing.T) {
+	b := newRandomBundle(5, true)
+	root := b.BlockRoot()
+	shareRoot := b.ShareRoot("test")
+	assert.NotEqual(t, root, shareRoot)
+
+	sp, err := b.FindHeaderShares(b.Blocks[1].Header().Hash(), "test")
+	assert.NoError(t, err)
+
+	_, proofs := merkle.ProofsFromByteSlices(sp.preimages())
+	assert.NotEmpty(t, proofs)
+	for i, p := range proofs {
+		t.Logf("Proof %d: %x", i, p)
+		assert.NoError(t, p.Verify(shareRoot, sp.preimages()[i]), "proof %d failed", i)
+	}
 }

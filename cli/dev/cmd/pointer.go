@@ -51,6 +51,9 @@ var PointerCmd = &cobra.Command{
 			panicErr(err, "failed to decode bundle")
 
 			log.Info("✔️ Data Pointer Verified", "bundleSize", b.Size())
+
+			// set the share root
+			dataPointer.ShareRoot = b.BlockRoot()
 		}
 
 		// 3. print the data pointer

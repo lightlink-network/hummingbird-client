@@ -77,8 +77,7 @@ var RollupNextCmd = &cobra.Command{
 		for i, p := range b.CanonicalStateChainHeader.CelestiaPointers {
 			fmt.Printf("	Celestia Pointer #%d:\n", i)
 			fmt.Println("		Height:", p.Height)
-			fmt.Println("		Share Start:", p.ShareStart)
-			fmt.Println("		Share Len:", p.ShareLen)
+			fmt.Println("		Share Root:", common.BytesToHash(p.ShareRoot[:]).Hex())
 		}
 		fmt.Println(" ")
 

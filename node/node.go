@@ -108,9 +108,8 @@ func (n *Node) GetDAPointer(hash common.Hash) ([]*CelestiaPointer, error) {
 	for i := 0; i < len(header.CelestiaPointers); i++ {
 
 		pointers = append(pointers, &CelestiaPointer{
-			Height:     header.CelestiaPointers[i].Height,
-			ShareStart: header.CelestiaPointers[i].ShareStart.Uint64(),
-			ShareLen:   uint64(header.CelestiaPointers[i].ShareLen),
+			Height:    header.CelestiaPointers[i].Height,
+			ShareRoot: header.CelestiaPointers[i].ShareRoot,
 		})
 	}
 
@@ -126,9 +125,8 @@ func (n *Node) FetchRollupBlock(rblock common.Hash) (*canonicalstatechain.Canoni
 	bundles := make([]*Bundle, 0)
 	for i := 0; i < len(header.CelestiaPointers); i++ {
 		pointer := &CelestiaPointer{
-			Height:     header.CelestiaPointers[i].Height,
-			ShareStart: header.CelestiaPointers[i].ShareStart.Uint64(),
-			ShareLen:   uint64(header.CelestiaPointers[i].ShareLen),
+			Height:    header.CelestiaPointers[i].Height,
+			ShareRoot: header.CelestiaPointers[i].ShareRoot,
 		}
 
 		shares, err := n.Celestia.GetSharesByNamespace(pointer)

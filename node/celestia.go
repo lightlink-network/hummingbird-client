@@ -30,13 +30,14 @@ import (
 
 // CelestiaPointer is a pointer to a Celestia header
 type CelestiaPointer struct {
-	Height     uint64
-	ShareStart uint64
-	ShareLen   uint64
+	Height    uint64
+	ShareRoot common.Hash
 
 	// Extra data Only present if the pointer is stored in the local database.
 	Commitment common.Hash
 	TxHash     common.Hash
+	ShareStart uint64
+	ShareLen   uint64
 }
 
 type CelestiaProof struct {
@@ -53,6 +54,8 @@ type Celestia interface {
 	GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error)
 	GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error)
 	GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error)
+	// GetPointer returns the pointer to the Celestia header that contains the tx with the given hash
+	// This method does not set the ShareRoot field of the CelestiaPointer.
 	GetPointer(txHash common.Hash) (*CelestiaPointer, error)
 }
 
@@ -167,6 +170,9 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 	if err != nil {
 		return nil, err
 	}
+
+	// set the share root
+	pointer.ShareRoot = common.BytesToHash(blocks.ShareRoot(c.Namespace()))
 
 	return pointer, nil
 }
@@ -368,6 +374,7 @@ func (c *celestiaMock) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
 		Height:     c.height,
 		ShareStart: 0,
 		ShareLen:   uint64(len(blocks.Blocks)),
+		ShareRoot:  common.Hash(blocks.ShareRoot(c.namespace)),
 		TxHash:     hash,
 	}
 

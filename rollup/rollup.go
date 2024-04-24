@@ -5,7 +5,6 @@ import (
 	"hummingbird/node"
 	"hummingbird/utils"
 	"log/slog"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -122,9 +121,8 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 		}
 		r.Opts.Logger.Debug("Published bundle to Celestia", "bundle", i, "bundle_size", bundle.Size(), "celestia_tx", pointer.TxHash.Hex())
 		pointers = append(pointers, canonicalStateChainContract.CanonicalStateChainCelestiaPointer{
-			Height:     pointer.Height,
-			ShareStart: big.NewInt(int64(pointer.ShareStart)),
-			ShareLen:   uint16(pointer.ShareLen),
+			Height:    pointer.Height,
+			ShareRoot: pointer.ShareRoot,
 		})
 	}
 
@@ -321,9 +319,8 @@ func (r *Rollup) GetBlockByHash(hash common.Hash) (*Block, error) {
 	bundles := make([]*node.Bundle, 0)
 	for i := 0; i < len(header.CelestiaPointers); i++ {
 		pointer := &node.CelestiaPointer{
-			Height:     header.CelestiaPointers[i].Height,
-			ShareStart: header.CelestiaPointers[i].ShareStart.Uint64(),
-			ShareLen:   uint64(header.CelestiaPointers[i].ShareLen),
+			Height:    header.CelestiaPointers[i].Height,
+			ShareRoot: header.CelestiaPointers[i].ShareRoot,
 		}
 
 		shares, err := r.Celestia.GetSharesByPointer(pointer)

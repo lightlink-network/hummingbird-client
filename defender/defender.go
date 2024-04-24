@@ -354,9 +354,8 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 
 	// Get proof the shares are in the bundle
 	shareProof, err := d.Celestia.GetSharesProof(&node.CelestiaPointer{
-		Height:     rheader.CelestiaPointers[pointerIndex].Height,
-		ShareStart: rheader.CelestiaPointers[pointerIndex].ShareStart.Uint64(),
-		ShareLen:   uint64(rheader.CelestiaPointers[pointerIndex].ShareLen),
+		Height:    rheader.CelestiaPointers[pointerIndex].Height,
+		ShareRoot: rheader.CelestiaPointers[pointerIndex].ShareRoot,
 	}, sharePointer)
 	if err != nil {
 		return nil, fmt.Errorf("error getting share proof: %w", err)
@@ -391,7 +390,7 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 
 	// Provide the shares
 	if !skipShares && !provided {
-		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, attestationProof)
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, attestationProof, sharePointer.Proofs())
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}
@@ -432,9 +431,8 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 
 	// Get proof the shares are in the bundle
 	shareProof, err := d.Celestia.GetSharesProof(&node.CelestiaPointer{
-		Height:     rheader.CelestiaPointers[pointerIndex].Height,
-		ShareStart: rheader.CelestiaPointers[pointerIndex].ShareStart.Uint64(),
-		ShareLen:   uint64(rheader.CelestiaPointers[pointerIndex].ShareLen),
+		Height:    rheader.CelestiaPointers[pointerIndex].Height,
+		ShareRoot: rheader.CelestiaPointers[pointerIndex].ShareRoot,
 	}, sharePointer)
 	if err != nil {
 		return nil, fmt.Errorf("error getting share proof: %w", err)
@@ -466,7 +464,7 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 
 	// Provide the shares
 	if !skipShares {
-		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, attestationProof)
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, attestationProof, sharePointer.Proofs())
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}

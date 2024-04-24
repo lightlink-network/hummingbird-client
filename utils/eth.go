@@ -18,7 +18,10 @@ func IsContract(client *ethclient.Client, address common.Address) (bool, error) 
 }
 
 func HashWithoutExtraData(block *types.Block) common.Hash {
-	header := block.Header()
+	return HashHeaderWithoutExtraData(block.Header())
+}
+
+func HashHeaderWithoutExtraData(header *types.Header) common.Hash {
 	header.Extra = common.Hex2Bytes("0x")
 	return header.Hash()
 }

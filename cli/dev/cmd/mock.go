@@ -7,6 +7,7 @@ import (
 	chainoracle "hummingbird/node/contracts/ChainOracle.sol"
 	chainoracleContract "hummingbird/node/contracts/ChainOracle.sol"
 	"hummingbird/rollup"
+	"hummingbird/utils"
 	"math/big"
 	"math/rand"
 	"strconv"
@@ -73,8 +74,9 @@ var MockCmd = &cobra.Command{
 
 			// select a random header from the bundle
 			header := bundle.Blocks[rand.Intn(len(bundle.Blocks))].Header()
+			headerHash := utils.HashHeaderWithoutExtraData(header)
 
-			sharePointer, err := bundle.FindHeaderShares(header.Hash(), r.Namespace())
+			sharePointer, err := bundle.FindHeaderShares(headerHash, r.Namespace())
 			panicErr(err, "failed to find header shares")
 
 			shareProof, err := r.Celestia.GetSharesProof(rblock.GetCelestiaPointers()[pointerIndex], sharePointer)
@@ -82,11 +84,11 @@ var MockCmd = &cobra.Command{
 
 			shareProofs, err := contracts.NewShareProof(shareProof, getAttestations(r.Node, rblock.GetCelestiaPointers()[pointerIndex]))
 			panicErr(err, "failed to get share proofs")
-			log.Info("Got share proofs", "header", header.Hash().String(), "index", i)
+			log.Info("Got share proofs", "header", headerHash.String(), "index", i)
 
 			hds = append(hds, HeaderData{
 				Header:        header,
-				HeaderHash:    header.Hash(),
+				HeaderHash:    headerHash,
 				ShareProofs:   *shareProofs,
 				Shares:        sharesToBytes(sharePointer.Shares()),
 				ShareRanges:   formatRanges(sharePointer),

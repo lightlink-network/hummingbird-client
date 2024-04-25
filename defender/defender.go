@@ -395,7 +395,7 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 
 	// Provide the shares
 	if !skipShares && !provided {
-		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, attestationProof)
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, sharePointer.Proofs())
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}
@@ -470,7 +470,7 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 
 	// Provide the shares
 	if !skipShares {
-		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, attestationProof)
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, sharePointer.Proofs())
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}

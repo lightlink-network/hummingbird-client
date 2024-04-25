@@ -276,7 +276,7 @@ func GetSharesRoot(bundles []*Bundle, namespace string) []byte {
 	return merkle.HashFromByteSlices(shares.ToBytes(ss))
 }
 
-func GetSharesProofs(sp SharePointer, bundles []*Bundle, bundleNum int, ns string) []*merkle.Proof {
+func GetSharesProofs(sp *SharePointer, bundles []*Bundle, bundleNum int, ns string) []*merkle.Proof {
 	offset := 0
 	ss := []shares.Share{}
 
@@ -284,8 +284,8 @@ func GetSharesProofs(sp SharePointer, bundles []*Bundle, bundleNum int, ns strin
 		s, _ := bundles[i].Shares(ns)
 		ss = append(ss, s...)
 
-		if bundleNum < i {
-			offset += len(s)
+		if i < bundleNum {
+			offset = len(ss)
 		}
 	}
 	_, proofs := merkle.ProofsFromByteSlices(shares.ToBytes(ss))

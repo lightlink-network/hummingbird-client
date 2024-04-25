@@ -1,11 +1,9 @@
 package node
 
 import (
-	chainoracle "hummingbird/node/contracts/ChainOracle.sol"
 	"hummingbird/utils"
 
 	"github.com/celestiaorg/celestia-app/pkg/shares"
-	"github.com/tendermint/tendermint/crypto/merkle"
 )
 
 type ShareRange struct {
@@ -73,22 +71,4 @@ func (s *SharePointer) Shares() []shares.Share {
 
 func (s *SharePointer) AllShares() []shares.Share {
 	return s.shares
-}
-
-func (s *SharePointer) preimages() [][]byte {
-	preimages := make([][]byte, len(s.AllShares()))
-	for i, sp := range s.AllShares() {
-		preimages[i] = sp.ToBytes()
-	}
-
-	return preimages
-}
-
-func (s *SharePointer) Root() []byte {
-	return merkle.HashFromByteSlices(s.preimages())
-}
-
-func (s *SharePointer) Proofs() []chainoracle.BinaryMerkleProof {
-	_, proof := merkle.ProofsFromByteSlices(s.preimages())
-	return utils.ToBinaryMerkleProof(proof[s.StartShare : s.EndShare()+1])
 }

@@ -22,3 +22,8 @@ func HashWithoutExtraData(block *types.Block) common.Hash {
 	header.Extra = common.Hex2Bytes("0x")
 	return header.Hash()
 }
+
+func HashHeaderWithoutExtraData(header *types.Header) common.Hash {
+	header.Extra = common.Hex2Bytes("0x")
+	return header.Hash()
+}

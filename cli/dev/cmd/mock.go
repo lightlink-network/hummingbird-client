@@ -9,12 +9,10 @@ import (
 	"hummingbird/rollup"
 	"hummingbird/utils"
 	"math/big"
-	"math/rand"
 	"strconv"
 
 	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +23,7 @@ type MockData struct {
 }
 
 type HeaderData struct {
-	Header        *types.Header                       `json:"header"`
+	Header        *utils.L2HeaderJson                 `json:"header"`
 	HeaderHash    common.Hash                         `json:"headerHash"`
 	ShareProofs   chainoracle.SharesProof             `json:"shareProofs"`
 	ShareRanges   []chainoracle.ChainOracleShareRange `json:"shareRanges"`
@@ -38,18 +36,24 @@ func init() {
 }
 
 var MockCmd = &cobra.Command{
-	Use:   "mock [rblock] [num]",
+	Use:   "mock [rblock] [pointer] [block_index]",
 	Short: "mock will output mock data for testing using real blocks",
 	Long:  "mock will output mock data for testing using real blocks for a given rblock hash. `num` is the number of headers proofs to generate.",
-	Args:  cobra.MinimumNArgs(2),
+	Args:  cobra.MinimumNArgs(3),
 	ArgAliases: []string{
 		"rblock",
-		"num",
+		"pointer",
+		"block_index",
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// 0. parse args
 		rblockHash := common.HexToHash(args[0])
-		proofsNum, _ := strconv.Atoi(args[1])
+		pointerIndex, _ := strconv.Atoi(args[1])
+		blockNum, _ := strconv.Atoi(args[2])
+
+		if blockNum < 1 {
+			panic("block index must be greater than 0")
+		}
 
 		// 1. make node
 		n, log, err := makeNode()
@@ -63,39 +67,10 @@ var MockCmd = &cobra.Command{
 		panicErr(err, "failed to get rollup block")
 		log.Info("Got rblock", "hash", rblockHash.String(), "bundles", len(rblock.Bundles))
 
-		// 3. Fetch the items
-		bundles := rblock.Bundles
-		hds := make([]HeaderData, 0)
-		log.Info("Generating mock data", "num", proofsNum)
-		for i := 0; i < proofsNum; i++ {
-			// select a random bundle from the rblock
-			pointerIndex := rand.Intn(len(bundles))
-			bundle := bundles[pointerIndex]
-
-			// select a random header from the bundle
-			header := bundle.Blocks[rand.Intn(len(bundle.Blocks))].Header()
-			headerHash := utils.HashHeaderWithoutExtraData(header)
-
-			sharePointer, err := bundle.FindHeaderShares(headerHash, r.Namespace())
-			panicErr(err, "failed to find header shares")
-
-			shareProof, err := r.Celestia.GetSharesProof(rblock.GetCelestiaPointers()[pointerIndex], sharePointer)
-			panicErr(err, "failed to get share proof")
-
-			shareProofs, err := contracts.NewShareProof(shareProof, getAttestations(r.Node, rblock.GetCelestiaPointers()[pointerIndex]))
-			panicErr(err, "failed to get share proofs")
-			log.Info("Got share proofs", "header", headerHash.String(), "index", i)
-
-			blockProofs := node.GetSharesProofs(sharePointer, bundles, pointerIndex, r.Namespace())
-
-			hds = append(hds, HeaderData{
-				Header:        header,
-				HeaderHash:    headerHash,
-				ShareProofs:   *shareProofs,
-				Shares:        sharesToBytes(sharePointer.Shares()),
-				ShareRanges:   formatRanges(sharePointer),
-				PointerProofs: utils.ToBinaryMerkleProof(blockProofs),
-			})
+		// 3. Fetch the Header and the previous header from the bundle
+		hds := []HeaderData{
+			getHeaderData(r, rblock, pointerIndex, blockNum-1),
+			getHeaderData(r, rblock, pointerIndex, blockNum),
 		}
 
 		out := &MockData{
@@ -106,6 +81,36 @@ var MockCmd = &cobra.Command{
 
 		printJSON(out)
 	},
+}
+
+func getHeaderData(r *rollup.Rollup, rblock *rollup.Block, pointerIndex int, blockNum int) HeaderData {
+	bundle := rblock.Bundles[pointerIndex]
+
+	// - Get the header
+	header := bundle.Blocks[blockNum].Header()
+	headerHash := utils.HashHeaderWithoutExtraData(header)
+
+	// - Get the share proofs
+	sharePointer, err := bundle.FindHeaderShares(headerHash, r.Namespace())
+	panicErr(err, "failed to find header shares")
+
+	shareProof, err := r.Celestia.GetSharesProof(rblock.GetCelestiaPointers()[pointerIndex], sharePointer)
+	panicErr(err, "failed to get share proof")
+
+	shareProofs, err := contracts.NewShareProof(shareProof, getAttestations(r.Node, rblock.GetCelestiaPointers()[pointerIndex]))
+	panicErr(err, "failed to get share proofs")
+
+	// - Get the block proofs
+	blockProofs := node.GetSharesProofs(sharePointer, rblock.Bundles, pointerIndex, r.Namespace())
+
+	return HeaderData{
+		Header:        utils.ToL2HeaderJson(header),
+		HeaderHash:    headerHash,
+		ShareProofs:   *shareProofs,
+		Shares:        sharesToBytes(sharePointer.Shares()),
+		ShareRanges:   formatRanges(sharePointer),
+		PointerProofs: utils.ToBinaryMerkleProof(blockProofs),
+	}
 }
 
 func getAttestations(n *node.Node, celPointer *node.CelestiaPointer) chainoracle.AttestationProof {

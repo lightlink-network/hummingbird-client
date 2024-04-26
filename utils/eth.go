@@ -67,3 +67,42 @@ func ToL2HeaderJson(header *types.Header) *L2HeaderJson {
 		Nonce:            header.Nonce[:],
 	}
 }
+
+type TxJson struct {
+	ChainID  *big.Int       `json:"chainId,omitempty"`
+	Nonce    uint64         `json:"nonce"`
+	GasPrice *big.Int       `json:"gasPrice"`
+	Gas      uint64         `json:"gas"`
+	To       common.Address `json:"to"`
+	Value    *big.Int       `json:"value"`
+	Data     []byte         `json:"data"`
+	V        uint8          `json:"v"`
+	R        *big.Int       `json:"r"`
+	S        *big.Int       `json:"s"`
+}
+
+func ToTxJson(tx *types.Transaction) *TxJson {
+	to := common.Address{}
+	if tx.To() != nil {
+		to = *tx.To()
+	}
+
+	var chainID *big.Int
+	if tx.ChainId().Uint64() != 0 {
+		chainID = tx.ChainId()
+	}
+
+	v, r, s := tx.RawSignatureValues()
+	return &TxJson{
+		ChainID:  chainID,
+		Nonce:    tx.Nonce(),
+		GasPrice: tx.GasPrice(),
+		Gas:      tx.Gas(),
+		To:       to,
+		Value:    tx.Value(),
+		Data:     tx.Data(),
+		V:        uint8(v.Uint64()),
+		R:        r,
+		S:        s,
+	}
+}

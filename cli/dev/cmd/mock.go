@@ -10,6 +10,7 @@ import (
 	"hummingbird/utils"
 	"math/big"
 	"strconv"
+	"strings"
 
 	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/ethereum/go-ethereum/common"
@@ -20,6 +21,7 @@ type MockData struct {
 	RollupHash   common.Hash                                   `json:"rollupHash"`
 	RollupHeader canonicalstatechain.CanonicalStateChainHeader `json:"rollupHeader"`
 	Headers      []HeaderData                                  `json:"headers"`
+	Transactions [][]TransactionData                           `json:"transactions"`
 }
 
 type HeaderData struct {
@@ -31,28 +33,40 @@ type HeaderData struct {
 	Shares        [][]byte                            `json:"shares"`
 }
 
+type TransactionData struct {
+	Transaction   *utils.TxJson                       `json:"transaction"`
+	Hash          common.Hash                         `json:"hash"`
+	ShareProofs   chainoracle.SharesProof             `json:"shareProofs"`
+	ShareRanges   []chainoracle.ChainOracleShareRange `json:"shareRanges"`
+	PointerProofs []chainoracle.BinaryMerkleProof     `json:"pointerProofs"`
+	Shares        [][]byte                            `json:"shares"`
+}
+
 func init() {
 	RootCmd.AddCommand(MockCmd)
 }
 
 var MockCmd = &cobra.Command{
-	Use:   "mock [rblock] [pointer] [block_index]",
-	Short: "mock will output mock data for testing using real blocks",
-	Long:  "mock will output mock data for testing using real blocks for a given rblock hash. `num` is the number of headers proofs to generate.",
-	Args:  cobra.MinimumNArgs(3),
+	Use:     "mock [rblock]:[pointer] [blocks...]",
+	Short:   "mock will output mock data for testing using real blocks",
+	Long:    "mock will output mock data for testing using real blocks. The first argument is in the form rblock_hash:pointer_index. The Remaining arguments are the indexes of the blocks you want to fetch.",
+	Example: "",
+	Args:    cobra.MinimumNArgs(3),
 	ArgAliases: []string{
-		"rblock",
-		"pointer",
-		"block_index",
+		"rblock:pointer",
+		"blocks",
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		// 0. parse args
-		rblockHash := common.HexToHash(args[0])
-		pointerIndex, _ := strconv.Atoi(args[1])
-		blockNum, _ := strconv.Atoi(args[2])
 
-		if blockNum < 1 {
-			panic("block index must be greater than 0")
+		// 0. parse args
+		rblockPointer := strings.Split(args[0], ":")
+		rblockHash := common.HexToHash(rblockPointer[0])
+		pointerIndex, _ := strconv.Atoi(rblockPointer[1])
+
+		blocks := []int{}
+		for _, block := range args[1:] {
+			blockNum, _ := strconv.Atoi(block)
+			blocks = append(blocks, blockNum)
 		}
 
 		// 1. make node
@@ -62,21 +76,35 @@ var MockCmd = &cobra.Command{
 			Logger: log.With("ctx", "Rollup"),
 		})
 
-		// 2. Get rblock and celestia pointer
+		// 2. Get rblock
 		rblock, err := r.GetBlockByHash(rblockHash)
 		panicErr(err, "failed to get rollup block")
 		log.Info("Got rblock", "hash", rblockHash.String(), "bundles", len(rblock.Bundles))
 
-		// 3. Fetch the Header and the previous header from the bundle
-		hds := []HeaderData{
-			getHeaderData(r, rblock, pointerIndex, blockNum-1),
-			getHeaderData(r, rblock, pointerIndex, blockNum),
+		// 3. Loop through the blocks and get the header and transaction data
+		hds := make([]HeaderData, len(blocks))
+		txs := make([][]TransactionData, len(blocks))
+		for i, blockNum := range blocks {
+
+			// – Fetch the blocks header data
+			hds[i] = getHeaderData(r, rblock, pointerIndex, blockNum)
+
+			// – Fetch the blocks transactions data
+			txCount := len(rblock.Bundles[pointerIndex].Blocks[blockNum].Transactions())
+			txs[i] = make([]TransactionData, txCount)
+			for txNum := 0; txNum < txCount; txNum++ {
+				txs[i][txNum] = getTransactionData(r, rblock, pointerIndex, blockNum, txNum)
+			}
+
+			log.Info("Got block", "blockNum", blockNum, "headerHash", hds[i].HeaderHash.String(), "txCount", txCount)
 		}
 
+		// 4. Output the mock data
 		out := &MockData{
 			RollupHash:   rblockHash,
 			RollupHeader: *rblock.CanonicalStateChainHeader,
 			Headers:      hds,
+			Transactions: txs,
 		}
 
 		printJSON(out)
@@ -106,6 +134,35 @@ func getHeaderData(r *rollup.Rollup, rblock *rollup.Block, pointerIndex int, blo
 	return HeaderData{
 		Header:        utils.ToL2HeaderJson(header),
 		HeaderHash:    headerHash,
+		ShareProofs:   *shareProofs,
+		Shares:        shares.ToBytes(sharePointer.Shares()),
+		ShareRanges:   formatRanges(sharePointer),
+		PointerProofs: utils.ToBinaryMerkleProof(blockProofs),
+	}
+}
+
+func getTransactionData(r *rollup.Rollup, rblock *rollup.Block, pointerIndex int, blockNum int, txNum int) TransactionData {
+	bundle := rblock.Bundles[pointerIndex]
+
+	// - Get the Transaction
+	tx := bundle.Blocks[blockNum].Transactions()[txNum]
+
+	// - Get the share proofs
+	sharePointer, err := bundle.FindTxShares(tx.Hash(), r.Namespace())
+	panicErr(err, "failed to find header shares")
+
+	shareProof, err := r.Celestia.GetSharesProof(rblock.GetCelestiaPointers()[pointerIndex], sharePointer)
+	panicErr(err, "failed to get share proof")
+
+	shareProofs, err := contracts.NewShareProof(shareProof, getAttestations(r.Node, rblock.GetCelestiaPointers()[pointerIndex]))
+	panicErr(err, "failed to get share proofs")
+
+	// - Get the block proofs
+	blockProofs := node.GetSharesProofs(sharePointer, rblock.Bundles, pointerIndex, r.Namespace())
+
+	return TransactionData{
+		Transaction:   utils.ToTxJson(tx),
+		Hash:          tx.Hash(),
 		ShareProofs:   *shareProofs,
 		Shares:        shares.ToBytes(sharePointer.Shares()),
 		ShareRanges:   formatRanges(sharePointer),

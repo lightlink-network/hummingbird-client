@@ -107,7 +107,7 @@ func getHeaderData(r *rollup.Rollup, rblock *rollup.Block, pointerIndex int, blo
 		Header:        utils.ToL2HeaderJson(header),
 		HeaderHash:    headerHash,
 		ShareProofs:   *shareProofs,
-		Shares:        sharesToBytes(sharePointer.Shares()),
+		Shares:        shares.ToBytes(sharePointer.Shares()),
 		ShareRanges:   formatRanges(sharePointer),
 		PointerProofs: utils.ToBinaryMerkleProof(blockProofs),
 	}
@@ -132,14 +132,6 @@ func getAttestations(n *node.Node, celPointer *node.CelestiaPointer) chainoracle
 			NumLeaves: celProof.WrappedProof.NumLeaves,
 		},
 	}
-}
-
-func sharesToBytes(s []shares.Share) [][]byte {
-	shareBytes := [][]byte{}
-	for _, share := range s {
-		shareBytes = append(shareBytes, share.ToBytes())
-	}
-	return shareBytes
 }
 
 func formatRanges(sp *node.SharePointer) []chainoracle.ChainOracleShareRange {

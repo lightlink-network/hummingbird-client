@@ -52,6 +52,7 @@ type Celestia interface {
 	GetProof(pointer *CelestiaPointer, startBlock uint64, endBlock uint64, proofNonce big.Int) (*CelestiaProof, error)
 	GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error)
 	GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error)
+	GetShareProof(celestiaPointer *CelestiaPointer, shareIndex uint32) (*types.ShareProof, error)
 	GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error)
 	GetPointer(txHash common.Hash) (*CelestiaPointer, error)
 }
@@ -313,6 +314,26 @@ func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.
 	return utils.BytesToShares(proof.Data)
 }
 
+func (c *CelestiaClient) GetShareProof(celestiaPointer *CelestiaPointer, shareIndex uint32) (*types.ShareProof, error) {
+	ctx := context.Background()
+
+	shareStart := celestiaPointer.ShareStart + uint64(shareIndex)
+	shareEnd := celestiaPointer.ShareStart + uint64(shareIndex+1)
+
+	// Get the shares proof
+	sharesProofs, err := c.trpc.ProveShares(ctx, celestiaPointer.Height, shareStart, shareEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify the shares proof
+	if !sharesProofs.VerifyProof() {
+		return nil, err
+	}
+
+	return &sharesProofs, nil
+}
+
 func (c *CelestiaClient) GetSharesProof(celPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
 	ctx := context.Background()
 
@@ -401,6 +422,10 @@ func (c *celestiaMock) GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.
 }
 
 func (c *celestiaMock) GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
+	return nil, nil
+}
+
+func (c *celestiaMock) GetShareProof(celestiaPointer *CelestiaPointer, shareIndex uint32) (*types.ShareProof, error) {
 	return nil, nil
 }
 

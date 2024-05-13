@@ -13,9 +13,9 @@ import (
 
 type Challenge interface {
 	GetChallengeFee() (*big.Int, error)
-	GetDataRootInclusionChallenge(block common.Hash, pointerIndex uint8) (contracts.ChallengeDaInfo, error)
-	ChallengeDataRootInclusion(index uint64, pointerIndex uint8) (*types.Transaction, common.Hash, error)
-	DefendDataRootInclusion(common.Hash, challengeContract.ChallengeDataAvailabilityChallengeDAProof) (*types.Transaction, error)
+	GetDataRootInclusionChallenge(block common.Hash, pointerIndex uint8, shareIndex uint32) (contracts.ChallengeDaInfo, error)
+	ChallengeDataRootInclusion(index uint64, pointerIndex uint8, shareIndex uint32) (*types.Transaction, common.Hash, error)
+	DefendDataRootInclusion(common.Hash, challengeContract.SharesProof, challengeContract.BinaryMerkleProof) (*types.Transaction, error)
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
 	FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error)
 	DefendL2Header(common.Hash, common.Hash, common.Hash) (*types.Transaction, error)
@@ -24,15 +24,17 @@ type Challenge interface {
 	FilterL2HeaderChallengeUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeL2HeaderChallengeUpdateIterator, error)
 	GetChallengeWindow() (*big.Int, error)
 	GetChallengeWindowBlockRanges() ([][]uint64, error)
-	DataRootInclusionChallengeKey(opts *bind.CallOpts, blockHash common.Hash, pointerIndex uint8) (common.Hash, error)
+	DataRootInclusionChallengeKey(opts *bind.CallOpts, blockHash common.Hash, pointerIndex uint8, shareIndex uint32) (common.Hash, error)
 }
+
+var _ Challenge = &Client{} // Ensure Client implements Challenge
 
 func (c *Client) GetChallengeFee() (*big.Int, error) {
 	return c.challenge.ChallengeFee(nil)
 }
 
-func (c *Client) GetDataRootInclusionChallenge(blockHash common.Hash, pointerIndex uint8) (contracts.ChallengeDaInfo, error) {
-	key, err := c.challenge.DataRootInclusionChallengeKey(nil, blockHash, pointerIndex)
+func (c *Client) GetDataRootInclusionChallenge(blockHash common.Hash, pointerIndex uint8, shareIndex uint32) (contracts.ChallengeDaInfo, error) {
+	key, err := c.challenge.DataRootInclusionChallengeKey(nil, blockHash, pointerIndex, shareIndex)
 	if err != nil {
 		return contracts.ChallengeDaInfo{}, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
 	}
@@ -50,7 +52,7 @@ func (c *Client) GetDataRootInclusionChallenge(blockHash common.Hash, pointerInd
 	}, nil
 }
 
-func (c *Client) ChallengeDataRootInclusion(index uint64, pointerIndex uint8) (*types.Transaction, common.Hash, error) {
+func (c *Client) ChallengeDataRootInclusion(index uint64, pointerIndex uint8, shareIndex uint32) (*types.Transaction, common.Hash, error) {
 	transactor, err := c.transactor()
 	if err != nil {
 		return nil, common.Hash{}, fmt.Errorf("failed to create transactor: %w", err)
@@ -69,7 +71,7 @@ func (c *Client) ChallengeDataRootInclusion(index uint64, pointerIndex uint8) (*
 		return nil, common.Hash{}, fmt.Errorf("failed to get hash for block %d: %w", index, err)
 	}
 
-	tx, err := c.challenge.ChallengeDataRootInclusion(transactor, big.NewInt(int64(index)), pointerIndex)
+	tx, err := c.challenge.ChallengeDataRootInclusion(transactor, big.NewInt(int64(index)), pointerIndex, shareIndex)
 	if err != nil {
 		return nil, common.Hash{}, fmt.Errorf("failed to challenge data root inclusion: %w", err)
 	}
@@ -77,13 +79,13 @@ func (c *Client) ChallengeDataRootInclusion(index uint64, pointerIndex uint8) (*
 	return tx, blockHash, nil
 }
 
-func (c *Client) DefendDataRootInclusion(blockHash common.Hash, proof challengeContract.ChallengeDataAvailabilityChallengeDAProof) (*types.Transaction, error) {
+func (c *Client) DefendDataRootInclusion(blockHash common.Hash, proof challengeContract.SharesProof, sharesToRblockProof challengeContract.BinaryMerkleProof) (*types.Transaction, error) {
 	transactor, err := c.transactor()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 
-	tx, err := c.challenge.DefendDataRootInclusion(transactor, blockHash, proof)
+	tx, err := c.challenge.DefendDataRootInclusion(transactor, blockHash, proof, sharesToRblockProof)
 	if err != nil {
 		return nil, fmt.Errorf("failed to defend data root inclusion: %w", err)
 	}
@@ -145,8 +147,8 @@ func (c *Client) GetChallengeWindow() (*big.Int, error) {
 	return c.challenge.ChallengeWindow(nil)
 }
 
-func (c *Client) DataRootInclusionChallengeKey(opts *bind.CallOpts, blockHash common.Hash, pointerIndex uint8) (common.Hash, error) {
-	key, err := c.challenge.DataRootInclusionChallengeKey(opts, blockHash, pointerIndex)
+func (c *Client) DataRootInclusionChallengeKey(opts *bind.CallOpts, blockHash common.Hash, pointerIndex uint8, shareIndex uint32) (common.Hash, error) {
+	key, err := c.challenge.DataRootInclusionChallengeKey(opts, blockHash, pointerIndex, shareIndex)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
 	}

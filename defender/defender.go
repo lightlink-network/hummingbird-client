@@ -126,7 +126,7 @@ func (d *Defender) defendDAChallenges(c challengeContract.ChallengeChallengeDAUp
 // Defends a DA challenge event.
 func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpdate) error {
 	// ensure the challenge is in the correct status to be defended
-	challengeInfo, err := d.Ethereum.GetDataRootInclusionChallenge(c.BlockHash, uint8(c.PointerIndex.Uint64()))
+	challengeInfo, err := d.Ethereum.GetDataRootInclusionChallenge(c.BlockHash, uint8(c.PointerIndex.Uint64()), c.ShareIndex)
 	if err != nil {
 		return fmt.Errorf("error getting data root inclusion challenge: %w", err)
 	}
@@ -165,21 +165,20 @@ func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpd
 // Attempts to defend a DA challenge for the given block hash.
 //
 // Queries Celestia for a proof of data availability and submits a tx to the Challenge contract.
-func (d *Defender) DefendDA(block common.Hash, pointerIndex uint8) (*types.Transaction, error) {
-	proof, err := d.GetDAProof(block, pointerIndex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prove data availability: %w", err)
-	}
-	key, err := d.Ethereum.DataRootInclusionChallengeKey(nil, block, pointerIndex)
+func (d *Defender) DefendDA(block common.Hash, pointerIndex uint8, shareIndex uint32) (*types.Transaction, error) {
+	key, err := d.Ethereum.DataRootInclusionChallengeKey(nil, block, pointerIndex, shareIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
 	}
-	return d.Ethereum.DefendDataRootInclusion(key, *proof)
+
+	rblock, err := d.FetchRollupBlock(block)
+
+	return d.Ethereum.DefendDataRootInclusion(key, *attestationProof)
 }
 
 // Gets the Celestia pointer for the given block hash and queries Celestia for a proof
 // of data availability.
-func (d *Defender) GetDAProof(block common.Hash, pointerIndex uint8) (*challengeContract.ChallengeDataAvailabilityChallengeDAProof, error) {
+func (d *Defender) GetAttestationProof(block common.Hash, pointerIndex uint8) (*challengeContract.AttestationProof, error) {
 	pointers, err := d.GetDAPointer(block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Celestia pointer: %w", err)
@@ -196,9 +195,9 @@ func (d *Defender) GetDAProof(block common.Hash, pointerIndex uint8) (*challenge
 		return nil, fmt.Errorf("failed to get proof: %w", err)
 	}
 
-	p := &challengeContract.ChallengeDataAvailabilityChallengeDAProof{
-		RootNonce: commit.ProofNonce,
-		DataRootTuple: challengeContract.DataRootTuple{
+	p := &challengeContract.AttestationProof{
+		TupleRootNonce: commit.ProofNonce,
+		Tuple: challengeContract.DataRootTuple{
 			Height:   big.NewInt(int64(pointers[pointerIndex].Height)),
 			DataRoot: proof.Tuple.DataRoot,
 		},
@@ -208,7 +207,44 @@ func (d *Defender) GetDAProof(block common.Hash, pointerIndex uint8) (*challenge
 			NumLeaves: proof.WrappedProof.NumLeaves,
 		},
 	}
+
 	return p, nil
+}
+
+func (d *Defender) getSharesProof(rblockHash common.Hash, pointerIndex uint8, shareIndex uint32) (*challengeContract.SharesProof, error) {
+	attestationProof, err := d.GetAttestationProof(rblockHash, pointerIndex)
+	if err != nil {
+		return nil, fmt.Errorf("error proving data availability: %w", err)
+	}
+
+	pointers, err := d.GetDAPointer(rblockHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Celestia pointers: %w", err)
+	}
+
+	pointer := pointers[pointerIndex]
+	proof, err := d.Celestia.GetShareProof(pointer, shareIndex)
+	if err != nil {
+		return nil, fmt.Errorf("error getting share proof: %w", err)
+	}
+
+	shareProof, err := contracts.NewShareProof(proof, chainOracleContract.AttestationProof{
+		TupleRootNonce: attestationProof.TupleRootNonce,
+		Tuple: chainOracleContract.DataRootTuple{
+			Height:   attestationProof.Tuple.Height,
+			DataRoot: attestationProof.Tuple.DataRoot,
+		},
+		Proof: chainOracleContract.BinaryMerkleProof{
+			SideNodes: attestationProof.Proof.SideNodes,
+			Key:       attestationProof.Proof.Key,
+			NumLeaves: attestationProof.Proof.NumLeaves,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error creating share proof: %w", err)
+	}
+
+	return contracts.ToChallengeShareProofs(shareProof), nil
 }
 
 // Gets L2 Header challenge events from Challenge.sol for the given block range and status.
@@ -367,7 +403,7 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 	}
 
 	// Get proof the data is available
-	celProof, err := d.GetDAProof(rblock, pointerIndex)
+	celProof, err := d.GetAttestationProof(rblock, pointerIndex)
 	if err != nil {
 		return nil, fmt.Errorf("error proving data availability: %w", err)
 	}
@@ -376,10 +412,10 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 	provided, _ := d.Ethereum.AlreadyProvidedShares(rblock, shareProof.Data)
 
 	attestationProof := chainOracleContract.AttestationProof{
-		TupleRootNonce: celProof.RootNonce,
+		TupleRootNonce: celProof.TupleRootNonce,
 		Tuple: chainOracleContract.DataRootTuple{
-			Height:   celProof.DataRootTuple.Height,
-			DataRoot: celProof.DataRootTuple.DataRoot,
+			Height:   celProof.Tuple.Height,
+			DataRoot: celProof.Tuple.DataRoot,
 		},
 		Proof: chainOracleContract.BinaryMerkleProof{
 			SideNodes: celProof.Proof.SideNodes,
@@ -445,16 +481,16 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 	}
 
 	// Get proof the data is available
-	celProof, err := d.GetDAProof(rblock, pointerIndex)
+	celProof, err := d.GetAttestationProof(rblock, pointerIndex)
 	if err != nil {
 		return nil, fmt.Errorf("error proving data availability: %w", err)
 	}
 
 	attestationProof := chainOracleContract.AttestationProof{
-		TupleRootNonce: celProof.RootNonce,
+		TupleRootNonce: celProof.TupleRootNonce,
 		Tuple: chainOracleContract.DataRootTuple{
-			Height:   celProof.DataRootTuple.Height,
-			DataRoot: celProof.DataRootTuple.DataRoot,
+			Height:   celProof.Tuple.Height,
+			DataRoot: celProof.Tuple.DataRoot,
 		},
 		Proof: chainOracleContract.BinaryMerkleProof{
 			SideNodes: celProof.Proof.SideNodes,

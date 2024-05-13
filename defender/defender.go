@@ -429,9 +429,12 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 		return nil, fmt.Errorf("error creating share proof: %w", err)
 	}
 
+	// get the block proof
+	blockProofs := node.GetSharesProofs(sharePointer, bundles, int(pointerIndex), d.Namespace())
+
 	// Provide the shares
 	if !skipShares && !provided {
-		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, attestationProof)
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, utils.ToBinaryMerkleProof(blockProofs))
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}
@@ -504,9 +507,13 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 		return nil, fmt.Errorf("error creating share proof: %w", err)
 	}
 
+	// get the block proof
+	blockProofs := node.GetSharesProofs(sharePointer, bundles, int(pointerIndex), d.Namespace())
+
 	// Provide the shares
 	if !skipShares {
-		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, attestationProof)
+
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, utils.ToBinaryMerkleProof(blockProofs))
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}

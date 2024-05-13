@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/tendermint/tendermint/crypto/merkle"
 )
 
 // TxSizeLimit is the maximum size of a Celestia tx in bytes
@@ -259,4 +260,38 @@ func FindTxSharesInBundles(bundles []*Bundle, hash common.Hash, namespace string
 		}
 	}
 	return nil, 0, fmt.Errorf("tx not found in any bundle")
+}
+
+func BundlesToShares(bundles []*Bundle, namespace string) []shares.Share {
+	ss := []shares.Share{}
+	for _, bundle := range bundles {
+		s, _ := bundle.Shares(namespace)
+		ss = append(ss, s...)
+	}
+	return ss
+}
+
+func GetSharesRoot(bundles []*Bundle, namespace string) []byte {
+	ss := BundlesToShares(bundles, namespace)
+	return merkle.HashFromByteSlices(shares.ToBytes(ss))
+}
+
+func GetSharesProofs(sp *SharePointer, bundles []*Bundle, bundleNum int, ns string) []*merkle.Proof {
+	offset := 0
+	ss := []shares.Share{}
+
+	for i := 0; i < len(bundles); i++ {
+		s, _ := bundles[i].Shares(ns)
+		ss = append(ss, s...)
+
+		if i < bundleNum {
+			offset = len(ss)
+		}
+	}
+	_, proofs := merkle.ProofsFromByteSlices(shares.ToBytes(ss))
+
+	// adjust the index of the proof
+	startProof := offset + sp.StartShare
+	endProof := offset + sp.EndShare() + 1
+	return proofs[startProof:endProof]
 }

@@ -242,6 +242,24 @@ func (b *Bundle) FindTxShares(hash common.Hash, namespace string) (*SharePointer
 	// to avoid code duplication. `FindBytesShares` ?
 }
 
+func (b *Bundle) Share(namespace string, index int) (*SharePointer, error) {
+	blob, err := b.Blob(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	shares, err := utils.BlobToShares(blob)
+	if err != nil {
+		return nil, err
+	}
+
+	if index >= len(shares) {
+		return nil, fmt.Errorf("share index out of range")
+	}
+
+	return NewSharePointer(shares, index, 0, index, len(shares[index].ToBytes())), nil
+}
+
 func FindHeaderSharesInBundles(bundles []*Bundle, hash common.Hash, namespace string) (*SharePointer, uint8, error) {
 	for i, bundle := range bundles {
 		pointer, err := bundle.FindHeaderShares(hash, namespace)

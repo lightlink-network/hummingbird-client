@@ -2,6 +2,7 @@ package utils
 
 import (
 	chainoracle "hummingbird/node/contracts/ChainOracle.sol"
+	challenge "hummingbird/node/contracts/Challenge.sol"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -50,5 +51,24 @@ func ToBinaryMerkleProof(proofs []*merkle.Proof) []chainoracle.BinaryMerkleProof
 		}
 	}
 	return rowProofs
+}
 
+func ToChallengeBinaryMerkleProof(proofs []*merkle.Proof) []challenge.BinaryMerkleProof {
+	rowProofs := make([]challenge.BinaryMerkleProof, len(proofs))
+	for i, proof := range proofs {
+		sideNodes := make([][32]byte, len(proof.Aunts))
+		for j, sideNode := range proof.Aunts {
+			var bzSideNode [32]byte
+			for k, b := range sideNode {
+				bzSideNode[k] = b
+			}
+			sideNodes[j] = bzSideNode
+		}
+		rowProofs[i] = challenge.BinaryMerkleProof{
+			SideNodes: sideNodes,
+			Key:       big.NewInt(proof.Index),
+			NumLeaves: big.NewInt(proof.Total),
+		}
+	}
+	return rowProofs
 }

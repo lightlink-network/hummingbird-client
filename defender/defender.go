@@ -147,7 +147,7 @@ func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpd
 	log.Info("Attempting to defend pending DA challenge")
 
 	// attempt to defend the challenge by submitting a tx to the Challenge contract
-	tx, err := d.DefendDA(c.BlockHash, uint8(c.PointerIndex.Uint64()))
+	tx, err := d.DefendDA(c.BlockHash, uint8(c.PointerIndex.Uint64()), c.ShareIndex)
 	if err != nil {
 		if strings.Contains(err.Error(), ErrNoDataCommitment) {
 			log.Info("Pending DA challenge is awaiting data commitment from Celestia validators, will retry later")
@@ -166,14 +166,39 @@ func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpd
 //
 // Queries Celestia for a proof of data availability and submits a tx to the Challenge contract.
 func (d *Defender) DefendDA(block common.Hash, pointerIndex uint8, shareIndex uint32) (*types.Transaction, error) {
-	key, err := d.Ethereum.DataRootInclusionChallengeKey(nil, block, pointerIndex, shareIndex)
+	key, shareProof, shareToRBlockRootProof, err := d.GetDaProof(block, pointerIndex, shareIndex)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
+		return nil, fmt.Errorf("error getting DA proof: %w", err)
 	}
 
-	rblock, err := d.FetchRollupBlock(block)
+	return d.Ethereum.DefendDataRootInclusion(*key, *shareProof, *shareToRBlockRootProof)
+}
 
-	return d.Ethereum.DefendDataRootInclusion(key, *attestationProof)
+func (d *Defender) GetDaProof(block common.Hash, pointerIndex uint8, shareIndex uint32) (*common.Hash, *challengeContract.SharesProof, *challengeContract.BinaryMerkleProof, error) {
+	_, bundles, err := d.Node.FetchRollupBlock(block)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error fetching rollup block: %w", err)
+	}
+
+	key, err := d.Ethereum.DataRootInclusionChallengeKey(nil, block, pointerIndex, shareIndex)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
+	}
+
+	shareProof, err := d.getSharesProof(block, pointerIndex, shareIndex)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error getting shares proof: %w", err)
+	}
+
+	sp, err := bundles[pointerIndex].Share(d.Namespace(), int(shareIndex))
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error getting share: %w", err)
+	}
+
+	// get the block proof
+	blockProofs := node.GetSharesProofs(sp, bundles, int(pointerIndex), d.Namespace())
+
+	return &key, shareProof, &utils.ToChallengeBinaryMerkleProof(blockProofs)[0], nil
 }
 
 // Gets the Celestia pointer for the given block hash and queries Celestia for a proof

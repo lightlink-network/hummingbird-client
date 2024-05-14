@@ -28,6 +28,7 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rollup height: %w", err)
 	}
+	r.Opts.Logger.Info("Rollup Height", "height", rollupHeight)
 
 	// get latest rollup head
 	latestRollupHead, err := r.Ethereum.GetRollupHead()
@@ -35,11 +36,15 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 		return nil, fmt.Errorf("failed to get rollup head: %w", err)
 	}
 
+	r.Opts.Logger.Info("Latest Rollup Head", "head", latestRollupHead)
+
 	// hash latest rollup head
 	latestRollupHash, err := r.Ethereum.HashHeader(&latestRollupHead)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash rollup head: %w", err)
 	}
+
+	r.Opts.Logger.Info("Latest Rollup Hash", "hash", latestRollupHash)
 
 	// get previous rollup header
 	prevRollupHeader, err := r.Ethereum.GetRollupHeaderByHash(latestRollupHead.PrevHash)

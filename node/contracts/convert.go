@@ -161,6 +161,7 @@ func ToChallengeShareProofs(p *chainoracle.SharesProof) *challenge.SharesProof {
 					Version: node.Max.Version,
 					Id:      node.Max.Id,
 				},
+				Digest: node.Digest,
 			}
 		}
 

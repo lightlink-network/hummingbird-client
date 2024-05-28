@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hummingbird/node"
 	"hummingbird/utils"
+	"math"
 	"math/big"
 	"strings"
 	"time"
@@ -175,7 +176,7 @@ func (d *Defender) DefendDA(block common.Hash, pointerIndex uint8, shareIndex ui
 }
 
 func (d *Defender) GetDaProof(block common.Hash, pointerIndex uint8, shareIndex uint32) (*common.Hash, *challengeContract.SharesProof, *challengeContract.BinaryMerkleProof, error) {
-	_, bundles, err := d.Node.FetchRollupBlock(block)
+	header, bundles, err := d.Node.FetchRollupBlock(block)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error fetching rollup block: %w", err)
 	}
@@ -185,12 +186,25 @@ func (d *Defender) GetDaProof(block common.Hash, pointerIndex uint8, shareIndex 
 		return nil, nil, nil, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
 	}
 
-	shareProof, err := d.getSharesProof(block, pointerIndex, shareIndex)
+	// get share index relative to the start of the share range
+	idx := new(big.Int).Sub(header.CelestiaPointers[pointerIndex].ShareStart, new(big.Int).SetUint64(uint64(shareIndex)))
+
+	if idx.BitLen() > 64 {
+		return nil, nil, nil, fmt.Errorf("index is too large to convert to uint64")
+	}
+
+	idxUint64 := idx.Uint64()
+
+	if idxUint64 > math.MaxUint32 {
+		return nil, nil, nil, fmt.Errorf("index is too large to convert to uint32")
+	}
+
+	shareProof, err := d.getSharesProof(block, pointerIndex, uint32(idxUint64))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error getting shares proof: %w", err)
 	}
 
-	sp, err := bundles[pointerIndex].Share(d.Namespace(), int(shareIndex))
+	sp, err := bundles[pointerIndex].Share(d.Namespace(), int(idxUint64))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error getting share: %w", err)
 	}

@@ -4,7 +4,6 @@ celestia:
   endpoint: http://127.0.0.1:26658 # Celestia light node endpoint
   namespace: lightlink # Celestia blob namespace
   tendermint_rpc: http://full.consensus.mocha-4.celestia-mocha.com:26657 # Tendermint RPC endpoint
-  grpc: full.consensus.mocha-4.celestia-mocha.com:9090 # Celestia full node endpoint
   gasPrice: 0.003 # Gas price in TIA
   retries: 0 # Number of retries when a submitBlob request fails
 ethereum:

@@ -16,8 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/tendermint/tendermint/types"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/celestiaorg/celestia-app/pkg/appconsts"
 	"github.com/celestiaorg/celestia-app/pkg/shares"
@@ -61,7 +59,6 @@ type CelestiaClientOpts struct {
 	Endpoint      string
 	Token         string
 	TendermintRPC string
-	GRPC          string
 	Namespace     string
 	Logger        *slog.Logger
 	GasPrice      float64
@@ -72,7 +69,6 @@ type CelestiaClient struct {
 	namespace string
 	client    *client.Client
 	trpc      *http.HTTP
-	grcp      *grpc.ClientConn
 	logger    *slog.Logger
 	gasPrice  float64
 	retries   int
@@ -97,17 +93,11 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		return nil, fmt.Errorf("failed to start Tendermint RPC: %w", err)
 	}
 
-	grcp, err := grpc.Dial(opts.GRPC, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Celestia GRPC: %w", err)
-	}
-
 	opts.Logger.Info("Connected to Celestia")
 	return &CelestiaClient{
 		namespace: opts.Namespace,
 		client:    c,
 		trpc:      trpc,
-		grcp:      grcp,
 		logger:    opts.Logger,
 		gasPrice:  opts.GasPrice,
 		retries:   opts.Retries,

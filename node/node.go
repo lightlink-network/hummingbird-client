@@ -53,7 +53,6 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	cel, err := NewCelestiaClient(CelestiaClientOpts{
 		Endpoint:      cfg.Celestia.Endpoint,
 		Token:         cfg.Celestia.Token,
-		GRPC:          cfg.Celestia.GRPC,
 		TendermintRPC: cfg.Celestia.TendermintRPC,
 		Namespace:     cfg.Celestia.Namespace,
 		Logger:        logger.With("ctx", "celestia"),

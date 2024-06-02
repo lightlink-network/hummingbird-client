@@ -20,8 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	thttp "github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/tendermint/tendermint/types"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/celestiaorg/celestia-app/pkg/appconsts"
 	"github.com/celestiaorg/celestia-app/pkg/shares"
@@ -56,6 +54,7 @@ type Celestia interface {
 	GetProof(pointer *CelestiaPointer, startBlock uint64, endBlock uint64, proofNonce big.Int) (*CelestiaProof, error)
 	GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error)
 	GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error)
+	GetShareProof(celestiaPointer *CelestiaPointer, shareIndex uint32) (*types.ShareProof, error)
 	GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error)
 	GetPointer(txHash common.Hash) (*CelestiaPointer, error)
 }
@@ -64,7 +63,6 @@ type CelestiaClientOpts struct {
 	Endpoint                string
 	Token                   string
 	TendermintRPC           string
-	GRPC                    string
 	Namespace               string
 	Logger                  *slog.Logger
 	GasPrice                float64
@@ -78,7 +76,6 @@ type CelestiaClient struct {
 	namespace               string
 	client                  *client.Client
 	trpc                    *thttp.HTTP
-	grcp                    *grpc.ClientConn
 	logger                  *slog.Logger
 	gasPrice                float64
 	gasPriceIncreasePercent *big.Int
@@ -106,17 +103,11 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		return nil, fmt.Errorf("failed to start Tendermint RPC: %w", err)
 	}
 
-	grcp, err := grpc.Dial(opts.GRPC, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Celestia GRPC: %w", err)
-	}
-
 	opts.Logger.Info("Connected to Celestia")
 	return &CelestiaClient{
 		namespace:               opts.Namespace,
 		client:                  c,
 		trpc:                    trpc,
-		grcp:                    grcp,
 		logger:                  opts.Logger,
 		gasPrice:                opts.GasPrice,
 		gasPriceIncreasePercent: opts.GasPriceIncreasePercent,
@@ -332,6 +323,26 @@ func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.
 	return utils.BytesToShares(proof.Data)
 }
 
+func (c *CelestiaClient) GetShareProof(celestiaPointer *CelestiaPointer, shareIndex uint32) (*types.ShareProof, error) {
+	ctx := context.Background()
+
+	shareStart := celestiaPointer.ShareStart + uint64(shareIndex)
+	shareEnd := celestiaPointer.ShareStart + uint64(shareIndex+1)
+
+	// Get the shares proof
+	sharesProofs, err := c.trpc.ProveShares(ctx, celestiaPointer.Height, shareStart, shareEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify the shares proof
+	if !sharesProofs.VerifyProof() {
+		return nil, err
+	}
+
+	return &sharesProofs, nil
+}
+
 func (c *CelestiaClient) GetSharesProof(celPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
 	ctx := context.Background()
 
@@ -460,6 +471,10 @@ func (c *celestiaMock) GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.
 }
 
 func (c *celestiaMock) GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error) {
+	return nil, nil
+}
+
+func (c *celestiaMock) GetShareProof(celestiaPointer *CelestiaPointer, shareIndex uint32) (*types.ShareProof, error) {
 	return nil, nil
 }
 

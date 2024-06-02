@@ -11,7 +11,6 @@ type Config struct {
 		Endpoint                string  `mapstructure:"endpoint"`
 		Namespace               string  `mapstructure:"namespace"`
 		TendermintRPC           string  `mapstructure:"tendermint_rpc"`
-		GRPC                    string  `mapstructure:"grpc"`
 		GasPrice                float64 `mapstructure:"gasPrice"`
 		GasPriceIncreasePercent int     `mapstructure:"gasPriceIncreasePercent"`
 		GasAPI                  string  `mapstructure:"gasAPI"`

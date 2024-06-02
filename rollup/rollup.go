@@ -135,6 +135,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 		L2Height:         bundles[len(bundles)-1].Height(),
 		PrevHash:         prevHash,
 		StateRoot:        bundles[len(bundles)-1].StateRoot(),
+		ShareRoot:        [32]byte(node.GetSharesRoot(bundles, r.Namespace())),
 		CelestiaPointers: pointers,
 	}
 

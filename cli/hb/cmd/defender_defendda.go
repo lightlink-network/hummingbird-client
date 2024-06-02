@@ -20,8 +20,8 @@ func init() {
 var DefenderDefendDaCmd = &cobra.Command{
 	Use:        "defend-da",
 	Short:      "defend-da will defend against a data availability challenge",
-	ArgAliases: []string{"block", "pointerIndex"},
-	Args:       cobra.MinimumNArgs(2),
+	ArgAliases: []string{"block", "pointerIndex", "shareIndex"},
+	Args:       cobra.MinimumNArgs(3),
 
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
@@ -49,8 +49,9 @@ var DefenderDefendDaCmd = &cobra.Command{
 		// get block hash and tx hash from args/flags
 		blockHash := common.HexToHash(args[0])
 		pointerIndex, _ := strconv.Atoi(args[1])
+		shareIndex, _ := strconv.Atoi(args[2])
 
-		tx, err := d.DefendDA(blockHash, uint8(pointerIndex))
+		tx, err := d.DefendDA(blockHash, uint8(pointerIndex), uint32(shareIndex))
 		if err != nil {
 			if strings.Contains(err.Error(), "no data commitment has been generated for the provided height") {
 				logger.Error("Failed to defend data availability, please wait for Celestia validators to commit data root", "err", err)

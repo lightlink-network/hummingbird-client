@@ -49,7 +49,7 @@ var DefenderProveDaCmd = &cobra.Command{
 			utils.NoErr(err)
 		}
 
-		proof, err := d.GetDAProof(blockHash, uint8(pointerIndex))
+		proof, err := d.GetAttestationProof(blockHash, uint8(pointerIndex))
 		if err != nil {
 			logger.Error("Failed to prove data availability", "err", err)
 			return
@@ -67,9 +67,9 @@ var DefenderProveDaCmd = &cobra.Command{
 
 		fmt.Println(" ")
 		fmt.Println("Proof:")
-		fmt.Println("	Nonce:", proof.RootNonce)
-		fmt.Println("	Tuple.Height:", proof.DataRootTuple.Height)
-		fmt.Println("	Tuple.DataRoot:", common.Hash(proof.DataRootTuple.DataRoot).Hex())
+		fmt.Println("	Nonce:", proof.TupleRootNonce)
+		fmt.Println("	Tuple.Height:", proof.Tuple.Height)
+		fmt.Println("	Tuple.DataRoot:", common.Hash(proof.Tuple.DataRoot).Hex())
 		fmt.Println("	WrappedProof:", hexutil.Encode(wrappedProof))
 		fmt.Println(" ")
 
@@ -78,7 +78,7 @@ var DefenderProveDaCmd = &cobra.Command{
 		}
 
 		// Verify the proof against the L1 rollup contract.
-		verified, err := n.Ethereum.DAVerify(proof.RootNonce, blobstreamx.DataRootTuple(proof.DataRootTuple), blobstreamx.BinaryMerkleProof(proof.Proof))
+		verified, err := n.Ethereum.DAVerify(proof.TupleRootNonce, blobstreamx.DataRootTuple(proof.Tuple), blobstreamx.BinaryMerkleProof(proof.Proof))
 		if err != nil {
 			logger.Error("Failed to verify proof", "err", err)
 			return

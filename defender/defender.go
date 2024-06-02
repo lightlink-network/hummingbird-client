@@ -167,52 +167,44 @@ func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpd
 //
 // Queries Celestia for a proof of data availability and submits a tx to the Challenge contract.
 func (d *Defender) DefendDA(block common.Hash, pointerIndex uint8, shareIndex uint32) (*types.Transaction, error) {
-	key, shareProof, shareToRBlockRootProof, err := d.GetDaProof(block, pointerIndex, shareIndex)
+	key, shareProof, err := d.GetDaProof(block, pointerIndex, shareIndex)
 	if err != nil {
 		return nil, fmt.Errorf("error getting DA proof: %w", err)
 	}
 
-	return d.Ethereum.DefendDataRootInclusion(*key, *shareProof, *shareToRBlockRootProof)
+	return d.Ethereum.DefendDataRootInclusion(*key, *shareProof)
 }
 
-func (d *Defender) GetDaProof(block common.Hash, pointerIndex uint8, shareIndex uint32) (*common.Hash, *challengeContract.SharesProof, *challengeContract.BinaryMerkleProof, error) {
-	header, bundles, err := d.Node.FetchRollupBlock(block)
+func (d *Defender) GetDaProof(block common.Hash, pointerIndex uint8, shareIndex uint32) (*common.Hash, *challengeContract.SharesProof, error) {
+	header, _, err := d.Node.FetchRollupBlock(block)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error fetching rollup block: %w", err)
+		return nil, nil, fmt.Errorf("error fetching rollup block: %w", err)
 	}
 
 	key, err := d.Ethereum.DataRootInclusionChallengeKey(nil, block, pointerIndex, shareIndex)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
+		return nil, nil, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
 	}
 
 	// get share index relative to the start of the share range
 	idx := new(big.Int).Sub(header.CelestiaPointers[pointerIndex].ShareStart, new(big.Int).SetUint64(uint64(shareIndex)))
 
 	if idx.BitLen() > 64 {
-		return nil, nil, nil, fmt.Errorf("index is too large to convert to uint64")
+		return nil, nil, fmt.Errorf("index is too large to convert to uint64")
 	}
 
 	idxUint64 := idx.Uint64()
 
 	if idxUint64 > math.MaxUint32 {
-		return nil, nil, nil, fmt.Errorf("index is too large to convert to uint32")
+		return nil, nil, fmt.Errorf("index is too large to convert to uint32")
 	}
 
 	shareProof, err := d.getSharesProof(block, pointerIndex, uint32(idxUint64))
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error getting shares proof: %w", err)
+		return nil, nil, fmt.Errorf("error getting shares proof: %w", err)
 	}
 
-	sp, err := bundles[pointerIndex].Share(d.Namespace(), int(idxUint64))
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error getting share: %w", err)
-	}
-
-	// get the block proof
-	blockProofs := node.GetSharesProofs(sp, bundles, int(pointerIndex), d.Namespace())
-
-	return &key, shareProof, &utils.ToChallengeBinaryMerkleProof(blockProofs)[0], nil
+	return &key, shareProof, nil
 }
 
 // Gets the Celestia pointer for the given block hash and queries Celestia for a proof
@@ -468,12 +460,9 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 		return nil, fmt.Errorf("error creating share proof: %w", err)
 	}
 
-	// get the block proof
-	blockProofs := node.GetSharesProofs(sharePointer, bundles, int(pointerIndex), d.Namespace())
-
 	// Provide the shares
 	if !skipShares && !provided {
-		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, utils.ToBinaryMerkleProof(blockProofs))
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp)
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}
@@ -546,13 +535,10 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 		return nil, fmt.Errorf("error creating share proof: %w", err)
 	}
 
-	// get the block proof
-	blockProofs := node.GetSharesProofs(sharePointer, bundles, int(pointerIndex), d.Namespace())
-
 	// Provide the shares
 	if !skipShares {
 
-		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp, utils.ToBinaryMerkleProof(blockProofs))
+		tx, err := d.Ethereum.ProvideShares(rblock, pointerIndex, sp)
 		if err != nil {
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}

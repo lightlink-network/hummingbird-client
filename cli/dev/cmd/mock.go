@@ -25,21 +25,19 @@ type MockData struct {
 }
 
 type HeaderData struct {
-	Header        *utils.L2HeaderJson                 `json:"header"`
-	HeaderHash    common.Hash                         `json:"headerHash"`
-	ShareProofs   chainoracle.SharesProof             `json:"shareProofs"`
-	ShareRanges   []chainoracle.ChainOracleShareRange `json:"shareRanges"`
-	PointerProofs []chainoracle.BinaryMerkleProof     `json:"pointerProofs"`
-	Shares        [][]byte                            `json:"shares"`
+	Header      *utils.L2HeaderJson                 `json:"header"`
+	HeaderHash  common.Hash                         `json:"headerHash"`
+	ShareProofs chainoracle.SharesProof             `json:"shareProofs"`
+	ShareRanges []chainoracle.ChainOracleShareRange `json:"shareRanges"`
+	Shares      [][]byte                            `json:"shares"`
 }
 
 type TransactionData struct {
-	Transaction   *utils.TxJson                       `json:"transaction"`
-	Hash          common.Hash                         `json:"hash"`
-	ShareProofs   chainoracle.SharesProof             `json:"shareProofs"`
-	ShareRanges   []chainoracle.ChainOracleShareRange `json:"shareRanges"`
-	PointerProofs []chainoracle.BinaryMerkleProof     `json:"pointerProofs"`
-	Shares        [][]byte                            `json:"shares"`
+	Transaction *utils.TxJson                       `json:"transaction"`
+	Hash        common.Hash                         `json:"hash"`
+	ShareProofs chainoracle.SharesProof             `json:"shareProofs"`
+	ShareRanges []chainoracle.ChainOracleShareRange `json:"shareRanges"`
+	Shares      [][]byte                            `json:"shares"`
 }
 
 func init() {
@@ -128,16 +126,12 @@ func getHeaderData(r *rollup.Rollup, rblock *rollup.Block, pointerIndex int, blo
 	shareProofs, err := contracts.NewShareProof(shareProof, getAttestations(r.Node, rblock.GetCelestiaPointers()[pointerIndex]))
 	panicErr(err, "failed to get share proofs")
 
-	// - Get the block proofs
-	blockProofs := node.GetSharesProofs(sharePointer, rblock.Bundles, pointerIndex, r.Namespace())
-
 	return HeaderData{
-		Header:        utils.ToL2HeaderJson(header),
-		HeaderHash:    headerHash,
-		ShareProofs:   *shareProofs,
-		Shares:        shares.ToBytes(sharePointer.Shares()),
-		ShareRanges:   formatRanges(sharePointer),
-		PointerProofs: utils.ToBinaryMerkleProof(blockProofs),
+		Header:      utils.ToL2HeaderJson(header),
+		HeaderHash:  headerHash,
+		ShareProofs: *shareProofs,
+		Shares:      shares.ToBytes(sharePointer.Shares()),
+		ShareRanges: formatRanges(sharePointer),
 	}
 }
 
@@ -157,16 +151,12 @@ func getTransactionData(r *rollup.Rollup, rblock *rollup.Block, pointerIndex int
 	shareProofs, err := contracts.NewShareProof(shareProof, getAttestations(r.Node, rblock.GetCelestiaPointers()[pointerIndex]))
 	panicErr(err, "failed to get share proofs")
 
-	// - Get the block proofs
-	blockProofs := node.GetSharesProofs(sharePointer, rblock.Bundles, pointerIndex, r.Namespace())
-
 	return TransactionData{
-		Transaction:   utils.ToTxJson(tx),
-		Hash:          tx.Hash(),
-		ShareProofs:   *shareProofs,
-		Shares:        shares.ToBytes(sharePointer.Shares()),
-		ShareRanges:   formatRanges(sharePointer),
-		PointerProofs: utils.ToBinaryMerkleProof(blockProofs),
+		Transaction: utils.ToTxJson(tx),
+		Hash:        tx.Hash(),
+		ShareProofs: *shareProofs,
+		Shares:      shares.ToBytes(sharePointer.Shares()),
+		ShareRanges: formatRanges(sharePointer),
 	}
 }
 

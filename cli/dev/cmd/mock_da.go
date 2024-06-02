@@ -19,11 +19,14 @@ type MockDaData struct {
 }
 
 type CHallengeDaData struct {
-	Key                    common.Hash                  `json:"key"`
-	PointerIndex           uint8                        `json:"pointerIndex"`
-	ShareIndex             uint32                       `json:"shareIndex"`
-	ShareProof             *challenge.SharesProof       `json:"shareProof"`
-	ShareToRBlockRootProof *challenge.BinaryMerkleProof `json:"shareToRBlockRootProof"`
+	Key          common.Hash            `json:"key"`
+	PointerIndex uint8                  `json:"pointerIndex"`
+	ShareIndex   uint32                 `json:"shareIndex"`
+	ShareProof   *challenge.SharesProof `json:"shareProof"`
+}
+
+func init() {
+	RootCmd.AddCommand(MockDaCmd)
 }
 
 var MockDaCmd = &cobra.Command{
@@ -59,7 +62,7 @@ var MockDaCmd = &cobra.Command{
 			Logger: log.With("ctx", "Defender"),
 		})
 
-		key, shareProof, shareToRblockRootProof, err := d.GetDaProof(rblockHash, uint8(pointerIndex), uint32(shareIndex))
+		key, shareProof, err := d.GetDaProof(rblockHash, uint8(pointerIndex), uint32(shareIndex))
 		panicErr(err, "failed to get da proof")
 
 		// 4. Output the mock data
@@ -67,11 +70,10 @@ var MockDaCmd = &cobra.Command{
 			RollupHash:   rblockHash,
 			RollupHeader: *rblock.CanonicalStateChainHeader,
 			DaProof: CHallengeDaData{
-				Key:                    *key,
-				PointerIndex:           uint8(pointerIndex),
-				ShareIndex:             uint32(shareIndex),
-				ShareProof:             shareProof,
-				ShareToRBlockRootProof: shareToRblockRootProof,
+				Key:          *key,
+				PointerIndex: uint8(pointerIndex),
+				ShareIndex:   uint32(shareIndex),
+				ShareProof:   shareProof,
 			},
 		}
 

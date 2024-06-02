@@ -15,7 +15,7 @@ type Challenge interface {
 	GetChallengeFee() (*big.Int, error)
 	GetDataRootInclusionChallenge(block common.Hash, pointerIndex uint8, shareIndex uint32) (contracts.ChallengeDaInfo, error)
 	ChallengeDataRootInclusion(index uint64, pointerIndex uint8, shareIndex uint32) (*types.Transaction, common.Hash, error)
-	DefendDataRootInclusion(common.Hash, challengeContract.SharesProof, challengeContract.BinaryMerkleProof) (*types.Transaction, error)
+	DefendDataRootInclusion(common.Hash, challengeContract.SharesProof) (*types.Transaction, error)
 	SettleDataRootInclusion(common.Hash) (*types.Transaction, error)
 	FilterChallengeDAUpdate(opts *bind.FilterOpts, _blockHash [][32]byte, _blockIndex []*big.Int, _status []uint8) (*challengeContract.ChallengeChallengeDAUpdateIterator, error)
 	DefendL2Header(common.Hash, common.Hash, common.Hash) (*types.Transaction, error)
@@ -79,13 +79,13 @@ func (c *Client) ChallengeDataRootInclusion(index uint64, pointerIndex uint8, sh
 	return tx, blockHash, nil
 }
 
-func (c *Client) DefendDataRootInclusion(blockHash common.Hash, proof challengeContract.SharesProof, sharesToRblockProof challengeContract.BinaryMerkleProof) (*types.Transaction, error) {
+func (c *Client) DefendDataRootInclusion(blockHash common.Hash, proof challengeContract.SharesProof) (*types.Transaction, error) {
 	transactor, err := c.transactor()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 
-	tx, err := c.challenge.DefendDataRootInclusion(transactor, blockHash, proof, sharesToRblockProof)
+	tx, err := c.challenge.DefendDataRootInclusion(transactor, blockHash, proof)
 	if err != nil {
 		return nil, fmt.Errorf("failed to defend data root inclusion: %w", err)
 	}

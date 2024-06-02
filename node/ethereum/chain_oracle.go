@@ -11,19 +11,19 @@ import (
 )
 
 type ChainOracle interface {
-	ProvideShares(rblock common.Hash, pointerIndex uint8, shareProof *chainOracleContract.SharesProof, blockProofs []chainOracleContract.BinaryMerkleProof) (*types.Transaction, error)
+	ProvideShares(rblock common.Hash, pointerIndex uint8, shareProof *chainOracleContract.SharesProof) (*types.Transaction, error)
 	ProvideHeader(rblock common.Hash, shareData [][]byte, ranges []chainOracleContract.ChainOracleShareRange) (*types.Transaction, error)
 	ProvideLegacyTx(rblock common.Hash, shareData [][]byte, ranges []chainOracleContract.ChainOracleShareRange) (*types.Transaction, error)
 	AlreadyProvidedShares(rblock common.Hash, shareData [][]byte) (bool, error)
 	AlreadyProvidedHeader(l2Hash common.Hash) (bool, error)
 }
 
-func (c *Client) ProvideShares(rblock common.Hash, pointerIndex uint8, shareProof *chainOracleContract.SharesProof, blockProofs []chainOracleContract.BinaryMerkleProof) (*types.Transaction, error) {
+func (c *Client) ProvideShares(rblock common.Hash, pointerIndex uint8, shareProof *chainOracleContract.SharesProof) (*types.Transaction, error) {
 	transactor, err := c.transactor()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
-	return c.chainLoader.ProvideShares(transactor, rblock, pointerIndex, *shareProof, blockProofs)
+	return c.chainLoader.ProvideShares(transactor, rblock, pointerIndex, *shareProof)
 }
 
 func (c *Client) ProvideHeader(rblock common.Hash, shareData [][]byte, ranges []chainOracleContract.ChainOracleShareRange) (*types.Transaction, error) {

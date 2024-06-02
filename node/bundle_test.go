@@ -159,3 +159,23 @@ func sharesPointerToTx(pointer *SharePointer, s []shares.Share) (*ethtypes.Trans
 	err := rlp.DecodeBytes(data, &tx)
 	return tx, err
 }
+
+func TestBundleShareRoot(t *testing.T) {
+	b1 := newRandomBundle(5, true)
+	b2 := newRandomBundle(5, true)
+	bundles := []*Bundle{b1, b2}
+
+	sp, err := b2.FindHeaderShares(b2.Blocks[1].Header().Hash(), "test")
+	assert.NoError(t, err)
+
+	shareRoot := GetSharesRoot(bundles, "test")
+	proofs := GetSharesProofs(sp, bundles, 1, "test")
+	assert.NotEmpty(t, proofs)
+
+	assert.Equal(t, len(proofs), len(sp.Shares()), "proofs and shares should have same length")
+	// bundleShares := BundlesToShares(bundles, "test")
+	for i, p := range proofs {
+		t.Logf("Proof %d: %x", i, p)
+		assert.NoError(t, p.Verify(shareRoot, sp.Shares()[i].ToBytes()), "proof %d failed", i)
+	}
+}

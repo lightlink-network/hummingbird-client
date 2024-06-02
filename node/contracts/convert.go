@@ -2,6 +2,7 @@ package contracts
 
 import (
 	chainoracle "hummingbird/node/contracts/ChainOracle.sol"
+	challenge "hummingbird/node/contracts/Challenge.sol"
 	"math/big"
 
 	"github.com/tendermint/tendermint/crypto/merkle"
@@ -141,5 +142,87 @@ func toAttestationProof(
 			Key:       big.NewInt(dataRootInclusionProof.Index),
 			NumLeaves: big.NewInt(dataRootInclusionProof.Total),
 		},
+	}
+}
+
+func ToChallengeShareProofs(p *chainoracle.SharesProof) *challenge.SharesProof {
+
+	// convert to challenge namespace merkle multiproof
+	shareProofs := make([]challenge.NamespaceMerkleMultiproof, len(p.ShareProofs))
+	for i, proof := range p.ShareProofs {
+		sideNodes := make([]challenge.NamespaceNode, len(proof.SideNodes))
+		for j, node := range proof.SideNodes {
+			sideNodes[j] = challenge.NamespaceNode{
+				Min: challenge.Namespace{
+					Version: node.Min.Version,
+					Id:      node.Min.Id,
+				},
+				Max: challenge.Namespace{
+					Version: node.Max.Version,
+					Id:      node.Max.Id,
+				},
+				Digest: node.Digest,
+			}
+		}
+
+		shareProofs[i] = challenge.NamespaceMerkleMultiproof{
+			BeginKey:  proof.BeginKey,
+			EndKey:    proof.EndKey,
+			SideNodes: sideNodes,
+		}
+	}
+
+	// convert to challenge row roots
+	rowRoots := make([]challenge.NamespaceNode, len(p.RowRoots))
+	for i, root := range p.RowRoots {
+		rowRoots[i] = challenge.NamespaceNode{
+			Min: challenge.Namespace{
+				Version: root.Min.Version,
+				Id:      root.Min.Id,
+			},
+			Max: challenge.Namespace{
+				Version: root.Max.Version,
+				Id:      root.Max.Id,
+			},
+			Digest: root.Digest,
+		}
+	}
+
+	rowProofs := make([]challenge.BinaryMerkleProof, len(p.RowProofs))
+	for i, proof := range p.RowProofs {
+		sideNodes := make([][32]byte, len(proof.SideNodes))
+		for j, sideNode := range proof.SideNodes {
+			sideNodes[j] = sideNode
+		}
+		rowProofs[i] = challenge.BinaryMerkleProof{
+			SideNodes: sideNodes,
+			Key:       proof.Key,
+			NumLeaves: proof.NumLeaves,
+		}
+	}
+
+	attestationProof := challenge.AttestationProof{
+		TupleRootNonce: p.AttestationProof.TupleRootNonce,
+		Tuple: challenge.DataRootTuple{
+			Height:   p.AttestationProof.Tuple.Height,
+			DataRoot: p.AttestationProof.Tuple.DataRoot,
+		},
+		Proof: challenge.BinaryMerkleProof{
+			SideNodes: p.AttestationProof.Proof.SideNodes,
+			Key:       p.AttestationProof.Proof.Key,
+			NumLeaves: p.AttestationProof.Proof.NumLeaves,
+		},
+	}
+
+	return &challenge.SharesProof{
+		Data:        p.Data,
+		ShareProofs: shareProofs,
+		Namespace: challenge.Namespace{
+			Version: p.Namespace.Version,
+			Id:      p.Namespace.Id,
+		},
+		RowRoots:         rowRoots,
+		RowProofs:        rowProofs,
+		AttestationProof: attestationProof,
 	}
 }

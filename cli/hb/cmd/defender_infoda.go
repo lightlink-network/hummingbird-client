@@ -21,8 +21,8 @@ func init() {
 var DefenderInfoDaCmd = &cobra.Command{
 	Use:        "info-da",
 	Short:      "info-da will provide info on an existing challenge",
-	ArgAliases: []string{"block", "pointerIndex"},
-	Args:       cobra.ExactArgs(2),
+	ArgAliases: []string{"block", "pointerIndex", "shareIndex"},
+	Args:       cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Load()
 		logger := GetLogger(viper.GetString("log-type"))
@@ -41,8 +41,13 @@ var DefenderInfoDaCmd = &cobra.Command{
 			logger.Error("Failed to parse pointer index", "err", err)
 			panic(err)
 		}
+		shareIndex, err := strconv.Atoi(args[2])
+		if err != nil {
+			logger.Error("Failed to parse pointer index", "err", err)
+			panic(err)
+		}
 
-		info, err := d.InfoDA(blockHash, uint8(pointerIndex))
+		info, err := d.InfoDA(blockHash, uint8(pointerIndex), uint32(shareIndex))
 		if err != nil {
 			logger.Error("Failed to get data availability info", "err", err)
 			panic(err)

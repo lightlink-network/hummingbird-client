@@ -7,13 +7,15 @@ import (
 type Config struct {
 	StorePath string `mapstructure:"storePath"`
 	Celestia  struct {
-		Token         string  `mapstructure:"token"`
-		Endpoint      string  `mapstructure:"endpoint"`
-		Namespace     string  `mapstructure:"namespace"`
-		TendermintRPC string  `mapstructure:"tendermint_rpc"`
-		GRPC          string  `mapstructure:"grpc"`
-		GasPrice      float64 `mapstructure:"gasPrice"`
-		Retries       int     `mapstructure:"retries"`
+		Token                   string  `mapstructure:"token"`
+		Endpoint                string  `mapstructure:"endpoint"`
+		Namespace               string  `mapstructure:"namespace"`
+		TendermintRPC           string  `mapstructure:"tendermint_rpc"`
+		GasPrice                float64 `mapstructure:"gasPrice"`
+		GasPriceIncreasePercent int     `mapstructure:"gasPriceIncreasePercent"`
+		GasAPI                  string  `mapstructure:"gasAPI"`
+		Retries                 int     `mapstructure:"retries"`
+		RetryDelay              int     `mapstructure:"retryDelay"`
 	} `mapstructure:"celestia"`
 	Ethereum struct {
 		HTTPEndpoint            string `mapstructure:"httpEndpoint"`

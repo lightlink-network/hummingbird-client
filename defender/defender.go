@@ -144,6 +144,8 @@ func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpd
 		"expiry", time.Unix(c.Expiry.Int64(), 0).Format(time.RFC1123Z),
 		"statusEnum", c.Status,
 		"statusString", statusString,
+		"pointerIndex", c.PointerIndex,
+		"shareIndex", c.ShareIndex,
 	)
 	log.Info("Attempting to defend pending DA challenge")
 

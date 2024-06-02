@@ -3,9 +3,13 @@ package node
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/big"
+	"net/http"
+	"strconv"
 	"time"
 
 	cosmosmath "cosmossdk.io/math"
@@ -14,7 +18,7 @@ import (
 	"github.com/celestiaorg/celestia-node/share"
 	gosquare "github.com/celestiaorg/go-square/square"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/tendermint/tendermint/rpc/client/http"
+	thttp "github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/tendermint/tendermint/types"
 
 	"github.com/celestiaorg/celestia-app/pkg/appconsts"
@@ -46,7 +50,7 @@ type CelestiaProof struct {
 // Celestia is the interface for interacting with the Celestia node
 type Celestia interface {
 	Namespace() string
-	PublishBundle(blocks Bundle) (*CelestiaPointer, error)
+	PublishBundle(blocks Bundle) (*CelestiaPointer, float64, error)
 	GetProof(pointer *CelestiaPointer, startBlock uint64, endBlock uint64, proofNonce big.Int) (*CelestiaProof, error)
 	GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error)
 	GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error)
@@ -56,22 +60,28 @@ type Celestia interface {
 }
 
 type CelestiaClientOpts struct {
-	Endpoint      string
-	Token         string
-	TendermintRPC string
-	Namespace     string
-	Logger        *slog.Logger
-	GasPrice      float64
-	Retries       int
+	Endpoint                string
+	Token                   string
+	TendermintRPC           string
+	Namespace               string
+	Logger                  *slog.Logger
+	GasPrice                float64
+	GasPriceIncreasePercent *big.Int
+	GasAPI                  string
+	Retries                 int
+	RetryDelay              time.Duration
 }
 
 type CelestiaClient struct {
-	namespace string
-	client    *client.Client
-	trpc      *http.HTTP
-	logger    *slog.Logger
-	gasPrice  float64
-	retries   int
+	namespace               string
+	client                  *client.Client
+	trpc                    *thttp.HTTP
+	logger                  *slog.Logger
+	gasPrice                float64
+	gasPriceIncreasePercent *big.Int
+	gasAPI                  string
+	retries                 int
+	retryDelay              time.Duration
 }
 
 func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
@@ -84,7 +94,7 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		return nil, fmt.Errorf("failed to connect to Celestia: %w", err)
 	}
 
-	trpc, err := http.New(opts.TendermintRPC, "/websocket")
+	trpc, err := thttp.New(opts.TendermintRPC, "/websocket")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Tendermint RPC: %w", err)
 	}
@@ -95,12 +105,15 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 
 	opts.Logger.Info("Connected to Celestia")
 	return &CelestiaClient{
-		namespace: opts.Namespace,
-		client:    c,
-		trpc:      trpc,
-		logger:    opts.Logger,
-		gasPrice:  opts.GasPrice,
-		retries:   opts.Retries,
+		namespace:               opts.Namespace,
+		client:                  c,
+		trpc:                    trpc,
+		logger:                  opts.Logger,
+		gasPrice:                opts.GasPrice,
+		gasPriceIncreasePercent: opts.GasPriceIncreasePercent,
+		gasAPI:                  opts.GasAPI,
+		retries:                 opts.Retries,
+		retryDelay:              opts.RetryDelay,
 	}, nil
 }
 
@@ -108,17 +121,17 @@ func (c *CelestiaClient) Namespace() string {
 	return c.namespace
 }
 
-func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
+func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64, error) {
 	// get the namespace
 	ns, err := share.NewBlobNamespaceV0([]byte(c.Namespace()))
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// encode the blocks
 	enc, err := blocks.EncodeRLP()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// create blob to submit
@@ -128,7 +141,13 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 	}
 
 	// gas price is defined by each node operator. 0.003 is a good default to be accepted
-	gasPrice := c.gasPrice
+	gasPrice := c.GasPrice()
+
+	if c.gasPriceIncreasePercent != nil {
+		apiPrice := gasPrice
+		gasPrice *= 1 + float64(c.gasPriceIncreasePercent.Int64())/100
+		c.logger.Info("Gas price increased", "percent", c.gasPriceIncreasePercent, "old_gas_price", apiPrice, "new_gas_price", gasPrice)
+	}
 
 	// estimate gas limit (maximum gas used by the tx)
 	gasLimit := blobtypes.DefaultEstimateGas([]uint32{uint32(b.Size())})
@@ -150,19 +169,19 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, error) 
 		gasPrice *= 1.2
 		fee = int64(gasPrice * float64(gasLimit))
 
-		c.logger.Warn("Failed to submit blob, retrying", "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
+		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
 
 		i++
 
 		// Delay between publishing bundles to Celestia to mitigate 'incorrect account sequence' errors
-		time.Sleep(30 * time.Second)
+		time.Sleep(c.retryDelay)
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, gasPrice, err
 	}
 
-	return pointer, nil
+	return pointer, gasPrice, nil
 }
 
 // PostData submits a new transaction with the provided data to the Celestia node.
@@ -344,6 +363,46 @@ func (c *CelestiaClient) GetSharesProof(celPointer *CelestiaPointer, sharePointe
 	return &sharesProofs, nil
 }
 
+type GasPrice struct {
+	Slow   string `json:"slow"`
+	Median string `json:"median"`
+	Fast   string `json:"fast"`
+}
+
+func (c *CelestiaClient) GasPrice() float64 {
+	// Make HTTP GET request
+	resp, err := http.Get(c.gasAPI)
+	if err != nil {
+		c.logger.Error("Error making HTTP request:", err)
+		return c.gasPrice
+	}
+	defer resp.Body.Close()
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.logger.Error("Error reading response body:", err)
+		return c.gasPrice
+	}
+
+	// Parse JSON response
+	var gasPrice GasPrice
+	err = json.Unmarshal(body, &gasPrice)
+	if err != nil {
+		c.logger.Error("Error parsing JSON response:", err)
+		return c.gasPrice
+	}
+
+	// Convert fast gas price to float64
+	fast, err := strconv.ParseFloat(gasPrice.Fast, 64)
+	if err != nil {
+		c.logger.Error("Error converting fast gas price to float64:", err)
+		return c.gasPrice
+	}
+
+	return fast
+}
+
 // MOCK CLINT FOR TESTING
 
 type celestiaMock struct {
@@ -371,7 +430,7 @@ func (c *celestiaMock) Namespace() string {
 	return c.namespace
 }
 
-func (c *celestiaMock) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
+func (c *celestiaMock) PublishBundle(blocks Bundle) (*CelestiaPointer, float64, error) {
 	c.height++
 
 	// use the first block's hash as the data root
@@ -385,7 +444,7 @@ func (c *celestiaMock) PublishBundle(blocks Bundle) (*CelestiaPointer, error) {
 		TxHash:     hash,
 	}
 
-	return c.pointers[hash], nil
+	return c.pointers[hash], 0, nil
 }
 
 // returns a mock proof, cannot be used for verification

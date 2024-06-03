@@ -3,7 +3,7 @@
 ![Test, Build Image & Push to ECR](https://github.com/lightlink-network/hummingbird-client/actions/workflows/build_and_publish.yml/badge.svg?branch=main)
 
 > [!NOTE]  
-> Hummingbird is a work in progress and is not yet ready for production use.
+> Hummingbird is currently in beta. Please report any issues to the [GitHub repository](https://github.com/lightlink-network/hummingbird-client/issues).
 
 ![LightLink Hummingbird preview screenshot](preview.png)
 
@@ -66,7 +66,7 @@ cd $HOME
 rm -rf hummingbird-client
 git clone https://github.com/lightlink-network/hummingbird-client.git
 cd hummingbird-client
-git checkout tags/v1.0.0-alpha -b v1.0.0-alpha
+git checkout tags/v1.1.0-beta -b v1.1.0-beta
 make build
 ```
 

@@ -389,11 +389,19 @@ func (d *Defender) DefendL2Header(rblock common.Hash, l2BlockNum *big.Int) (*typ
 	}
 	d.Opts.Logger.Info("Provided header", "tx", tx.Hash().Hex(), "rblock", rblock.Hex(), "header", l2BlockHash.Hex())
 
+	// TODO: remove this sleep hack and fix Ethereum.Wait
+	d.Opts.Logger.Info("Waiting for 30 seconds to ensure header is available")
+	time.Sleep(30 * time.Second)
+
 	tx, err = d.ProvideL2Header(challenge.PrevHeader.Rblock, l2PrevBlockHash, false)
 	if err != nil {
 		return nil, fmt.Errorf("error providing previous header: %w", err)
 	}
 	d.Opts.Logger.Info("Provided previous header", "tx", tx.Hash().Hex(), "rblock", rblock.Hex(), "header", l2PrevBlockHash.Hex())
+
+	// TODO: remove this sleep hack and fix Ethereum.Wait
+	d.Opts.Logger.Info("Waiting for 30 seconds to ensure previous header is available")
+	time.Sleep(30 * time.Second)
 
 	// 5. Defend the challenge
 	tx, err = d.Ethereum.DefendL2Header(challengeHash, l2BlockHash, l2PrevBlockHash)
@@ -472,8 +480,8 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 		d.Ethereum.Wait(tx.Hash())
 
 		// TODO: remove this sleep hack and fix Ethereum.Wait
-		d.Opts.Logger.Info("Waiting for 10 seconds to ensure shares are available")
-		time.Sleep(10 * time.Second)
+		d.Opts.Logger.Info("Waiting for 30 seconds to ensure shares are available")
+		time.Sleep(30 * time.Second)
 		d.Ethereum.Wait(tx.Hash())
 	}
 
@@ -548,8 +556,8 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 		d.Ethereum.Wait(tx.Hash())
 
 		// TODO: remove this sleep hack and fix Ethereum.Wait
-		d.Opts.Logger.Info("Waiting for 3 seconds to ensure shares are available")
-		time.Sleep(10 * time.Second)
+		d.Opts.Logger.Info("Waiting for 30 seconds to ensure shares are available")
+		time.Sleep(30 * time.Second)
 	}
 
 	ranges := make([]chainOracleContract.ChainOracleShareRange, len(sharePointer.Ranges))

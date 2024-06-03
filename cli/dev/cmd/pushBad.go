@@ -1,15 +1,17 @@
 package cmd
 
 import (
+	"fmt"
+	hbcmd "hummingbird/cli/hb/cmd"
 	"hummingbird/config"
 	"hummingbird/node"
 	"hummingbird/rollup"
 	"hummingbird/utils"
-	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -18,9 +20,13 @@ var (
 		Short: "push-bad will push a bad block to Layer 1",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+
+			fmt.Println("push-bad called")
 			cfg := config.Load()
-			logger := slog.Default()
+			logger := hbcmd.GetLogger(viper.GetString("log-type"))
 			ethKey := getEthKey()
+
+			logger.Info("Pushing bad block", "reasons", args)
 
 			n, err := node.NewFromConfig(cfg, logger, ethKey)
 			utils.NoErr(err)
@@ -44,12 +50,15 @@ var (
 			}
 
 			// push bad block
+			logger.Info("Creating bad block...")
 			b, err := r.CreateNextBlock()
 			if err != nil {
 				logger.Error("Failed to create bad block", "err", err)
 				return
 			}
+			logger.Info("Created bad block!", "bundles", len(b.Bundles))
 
+			logger.Info("Getting rollup head...")
 			head, err := r.GetRollupHead()
 			if err != nil {
 				logger.Error("Failed to get rollup head", "err", err)
@@ -64,6 +73,7 @@ var (
 				b.L2Height = head.L2Height - 1
 			}
 
+			logger.Info("Submitting bad block...", "epoch", b.Epoch, "l2height", b.L2Height)
 			tx, err := r.SubmitBlock(b)
 			if err != nil {
 				logger.Error("Failed to submit bad block", "err", err)

@@ -193,6 +193,45 @@ func TestValidateBundles(t *testing.T) {
 			},
 			errStr: "block 1 in bundle 1 is not sequential",
 		},
+		{
+			name: "test should fail as the first block in bundles 2 & 3 are not parent block + 1",
+			args: args{
+				bundles: []*node.Bundle{
+					{Blocks: []*ethtypes.Block{
+						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+							Number: big.NewInt(2),
+						}),
+						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+							Number: big.NewInt(3),
+						}),
+						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+							Number: big.NewInt(4),
+						})}},
+					{Blocks: []*ethtypes.Block{
+						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+							Number: big.NewInt(7),
+						}),
+						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+							Number: big.NewInt(8),
+						}),
+						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+							Number: big.NewInt(9),
+						})}},
+					{Blocks: []*ethtypes.Block{
+						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+							Number: big.NewInt(12),
+						}),
+						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+							Number: big.NewInt(13),
+						}),
+						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+							Number: big.NewInt(14),
+						})}},
+				},
+				head: 1,
+			},
+			errStr: "first block in bundle 1 is not the correct height",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

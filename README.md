@@ -66,7 +66,7 @@ cd $HOME
 rm -rf hummingbird-client
 git clone https://github.com/lightlink-network/hummingbird-client.git
 cd hummingbird-client
-git checkout tags/v1.1.0-beta -b v1.1.0-beta
+git checkout tags/v1.1.1-beta -b v1.1.1-beta
 make build
 ```
 

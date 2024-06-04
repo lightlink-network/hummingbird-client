@@ -356,7 +356,7 @@ func (r *Rollup) fetchBundles(fetchStart, fetchTarget uint64) ([]*node.Bundle, e
 			bundles = append(bundles, bundle)
 		}
 
-		fetchStart = to + 1
+		fetchStart = bundle.Blocks[len(bundle.Blocks)-1].Number().Uint64() + 1
 	}
 
 	return bundles, nil

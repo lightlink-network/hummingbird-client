@@ -407,15 +407,6 @@ func ValidateBundles(bundles []*node.Bundle, head uint64) error {
 			return fmt.Errorf("first block in bundle %d is not the correct height", i)
 		}
 
-		if i > 0 {
-			// check the first block in the bundle is the previous bundles last block + 1
-			firstBlock := bundle.Blocks[0]
-			prevBundleLastBlock := bundles[i-1].Blocks[len(bundles[i-1].Blocks)-1]
-			if firstBlock.Number().Uint64() != prevBundleLastBlock.Number().Uint64()+1 {
-				return fmt.Errorf("first block in bundle %d is not the correct height", i)
-			}
-		}
-
 		// validate the blocks in the bundle
 		for j, block := range bundle.Blocks {
 			// check if the block is nil
@@ -425,6 +416,15 @@ func ValidateBundles(bundles []*node.Bundle, head uint64) error {
 			// check if the block.number is previous block.number + 1
 			if j > 0 && block.Number().Uint64() != bundle.Blocks[j-1].Number().Uint64()+1 {
 				return fmt.Errorf("block %d in bundle %d is not sequential", j, i)
+			}
+		}
+
+		if i > 0 {
+			// check the first block in the bundle is the previous bundles last block + 1
+			firstBlock := bundle.Blocks[0]
+			prevBundleLastBlock := bundles[i-1].Blocks[len(bundles[i-1].Blocks)-1]
+			if firstBlock.Number().Uint64() != prevBundleLastBlock.Number().Uint64()+1 {
+				return fmt.Errorf("first block in bundle %d is not the correct height", i)
 			}
 		}
 	}

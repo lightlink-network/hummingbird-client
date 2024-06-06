@@ -17,6 +17,7 @@ ethereum:
   blobstreamX: "0xc3e209eb245Fd59c8586777b499d6A665DF3ABD2"
   gasPriceIncreasePercent: 10 # Gas price increase percent e.g 10% increase from current gas price
   blockTime: 200 # block time in ms, used to calculate number of blocks to scan logs
+  timeout: 15 # Timeout in mins for each request
 lightlink:
   endpoint: https://replicator.pegasus.lightlink.io/rpc/v1 # Lightlink endpoint
   delay: 500 # Delay in ms between each request

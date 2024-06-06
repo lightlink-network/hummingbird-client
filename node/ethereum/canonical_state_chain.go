@@ -61,21 +61,26 @@ func (c *Client) GetRollupHeaderByHash(hash common.Hash) (canonicalStateChainCon
 	return c.canonicalStateChain.GetHeaderByHash(nil, hash)
 }
 
+// Wait waits for a transaction to be mined and returns the receipt
 func (c *Client) Wait(txHash common.Hash) (*types.Receipt, error) {
-	// 1. try to get the the tx, see if it is pending
-	_, isPending, err := c.client.TransactionByHash(context.TODO(), txHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction: %w", err)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), c.opts.Timeout)
+	defer cancel()
 
-	// 2. if it is pending, wait for it to be mined
-	if isPending {
-		time.Sleep(1 * time.Second)
-		return c.Wait(txHash)
+	for {
+		c.logger.Debug("Waiting for transaction to be mined...", "txHash", txHash.Hex())
+		// try to get the receipt
+		receipt, err := c.client.TransactionReceipt(ctx, txHash)
+		if err != nil {
+			// if the receipt is not found, keep checking
+			if err.Error() == "not found" {
+				time.Sleep(10 * time.Second)
+				continue
+			}
+			return nil, fmt.Errorf("failed to get transaction receipt: %w", err)
+		}
+		c.logger.Debug("Transaction mined successfully!", "txHash", txHash.Hex())
+		return receipt, nil
 	}
-
-	// 3. otherwise, if it is not pending, get the receipt
-	return c.client.TransactionReceipt(context.Background(), txHash)
 }
 
 func (c *Client) GetPublisher() (common.Address, error) {

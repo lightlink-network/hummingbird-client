@@ -27,6 +27,7 @@ type Config struct {
 		ChainOracle             string `mapstructure:"chainOracle"`
 		BlobstreamX             string `mapstructure:"blobstreamX"`
 		BlockTime               int    `mapstructure:"blockTime"`
+		Timeout                 int    `mapstructure:"timeout"`
 	} `mapstructure:"ethereum"`
 	LightLink struct {
 		Endpoint string `mapstructure:"endpoint"`

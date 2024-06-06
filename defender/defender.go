@@ -160,7 +160,29 @@ func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpd
 		}
 	}
 
+	_, err = d.Ethereum.Wait(tx.Hash())
+	if err != nil {
+		d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+		return err
+	}
+
 	log.Info("Pending DA challenge defended successfully", "tx", tx.Hash().Hex())
+
+	log.Info("Attempting to claim DA challenge reward")
+
+	// attempt to claim the challenge reward
+	txHash, err := d.ClaimDAChallengeReward(blockHash, uint8(c.PointerIndex.Uint64()), c.ShareIndex)
+	if err != nil {
+		return fmt.Errorf("error claiming DA challenge reward: %w", err)
+	}
+
+	_, err = d.Ethereum.Wait(*txHash)
+	if err != nil {
+		d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+		return err
+	}
+
+	log.Info("DA challenge reward claimed successfully", "tx", txHash.Hex())
 
 	return nil
 }
@@ -175,6 +197,16 @@ func (d *Defender) DefendDA(block common.Hash, pointerIndex uint8, shareIndex ui
 	}
 
 	return d.Ethereum.DefendDataRootInclusion(*key, *shareProof)
+}
+
+// Claim the data root inclusion challenge reward for the given block hash.
+func (d *Defender) ClaimDAChallengeReward(block common.Hash, pointerIndex uint8, shareIndex uint32) (*common.Hash, error) {
+	key, err := d.Ethereum.DataRootInclusionChallengeKey(nil, block, pointerIndex, shareIndex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
+	}
+
+	return d.Ethereum.ClaimDAChallengeReward(key)
 }
 
 func (d *Defender) GetDaProof(block common.Hash, pointerIndex uint8, shareIndex uint32) (*common.Hash, *challengeContract.SharesProof, error) {
@@ -347,9 +379,36 @@ func (d *Defender) defendL2HeaderChallenge(c challengeContract.ChallengeL2Header
 		}
 	}
 
+	_, err = d.Ethereum.Wait(tx.Hash())
+	if err != nil {
+		d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+		return err
+	}
+
 	log.Info("Pending L2 header challenge defended successfully", "tx", tx.Hash().Hex())
 
+	log.Info("Attempting to claim L2 header challenge reward")
+
+	// attempt to claim the challenge reward
+	txHash, err := d.Ethereum.ClaimL2HeaderChallengeReward(c.ChallengeHash)
+	if err != nil {
+		return fmt.Errorf("error claiming L2 header challenge reward: %w", err)
+	}
+
+	_, err = d.Ethereum.Wait(*txHash)
+	if err != nil {
+		d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+		return err
+	}
+
+	log.Info("L2 header challenge reward claimed successfully", "tx", txHash.Hex())
+
 	return nil
+}
+
+// Claims the reward for the given L2 header challenge hash.
+func (d *Defender) ClaimL2HeaderChallengeReward(challengeHash common.Hash) (*common.Hash, error) {
+	return d.Ethereum.ClaimL2HeaderChallengeReward(challengeHash)
 }
 
 // Defends an L2 header challenge by attempting to submit a header proof to the Challenge.sol contract.

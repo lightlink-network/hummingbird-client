@@ -63,5 +63,15 @@ var DefenderDefendDaCmd = &cobra.Command{
 		}
 
 		fmt.Println("Defended data availability with tx:", tx.Hash().Hex(), "gas used:", tx.Gas(), "gas price:", tx.GasPrice().Uint64())
+
+		fmt.Println("Waiting to claim reward...")
+		d.Wait(tx.Hash())
+
+		tx, err = d.Ethereum.ClaimDataRootInclusionReward(blockHash)
+		if err != nil {
+			logger.Error("Failed to claim data root inclusion reward", "err", err)
+			return
+		}
+		fmt.Println("Claimed data root inclusion reward with tx:", tx.Hash().Hex(), "gas used:", tx.Gas(), "gas price:", tx.GasPrice().Uint64())
 	},
 }

@@ -25,6 +25,7 @@ type Challenge interface {
 	GetChallengeWindow() (*big.Int, error)
 	GetChallengeWindowBlockRanges() ([][]uint64, error)
 	DataRootInclusionChallengeKey(opts *bind.CallOpts, blockHash common.Hash, pointerIndex uint8, shareIndex uint32) (common.Hash, error)
+	ClaimDataRootInclusionReward(common.Hash) (*types.Transaction, error)
 }
 
 var _ Challenge = &Client{} // Ensure Client implements Challenge
@@ -79,15 +80,29 @@ func (c *Client) ChallengeDataRootInclusion(index uint64, pointerIndex uint8, sh
 	return tx, blockHash, nil
 }
 
-func (c *Client) DefendDataRootInclusion(blockHash common.Hash, proof challengeContract.SharesProof) (*types.Transaction, error) {
+func (c *Client) DefendDataRootInclusion(challengeKey common.Hash, proof challengeContract.SharesProof) (*types.Transaction, error) {
 	transactor, err := c.transactor()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 
-	tx, err := c.challenge.DefendDataRootInclusion(transactor, blockHash, proof)
+	tx, err := c.challenge.DefendDataRootInclusion(transactor, challengeKey, proof)
 	if err != nil {
 		return nil, fmt.Errorf("failed to defend data root inclusion: %w", err)
+	}
+
+	return tx, nil
+}
+
+func (c *Client) ClaimDataRootInclusionReward(challengeKey common.Hash) (*types.Transaction, error) {
+	transactor, err := c.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	tx, err := c.challenge.ClaimDAChallengeReward(transactor, challengeKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim data root inclusion reward: %w", err)
 	}
 
 	return tx, nil

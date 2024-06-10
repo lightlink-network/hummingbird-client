@@ -162,6 +162,19 @@ func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpd
 
 	log.Info("Pending DA challenge defended successfully", "tx", tx.Hash().Hex())
 
+	challengeKey, err := d.DataRootInclusionChallengeKey(nil, blockHash, uint8(c.PointerIndex.Uint64()), c.ShareIndex)
+	if err != nil {
+		log.Error("Failed to get data root inclusion challenge key", "error", err)
+		return nil
+	}
+
+	tx, err = d.ClaimDataRootInclusionReward(challengeKey)
+	if err != nil {
+		log.Error("Failed to claim data root inclusion reward", "error", err)
+		return nil
+	}
+
+	log.Info("Claimed data root inclusion reward", "tx", tx.Hash().Hex())
 	return nil
 }
 

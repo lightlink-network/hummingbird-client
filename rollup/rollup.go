@@ -130,11 +130,16 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	}
 
 	// 8. create the rollup header
+	output, err := r.LightLink.GetOutputV0(bundles[len(bundles)-1].Last().Header())
+	if err != nil {
+		return nil, fmt.Errorf("createNextBlock: Failed to get output: %w", err)
+	}
+
 	header := &canonicalStateChainContract.CanonicalStateChainHeader{
 		Epoch:            epoch,
 		L2Height:         bundles[len(bundles)-1].Height(),
 		PrevHash:         prevHash,
-		StateRoot:        bundles[len(bundles)-1].StateRoot(),
+		OutputRoot:       output.Root(),
 		CelestiaPointers: pointers,
 	}
 

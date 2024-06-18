@@ -70,7 +70,7 @@ var RollupNextCmd = &cobra.Command{
 		fmt.Println("	Epoch:", b.Epoch)
 		fmt.Println("	L2Height:", b.L2Height)
 		fmt.Println("	PrevHash:", common.BytesToHash(b.PrevHash[:]).Hex())
-		fmt.Println("	StateRoot:", common.BytesToHash(b.CanonicalStateChainHeader.StateRoot[:]).Hex())
+		fmt.Println("	OutputRoot:", common.BytesToHash(b.CanonicalStateChainHeader.OutputRoot[:]).Hex())
 		fmt.Println("	Hash:", hash.Hex())
 		fmt.Println("	Bundle Size:", len(b.L2Blocks()))
 		for i, p := range b.CanonicalStateChainHeader.CelestiaPointers {

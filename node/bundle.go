@@ -82,9 +82,13 @@ func (b *Bundle) TxRoot() common.Hash {
 	return utils.CalculateMerkleRoot(hashes...)
 }
 
+func (b *Bundle) Last() *types.Block {
+	return b.Blocks[len(b.Blocks)-1]
+}
+
 // get the stateroot of the last block in the bundle
 func (b *Bundle) StateRoot() common.Hash {
-	last := b.Blocks[len(b.Blocks)-1]
+	last := b.Last()
 	return last.Header().Root
 }
 

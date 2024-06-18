@@ -70,7 +70,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		Endpoint:                cfg.LightLink.Endpoint,
 		Delay:                   time.Duration(cfg.LightLink.Delay) * time.Millisecond,
 		Logger:                  logger.With("ctx", "lightlink"),
-		L2ToL1MessagePasserAddr: common.HexToAddress(cfg.LightLink.L1ToL2MessagePasser),
+		L2ToL1MessagePasserAddr: common.HexToAddress(cfg.LightLink.L2ToL1MessagePasser),
 	})
 	if err != nil {
 		return nil, err

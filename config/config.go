@@ -31,7 +31,7 @@ type Config struct {
 	LightLink struct {
 		Endpoint            string `mapstructure:"endpoint"`
 		Delay               int    `mapstructure:"delay"`
-		L1ToL2MessagePasser string `mapstructure:"l1ToL2MessagePasser"`
+		L2ToL1MessagePasser string `mapstructure:"l2ToL1MessagePasser"`
 	} `mapstructure:"lightlink"`
 	Rollup struct {
 		L1PollDelay int    `mapstructure:"l1pollDelay"`

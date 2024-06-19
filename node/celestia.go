@@ -166,10 +166,17 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 		}
 
 		// Increase gas price by 20% if the transaction fails
-		gasPrice *= 1.2
-		fee = int64(gasPrice * float64(gasLimit))
+		newGasPrice := gasPrice * 1.2
+		fee = int64(newGasPrice * float64(gasLimit))
 
-		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
+		c.logger.Warn("Failed to submit blob, retrying after delay",
+			"delay", c.retryDelay,
+			"attempt", i+1,
+			"fee", fee,
+			"gas_limit", gasLimit,
+			"old_gas_price", gasPrice,
+			"new_gas_price", newGasPrice,
+			"error", err)
 
 		i++
 

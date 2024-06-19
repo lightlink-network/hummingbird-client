@@ -143,7 +143,7 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	// gas price is defined by each node operator. 0.003 is a good default to be accepted
 	gasPrice := c.GasPrice()
 
-	if c.gasPriceIncreasePercent != nil {
+	if c.gasPriceIncreasePercent.Int64() > 0 {
 		apiPrice := gasPrice
 		gasPrice *= 1 + float64(c.gasPriceIncreasePercent.Int64())/100
 		c.logger.Info("Gas price increased", "percent", c.gasPriceIncreasePercent, "old_gas_price", apiPrice, "new_gas_price", gasPrice)

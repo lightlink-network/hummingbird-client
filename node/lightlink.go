@@ -156,12 +156,21 @@ func (l *LightLinkClient) GetBlocks(start, end uint64) ([]*types.Block, error) {
 
 func (l *LightLinkClient) GetWithdrawalRoot(height uint64) (common.Hash, error) {
 	// get the storage root for L2ToL1MessagePasserAddr at the last block height
-	withdrawalRoot, err := l.client.Call("eth_getStorageAt", []any{l.opts.L2ToL1MessagePasserAddr.Hex(), hexutil.EncodeUint64(height)})
+	proofRaw, err := l.client.Call("eth_getProof", []any{l.opts.L2ToL1MessagePasserAddr.Hex(), []string{}, hexutil.EncodeUint64(height)})
 	if err != nil {
-		return common.Hash{}, fmt.Errorf("failed to get withdrawal root: %w", err)
+		return common.Hash{}, fmt.Errorf("failed to get withdrawal address proof: %w", err)
+	}
+	proof := make(map[string]interface{})
+	err = proofRaw.Bind(&proof)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed to bind withdrawal address proof: %w", err)
+	}
+	withdrawalRoot := proof["storageHash"].(string)
+	if withdrawalRoot == "" {
+		return common.Hash{}, fmt.Errorf("failed to get withdrawal address proof: storageHash is empty")
 	}
 
-	return common.HexToHash(withdrawalRoot.Result.(string)), nil
+	return common.HexToHash(withdrawalRoot), nil
 }
 
 type OutputV0 struct {

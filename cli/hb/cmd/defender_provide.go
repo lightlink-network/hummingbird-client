@@ -70,6 +70,11 @@ var DefenderProvideCmd = &cobra.Command{
 			return
 		}
 
+		if tx == nil {
+			logger.Error("Transaction is nil")
+			return
+		}
+
 		fmt.Println(" ")
 		fmt.Println("Tx Hash:", tx.Hash().Hex())
 		fmt.Println("Provided L2 Data:", targetHash.Hex())

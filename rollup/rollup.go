@@ -274,7 +274,11 @@ func (r *Rollup) Run() error {
 			"l2_blocks", len(block.L2Blocks()),
 		)
 
-		time.Sleep(r.Opts.L1PollDelay)
+		_, err = r.Ethereum.Wait(tx.Hash())
+		if err != nil {
+			log.Error("failed to wait for tx", "error", err)
+			return err
+		}
 	}
 
 }

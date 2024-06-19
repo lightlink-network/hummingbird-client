@@ -7,6 +7,7 @@ import (
 	"hummingbird/utils"
 	"log/slog"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -55,6 +56,7 @@ type ClientOpts struct {
 	DryRun                     bool
 	GasPriceIncreasePercent    *big.Int
 	BlockTime                  int
+	Timeout                    time.Duration
 }
 
 // NewEthereumRPC returns a new EthereumRPC client over HTTP.

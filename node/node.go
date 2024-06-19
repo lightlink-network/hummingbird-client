@@ -45,6 +45,7 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		DryRun:                     cfg.DryRun,
 		GasPriceIncreasePercent:    big.NewInt(int64(cfg.Ethereum.GasPriceIncreasePercent)),
 		BlockTime:                  cfg.Ethereum.BlockTime,
+		Timeout:                    time.Duration(cfg.Ethereum.Timeout) * time.Minute,
 	})
 	if err != nil {
 		return nil, err
@@ -85,6 +86,9 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	}
 
 	logger.Info("Rollup Node created!", "dryRun", cfg.DryRun)
+
+	logger.Info("Ethereum private key address", "address", crypto.PubkeyToAddress(ethKey.PublicKey).Hex())
+
 	return &Node{
 		Ethereum:  eth,
 		Celestia:  cel,

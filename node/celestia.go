@@ -143,7 +143,7 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	// gas price is defined by each node operator. 0.003 is a good default to be accepted
 	gasPrice := c.GasPrice()
 
-	if c.gasPriceIncreasePercent != nil {
+	if c.gasPriceIncreasePercent.Int64() > 0 {
 		apiPrice := gasPrice
 		gasPrice *= 1 + float64(c.gasPriceIncreasePercent.Int64())/100
 		c.logger.Info("Gas price increased", "percent", c.gasPriceIncreasePercent, "old_gas_price", apiPrice, "new_gas_price", gasPrice)
@@ -166,10 +166,17 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 		}
 
 		// Increase gas price by 20% if the transaction fails
-		gasPrice *= 1.2
-		fee = int64(gasPrice * float64(gasLimit))
+		newGasPrice := gasPrice * 1.2
+		fee = int64(newGasPrice * float64(gasLimit))
 
-		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
+		c.logger.Warn("Failed to submit blob, retrying after delay",
+			"delay", c.retryDelay,
+			"attempt", i+1,
+			"fee", fee,
+			"gas_limit", gasLimit,
+			"old_gas_price", gasPrice,
+			"new_gas_price", newGasPrice,
+			"error", err)
 
 		i++
 

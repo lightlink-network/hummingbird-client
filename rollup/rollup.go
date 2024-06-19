@@ -333,29 +333,31 @@ func (r *Rollup) fetchBundles(fetchStart, fetchTarget uint64) ([]*node.Bundle, [
 	pointers := make([]canonicalStateChainContract.CanonicalStateChainCelestiaPointer, 0)
 
 	for fetchStart < fetchTarget && uint64(len(bundles)) < r.Opts.BundleCount {
+		// Calculate the range of blocks to fetch
 		from := fetchStart
 		to := fetchStart + r.Opts.BundleSize - 1
+
+		// Ensure we don't fetch more than the fetchTarget
 		if to > fetchTarget {
 			to = fetchTarget
 		}
 
+		// Fetch the next bundle from the layer two network
 		bundle, err := r.fetchBundle(from, to)
 		if err != nil {
-			r.Opts.Logger.Error("Failed to fetch bundle", "from", from, "to", to, "error", err)
-			return nil, nil, err
-		} else {
-			bundles = append(bundles, bundle)
+			r.Opts.Logger.Error("Failed to fetch bundle, retrying", "from", from, "to", to, "error", err)
+			continue
 		}
 
-		// upload the bundle to celestia
-		r.Opts.Logger.Info("Publishing bundle to Celestia", "bundle", len(bundles), "bundle_size", bundle.Size(), "ll_height", bundle.Blocks[len(bundle.Blocks)-1].Number())
-
-		pointer, gasPrice, err := r.Celestia.PublishBundle(*bundle)
+		// Publish the bundle to the data availability layer (Celestia)
+		pointer, err := r.publishBundle(*bundle)
 		if err != nil {
-			return nil, nil, fmt.Errorf("createNextBlock: Failed to publish bundle: %w", err)
+			r.Opts.Logger.Error("Failed to publish bundle, will refetch and retry", "from", from, "to", to, "error", err)
+			continue
 		}
 
-		r.Opts.Logger.Debug("Published bundle to Celestia", "gas_price", gasPrice, "bundle", len(bundles), "bundle_size", bundle.Size(), "celestia_tx", pointer.TxHash.Hex())
+		// If successfully fetched and published the bundle, add it to the list of bundles and pointers
+		bundles = append(bundles, bundle)
 
 		pointers = append(pointers, canonicalStateChainContract.CanonicalStateChainCelestiaPointer{
 			Height:     pointer.Height,
@@ -363,10 +365,25 @@ func (r *Rollup) fetchBundles(fetchStart, fetchTarget uint64) ([]*node.Bundle, [
 			ShareLen:   uint16(pointer.ShareLen),
 		})
 
+		// Update the fetchStart to the next block to begin fetching from
 		fetchStart = bundle.Blocks[len(bundle.Blocks)-1].Number().Uint64() + 1
 	}
 
 	return bundles, pointers, nil
+}
+
+func (r *Rollup) publishBundle(bundle node.Bundle) (*node.CelestiaPointer, error) {
+	l := r.Opts.Logger.With("bundle_size", bundle.Size(), "first_l2_height", bundle.Blocks[0].Number(), "last_l2_height", bundle.Blocks[len(bundle.Blocks)-1].Number())
+	l.Info("Publishing bundle to Celestia...")
+
+	pointer, gasPrice, err := r.Celestia.PublishBundle(bundle)
+	if err != nil {
+		return nil, fmt.Errorf("publishBundle: Failed to publish bundle: %w", err)
+	}
+
+	l.Info("Bundle published successfully!", "gas_price", gasPrice, "celestia_tx", pointer.TxHash.Hex())
+
+	return pointer, nil
 }
 
 func (r *Rollup) fetchBundle(from, to uint64) (*node.Bundle, error) {

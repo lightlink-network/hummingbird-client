@@ -22,6 +22,7 @@ type LightLink interface {
 	GetBlocks(start, end uint64) ([]*types.Block, error)
 	GetOutputV0(last *types.Header) (OutputV0, error)
 	GetProof(address common.Address, keys []string, height uint64) (*RawProof, error)
+	WithdrawalAddress(height uint64) common.Address
 }
 
 type LightLinkClientOpts struct {
@@ -174,6 +175,10 @@ func (l *LightLinkClient) GetWithdrawalRoot(height uint64) (common.Hash, error) 
 	return common.HexToHash(withdrawalRoot), nil
 }
 
+func (l *LightLinkClient) WithdrawalAddress(height uint64) common.Address {
+	return l.opts.L2ToL1MessagePasserAddr
+}
+
 type RawProof struct {
 	Address      string   `json:"address"`
 	AccountProof []string `json:"accountProof"`
@@ -280,4 +285,8 @@ func (m *lightLinkMock) GetOutputV0(last *types.Header) (OutputV0, error) {
 
 func (m *lightLinkMock) GetProof(address common.Address, keys []string, height uint64) (*RawProof, error) {
 	return nil, nil
+}
+
+func (m *lightLinkMock) WithdrawalAddress(height uint64) common.Address {
+	return common.Address{}
 }

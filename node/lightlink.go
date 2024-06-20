@@ -21,6 +21,7 @@ type LightLink interface {
 	GetBlock(height uint64) (*types.Block, error)
 	GetBlocks(start, end uint64) ([]*types.Block, error)
 	GetOutputV0(last *types.Header) (OutputV0, error)
+	GetProof(address common.Address, keys []string, height uint64) (*RawProof, error)
 }
 
 type LightLinkClientOpts struct {
@@ -173,6 +174,35 @@ func (l *LightLinkClient) GetWithdrawalRoot(height uint64) (common.Hash, error) 
 	return common.HexToHash(withdrawalRoot), nil
 }
 
+type RawProof struct {
+	Address      string   `json:"address"`
+	AccountProof []string `json:"accountProof"`
+	Balance      string   `json:"balance"`
+	CodeHash     string   `json:"codeHash"`
+	Nonce        string   `json:"nonce"`
+	StorageHash  string   `json:"storageHash"`
+	StorageProof []struct {
+		Key   string
+		Value string
+		Proof []string
+	} `json:"storageProof"`
+}
+
+func (l *LightLinkClient) GetProof(address common.Address, keys []string, height uint64) (*RawProof, error) {
+	proofRaw, err := l.client.Call("eth_getProof", []any{address.Hex(), keys, hexutil.EncodeUint64(height)})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get proof: %w", err)
+	}
+
+	proof := &RawProof{}
+	err = proofRaw.Bind(proof)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind proof: %w", err)
+	}
+
+	return proof, nil
+}
+
 type OutputV0 struct {
 	StateRoot                common.Hash
 	MessagePasserStorageRoot common.Hash
@@ -246,4 +276,8 @@ func (m *lightLinkMock) SimulateAddBlock(block *types.Block) {
 
 func (m *lightLinkMock) GetOutputV0(last *types.Header) (OutputV0, error) {
 	return OutputV0{}, nil
+}
+
+func (m *lightLinkMock) GetProof(address common.Address, keys []string, height uint64) (*RawProof, error) {
+	return nil, nil
 }

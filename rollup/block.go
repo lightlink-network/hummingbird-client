@@ -5,7 +5,7 @@ import (
 
 	canonicalStateChainContract "hummingbird/node/contracts/CanonicalStateChain.sol"
 
-	"github.com/ethereum/go-ethereum/core/types"
+	"hummingbird/node/lightlink/types"
 )
 
 type Block struct {

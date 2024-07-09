@@ -2,6 +2,7 @@ package rollup
 
 import (
 	"hummingbird/node"
+	"hummingbird/node/lightlink/types"
 	"math/big"
 	"testing"
 
@@ -22,34 +23,34 @@ func TestValidateBundles(t *testing.T) {
 			name: "happy path should pass",
 			args: args{
 				bundles: []*node.Bundle{
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(2),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(3),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(4),
 						})}},
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(5),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(6),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(7),
 						})}},
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(8),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(9),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(10),
 						})}},
 				},
@@ -69,7 +70,7 @@ func TestValidateBundles(t *testing.T) {
 			name: "test should fail as bundle 0 is empty",
 			args: args{
 				bundles: []*node.Bundle{
-					{Blocks: []*ethtypes.Block{}},
+					{Blocks: []*types.Block{}},
 				},
 				head: 6,
 			},
@@ -79,17 +80,17 @@ func TestValidateBundles(t *testing.T) {
 			name: "test should fail as bundle 1 is empty",
 			args: args{
 				bundles: []*node.Bundle{
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(2),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(3),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(4),
 						})}},
-					{Blocks: []*ethtypes.Block{}},
+					{Blocks: []*types.Block{}},
 				},
 				head: 1,
 			},
@@ -99,34 +100,34 @@ func TestValidateBundles(t *testing.T) {
 			name: "test should fail as the first block in bundle 0 is not the head+1",
 			args: args{
 				bundles: []*node.Bundle{
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(2),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(3),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(4),
 						})}},
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(5),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(6),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(7),
 						})}},
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(8),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(9),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(10),
 						})}},
 				},
@@ -138,17 +139,17 @@ func TestValidateBundles(t *testing.T) {
 			name: "test should fail as bundle 1 has a nil block",
 			args: args{
 				bundles: []*node.Bundle{
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(2),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(3),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(4),
 						})}},
-					{Blocks: []*ethtypes.Block{nil}},
+					{Blocks: []*types.Block{nil}},
 				},
 				head: 1,
 			},
@@ -158,34 +159,34 @@ func TestValidateBundles(t *testing.T) {
 			name: "test should fail as the blocks in bundle 2 are not sequential",
 			args: args{
 				bundles: []*node.Bundle{
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(2),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(3),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(4),
 						})}},
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(5),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(7),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(8),
 						})}},
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(9),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(10),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(11),
 						})}},
 				},
@@ -197,34 +198,34 @@ func TestValidateBundles(t *testing.T) {
 			name: "test should fail as the first block in bundles 2 & 3 are not parent block + 1",
 			args: args{
 				bundles: []*node.Bundle{
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(2),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(3),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(4),
 						})}},
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(7),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(8),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(9),
 						})}},
-					{Blocks: []*ethtypes.Block{
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+					{Blocks: []*types.Block{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(12),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(13),
 						}),
-						ethtypes.NewBlockWithHeader(&ethtypes.Header{
+						types.NewBlockWithHeader(&ethtypes.Header{
 							Number: big.NewInt(14),
 						})}},
 				},

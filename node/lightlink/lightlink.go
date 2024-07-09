@@ -5,14 +5,15 @@ import (
 	"errors"
 	"math/big"
 
+	"hummingbird/node/lightlink/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/holiman/uint256"
 )
 
 const DepositTxType = 0x7E
+const DepositV2TxType = 125
 
 type txJSON struct {
 	Type hexutil.Uint64 `json:"type"`
@@ -32,6 +33,12 @@ type txJSON struct {
 	V                    *hexutil.Big      `json:"v"`
 	R                    *hexutil.Big      `json:"r"`
 	S                    *hexutil.Big      `json:"s"`
+
+	// Deposit
+	SourceHash          *common.Hash    `json:"sourceHash,omitempty"`
+	From                *common.Address `json:"from,omitempty"`
+	Mint                *hexutil.Big    `json:"mint,omitempty"`
+	IsSystemTransaction bool            `json:"isSystemTransaction,omitempty"`
 
 	// Only used for encoding:
 	Hash common.Hash `json:"hash"`
@@ -200,70 +207,6 @@ func UnMarshallTx(input []byte) (*types.Transaction, error) {
 			}
 		}
 
-	case types.BlobTxType:
-		var itx types.BlobTx
-		inner = &itx
-		if dec.ChainID == nil {
-			return nil, errors.New("missing required field 'chainId' in transaction")
-		}
-		itx.ChainID = uint256.MustFromBig((*big.Int)(dec.ChainID))
-		if dec.Nonce == nil {
-			return nil, errors.New("missing required field 'nonce' in transaction")
-		}
-		itx.Nonce = uint64(*dec.Nonce)
-		if dec.To != nil {
-			itx.To = *dec.To
-		}
-		if dec.Gas == nil {
-			return nil, errors.New("missing required field 'gas' for txdata")
-		}
-		itx.Gas = uint64(*dec.Gas)
-		if dec.MaxPriorityFeePerGas == nil {
-			return nil, errors.New("missing required field 'maxPriorityFeePerGas' for txdata")
-		}
-		itx.GasTipCap = uint256.MustFromBig((*big.Int)(dec.MaxPriorityFeePerGas))
-		if dec.MaxFeePerGas == nil {
-			return nil, errors.New("missing required field 'maxFeePerGas' for txdata")
-		}
-		itx.GasFeeCap = uint256.MustFromBig((*big.Int)(dec.MaxFeePerGas))
-		if dec.MaxFeePerDataGas == nil {
-			return nil, errors.New("missing required field 'maxFeePerDataGas' for txdata")
-		}
-		itx.BlobFeeCap = uint256.MustFromBig((*big.Int)(dec.MaxFeePerDataGas))
-		if dec.Value == nil {
-			return nil, errors.New("missing required field 'value' in transaction")
-		}
-		itx.Value = uint256.MustFromBig((*big.Int)(dec.Value))
-		if dec.Input == nil {
-			return nil, errors.New("missing required field 'input' in transaction")
-		}
-		itx.Data = *dec.Input
-		if dec.V == nil {
-			return nil, errors.New("missing required field 'v' in transaction")
-		}
-		if dec.AccessList != nil {
-			itx.AccessList = *dec.AccessList
-		}
-		if dec.BlobVersionedHashes == nil {
-			return nil, errors.New("missing required field 'blobVersionedHashes' in transaction")
-		}
-		itx.BlobHashes = dec.BlobVersionedHashes
-		itx.V = uint256.MustFromBig((*big.Int)(dec.V))
-		if dec.R == nil {
-			return nil, errors.New("missing required field 'r' in transaction")
-		}
-		itx.R = uint256.MustFromBig((*big.Int)(dec.R))
-		if dec.S == nil {
-			return nil, errors.New("missing required field 's' in transaction")
-		}
-		itx.S = uint256.MustFromBig((*big.Int)(dec.S))
-		withSignature := itx.V.Sign() != 0 || itx.R.Sign() != 0 || itx.S.Sign() != 0
-		if withSignature {
-			if err := sanityCheckSignature(itx.V.ToBig(), itx.R.ToBig(), itx.S.ToBig(), false); err != nil {
-				return nil, err
-			}
-		}
-
 	case DepositTxType:
 		if dec.AccessList != nil || dec.MaxFeePerGas != nil ||
 			dec.MaxPriorityFeePerGas != nil {
@@ -318,6 +261,69 @@ func UnMarshallTx(input []byte) (*types.Transaction, error) {
 				return nil, err
 			}
 		}
+
+	case DepositV2TxType:
+		if dec.AccessList != nil || dec.MaxFeePerGas != nil ||
+			dec.MaxPriorityFeePerGas != nil {
+			return nil, errors.New("unexpected field(s) in deposit transaction")
+		}
+		if dec.GasPrice != nil && dec.GasPrice.ToInt().Cmp(common.Big0) != 0 {
+			return nil, errors.New("deposit transaction GasPrice must be 0")
+		}
+		/*
+			type DepositTxV2 struct {
+			// SourceHash uniquely identifies the source of the deposit
+			SourceHash common.Hash
+			// From is exposed through the types.Signer, not through TxData
+			From common.Address
+			// nil means contract creation
+			To *common.Address `rlp:"nil"`
+			// Mint is minted on L2, locked on L1, nil if no minting.
+			Mint *big.Int `rlp:"nil"`
+			// Value is transferred from L2 balance, executed after Mint (if any)
+			Value *big.Int
+			// gas limit
+			Gas uint64
+			// Field indicating if this transaction is exempt from the L2 gas limit.
+			IsSystemTransaction bool
+			// Normal Tx data
+			Data []byte
+		} */
+		var itx types.DepositTxV2
+		inner = &itx
+
+		if dec.SourceHash == nil {
+			return nil, errors.New("missing required field 'sourceHash' in transaction")
+		}
+		itx.SourceHash = *dec.SourceHash
+
+		if dec.From == nil {
+			return nil, errors.New("missing required field 'from' in transaction")
+		}
+		itx.From = *dec.From
+
+		if dec.To != nil {
+			itx.To = dec.To
+		}
+
+		if dec.Mint != nil {
+			itx.Mint = (*big.Int)(dec.Mint)
+		}
+
+		if dec.Value != nil {
+			itx.Value = (*big.Int)(dec.Value)
+		}
+
+		if dec.Gas == nil {
+			return nil, errors.New("missing required field 'gas' in transaction")
+		}
+		itx.Gas = uint64(*dec.Gas)
+
+		if dec.IsSystemTransaction {
+			itx.IsSystemTransaction = dec.IsSystemTransaction
+		}
+
+		itx.Data = *dec.Input
 
 	default:
 		return nil, types.ErrTxTypeNotSupported

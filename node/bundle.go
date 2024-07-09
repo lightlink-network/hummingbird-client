@@ -3,12 +3,13 @@ package node
 import (
 	"bytes"
 	"fmt"
+	"hummingbird/node/lightlink/types"
 	"hummingbird/utils"
 
 	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/tendermint/tendermint/crypto/merkle"
 )
@@ -202,7 +203,7 @@ func (b *Bundle) FindTxShares(hash common.Hash, namespace string) (*SharePointer
 		return nil, fmt.Errorf("tx with hash %s not found in bundle", hash.Hex())
 	}
 
-	if tx.Type() != types.LegacyTxType {
+	if tx.Type() != ethtypes.LegacyTxType {
 		return nil, fmt.Errorf("tx with hash %s is not a legacy tx, only legacy txns supported", hash.Hex())
 	}
 

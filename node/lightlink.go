@@ -9,9 +9,11 @@ import (
 	"log/slog"
 	"time"
 
+	"hummingbird/node/lightlink/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -20,7 +22,7 @@ type LightLink interface {
 	GetHeight() (uint64, error) // GetHeight returns the current height of the lightlink network.
 	GetBlock(height uint64) (*types.Block, error)
 	GetBlocks(start, end uint64) ([]*types.Block, error)
-	GetOutputV0(last *types.Header) (OutputV0, error)
+	GetOutputV0(last *ethtypes.Header) (OutputV0, error)
 	GetProof(address common.Address, keys []string, height uint64) (*RawProof, error)
 	WithdrawalAddress(height uint64) common.Address
 }
@@ -101,7 +103,7 @@ func (l *LightLinkClient) GetBlock(height uint64) (*types.Block, error) {
 		txs = append(txs, tx)
 	}
 
-	h := &types.Header{}
+	h := &ethtypes.Header{}
 	err = resp.Bind(h)
 	if err != nil {
 		return nil, err
@@ -228,7 +230,7 @@ func (o OutputV0) Root() common.Hash {
 	return crypto.Keccak256Hash(buf[:])
 }
 
-func (l *LightLinkClient) GetOutputV0(last *types.Header) (OutputV0, error) {
+func (l *LightLinkClient) GetOutputV0(last *ethtypes.Header) (OutputV0, error) {
 	withdrawalRoot, err := l.GetWithdrawalRoot(last.Number.Uint64())
 	if err != nil {
 		return OutputV0{}, err
@@ -255,31 +257,31 @@ func unmarshalJsonTx(from any) (*types.Transaction, error) {
 
 type lightLinkMock struct {
 	Height uint64
-	Blocks []*types.Block
+	Blocks []*ethtypes.Block
 }
 
 func NewLightLinkMock() *lightLinkMock {
-	return &lightLinkMock{Height: 0, Blocks: []*types.Block{}}
+	return &lightLinkMock{Height: 0, Blocks: []*ethtypes.Block{}}
 }
 
 func (m *lightLinkMock) GetHeight() (uint64, error) {
 	return m.Height, nil
 }
 
-func (m *lightLinkMock) GetBlock(height uint64) (*types.Block, error) {
+func (m *lightLinkMock) GetBlock(height uint64) (*ethtypes.Block, error) {
 	return m.Blocks[height], nil
 }
 
-func (m *lightLinkMock) GetBlocks(start, end uint64) ([]*types.Block, error) {
+func (m *lightLinkMock) GetBlocks(start, end uint64) ([]*ethtypes.Block, error) {
 	return m.Blocks[start:end], nil
 }
 
-func (m *lightLinkMock) SimulateAddBlock(block *types.Block) {
+func (m *lightLinkMock) SimulateAddBlock(block *ethtypes.Block) {
 	m.Blocks = append(m.Blocks, block)
 	m.Height++
 }
 
-func (m *lightLinkMock) GetOutputV0(last *types.Header) (OutputV0, error) {
+func (m *lightLinkMock) GetOutputV0(last *ethtypes.Header) (OutputV0, error) {
 	return OutputV0{}, nil
 }
 

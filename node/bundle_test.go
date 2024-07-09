@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	crand "crypto/rand"
+	"hummingbird/node/lightlink/types"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -29,7 +30,7 @@ func randPrivKey() *ecdsa.PrivateKey {
 
 func newRandomBundle(size int, withTxns bool) *Bundle {
 	b := &Bundle{
-		Blocks: make([]*ethtypes.Block, size),
+		Blocks: make([]*types.Block, size),
 	}
 
 	for i := 0; i < size; i++ {
@@ -38,7 +39,7 @@ func newRandomBundle(size int, withTxns bool) *Bundle {
 			prevHash = b.Blocks[i-1].Hash()
 		}
 
-		b.Blocks[i] = ethtypes.NewBlockWithHeader(&ethtypes.Header{
+		b.Blocks[i] = types.NewBlockWithHeader(&ethtypes.Header{
 			ParentHash: prevHash,
 			Time:       uint64(i),
 			Coinbase:   randAddr(),
@@ -46,12 +47,12 @@ func newRandomBundle(size int, withTxns bool) *Bundle {
 		})
 
 		if withTxns {
-			signer := ethtypes.NewEIP155Signer(big.NewInt(1))
+			signer := types.NewEIP155Signer(big.NewInt(1))
 			randN := 1 + rand.Intn(10)
-			txns := make(ethtypes.Transactions, randN)
+			txns := make(types.Transactions, randN)
 			for j := 0; j < randN; j++ {
 				to := randAddr()
-				rtx := ethtypes.NewTx(&ethtypes.LegacyTx{
+				rtx := types.NewTx(&types.LegacyTx{
 					Nonce:    uint64(j + 1),
 					To:       &to,
 					Value:    big.NewInt(10000),
@@ -60,7 +61,7 @@ func newRandomBundle(size int, withTxns bool) *Bundle {
 					Data:     []byte{},
 				})
 
-				stx, _ := ethtypes.SignTx(rtx, signer, randPrivKey())
+				stx, _ := types.SignTx(rtx, signer, randPrivKey())
 				txns[j] = stx
 			}
 

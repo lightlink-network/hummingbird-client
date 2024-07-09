@@ -38,7 +38,7 @@ type txJSON struct {
 	SourceHash          *common.Hash    `json:"sourceHash,omitempty"`
 	From                *common.Address `json:"from,omitempty"`
 	Mint                *hexutil.Big    `json:"mint,omitempty"`
-	IsSystemTransaction bool            `json:"isSystemTransaction,omitempty"`
+	IsSystemTransaction bool            `json:"isSystemTx,omitempty"`
 
 	// Only used for encoding:
 	Hash common.Hash `json:"hash"`

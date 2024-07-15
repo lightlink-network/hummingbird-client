@@ -17,6 +17,7 @@ ethereum:
 lightlink:
   endpoint: https://replicator.pegasus.lightlink.io/rpc/v1 # Lightlink endpoint
   delay: 500 # Delay in ms between each request
+  l2ToL1MessagePasser: "0xE4397064013C6689E9624944F002fdE27257f92C" # L2 to L1 message passer contract address
 rollup:
   bundleCount: 2 # Number of bundles in each rollup block.
   bundleSize: 10 # Number of blocks in each bundle

@@ -405,6 +405,8 @@ func (c *CelestiaClient) GasPrice() float64 {
 
 // MOCK CLINT FOR TESTING
 
+var _ Celestia = &celestiaMock{}
+
 type celestiaMock struct {
 	fakeProof bool
 	namespace string

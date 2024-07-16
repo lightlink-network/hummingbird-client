@@ -230,10 +230,6 @@ func (o OutputV0) Root() common.Hash {
 	return crypto.Keccak256Hash(buf[:])
 }
 
-
-0x00309cf4e4b29e0f9249aa9e495969b5fe5e5b96a7090a65677d1bea390694c5
-
-
 func (l *LightLinkClient) GetOutputV0(last *ethtypes.Header) (OutputV0, error) {
 	withdrawalRoot, err := l.GetWithdrawalRoot(last.Number.Uint64())
 	if err != nil {

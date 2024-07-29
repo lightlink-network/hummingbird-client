@@ -3,12 +3,13 @@ package node
 import (
 	"bytes"
 	"fmt"
+	"hummingbird/node/lightlink/types"
 	"hummingbird/utils"
 
 	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/tendermint/tendermint/crypto/merkle"
 )
@@ -82,9 +83,13 @@ func (b *Bundle) TxRoot() common.Hash {
 	return utils.CalculateMerkleRoot(hashes...)
 }
 
+func (b *Bundle) Last() *types.Block {
+	return b.Blocks[len(b.Blocks)-1]
+}
+
 // get the stateroot of the last block in the bundle
 func (b *Bundle) StateRoot() common.Hash {
-	last := b.Blocks[len(b.Blocks)-1]
+	last := b.Last()
 	return last.Header().Root
 }
 
@@ -198,7 +203,7 @@ func (b *Bundle) FindTxShares(hash common.Hash, namespace string) (*SharePointer
 		return nil, fmt.Errorf("tx with hash %s not found in bundle", hash.Hex())
 	}
 
-	if tx.Type() != types.LegacyTxType {
+	if tx.Type() != ethtypes.LegacyTxType {
 		return nil, fmt.Errorf("tx with hash %s is not a legacy tx, only legacy txns supported", hash.Hex())
 	}
 

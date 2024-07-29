@@ -30,8 +30,9 @@ type Config struct {
 		Timeout                 int    `mapstructure:"timeout"`
 	} `mapstructure:"ethereum"`
 	LightLink struct {
-		Endpoint string `mapstructure:"endpoint"`
-		Delay    int    `mapstructure:"delay"`
+		Endpoint            string `mapstructure:"endpoint"`
+		Delay               int    `mapstructure:"delay"`
+		L2ToL1MessagePasser string `mapstructure:"l2ToL1MessagePasser"`
 	} `mapstructure:"lightlink"`
 	Rollup struct {
 		L1PollDelay int    `mapstructure:"l1pollDelay"`

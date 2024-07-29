@@ -4,8 +4,10 @@ import (
 	"context"
 	"math/big"
 
+	"hummingbird/node/lightlink/types"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -24,7 +26,7 @@ func HashWithoutExtraData(block *types.Block) common.Hash {
 	return header.Hash()
 }
 
-func HashHeaderWithoutExtraData(header *types.Header) common.Hash {
+func HashHeaderWithoutExtraData(header *ethtypes.Header) common.Hash {
 	header.Extra = common.Hex2Bytes("0x")
 	return header.Hash()
 }
@@ -47,7 +49,7 @@ type L2HeaderJson struct {
 	Nonce            []byte         `json:"nonce"`
 }
 
-func ToL2HeaderJson(header *types.Header) *L2HeaderJson {
+func ToL2HeaderJson(header *ethtypes.Header) *L2HeaderJson {
 
 	return &L2HeaderJson{
 		ParentHash:       header.ParentHash,

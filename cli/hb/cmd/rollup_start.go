@@ -13,6 +13,7 @@ import (
 
 func init() {
 	RollupStartCmd.Flags().Bool("dry", false, "dry run will not submit the rollup block to the L1 rollup contract, and will not upload real data to celestia")
+	RollupStartCmd.Flags().Bool("mock-da", false, "mock data availability will not publish data availability to celestia")
 }
 
 var RollupStartCmd = &cobra.Command{
@@ -29,6 +30,11 @@ var RollupStartCmd = &cobra.Command{
 
 		n, err := node.NewFromConfig(cfg, logger, ethKey)
 		utils.NoErr(err)
+
+		// is mock data availability enabled?
+		if mockDA, _ := cmd.Flags().GetBool("mock-da"); mockDA {
+			n.Celestia = node.NewCelestiaMock(cfg.Celestia.Namespace)
+		}
 
 		// Can only run rollup node if the eth key is a publisher
 		if !n.IsPublisher(ethKey) {

@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"hummingbird/rollup"
 
+	"hummingbird/node/lightlink/types"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/spf13/cobra"
 )

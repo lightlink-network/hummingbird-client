@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"hummingbird/node/jsonrpc"
 	"hummingbird/node/lightlink"
+	"hummingbird/utils"
 	"log/slog"
 	"time"
 
+	"hummingbird/node/lightlink/types"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // LinkLink is a client for the LightLink layer 2 network.
@@ -17,12 +22,16 @@ type LightLink interface {
 	GetHeight() (uint64, error) // GetHeight returns the current height of the lightlink network.
 	GetBlock(height uint64) (*types.Block, error)
 	GetBlocks(start, end uint64) ([]*types.Block, error)
+	GetOutputV0(last *ethtypes.Header) (OutputV0, error)
+	GetProof(address common.Address, keys []string, height uint64) (*RawProof, error)
+	WithdrawalAddress(height uint64) common.Address
 }
 
 type LightLinkClientOpts struct {
-	Endpoint string
-	Delay    time.Duration
-	Logger   *slog.Logger
+	Endpoint                string
+	Delay                   time.Duration
+	Logger                  *slog.Logger
+	L2ToL1MessagePasserAddr common.Address
 }
 
 type LightLinkClient struct {
@@ -94,7 +103,7 @@ func (l *LightLinkClient) GetBlock(height uint64) (*types.Block, error) {
 		txs = append(txs, tx)
 	}
 
-	h := &types.Header{}
+	h := &ethtypes.Header{}
 	err = resp.Bind(h)
 	if err != nil {
 		return nil, err
@@ -149,6 +158,92 @@ func (l *LightLinkClient) GetBlocks(start, end uint64) ([]*types.Block, error) {
 	return blocks, nil
 }
 
+func (l *LightLinkClient) GetWithdrawalRoot(height uint64) (common.Hash, error) {
+	// get the storage root for L2ToL1MessagePasserAddr at the last block height
+	proofRaw, err := l.client.Call("eth_getProof", []any{l.opts.L2ToL1MessagePasserAddr.Hex(), []string{}, hexutil.EncodeUint64(height)})
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed to get withdrawal address proof: %w", err)
+	}
+	proof := make(map[string]interface{})
+	err = proofRaw.Bind(&proof)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed to bind withdrawal address proof: %w", err)
+	}
+	withdrawalRoot := proof["storageHash"].(string)
+	if withdrawalRoot == "" {
+		return common.Hash{}, fmt.Errorf("failed to get withdrawal address proof: storageHash is empty")
+	}
+
+	return common.HexToHash(withdrawalRoot), nil
+}
+
+func (l *LightLinkClient) WithdrawalAddress(height uint64) common.Address {
+	return l.opts.L2ToL1MessagePasserAddr
+}
+
+type RawProof struct {
+	Address      string   `json:"address"`
+	AccountProof []string `json:"accountProof"`
+	Balance      string   `json:"balance"`
+	CodeHash     string   `json:"codeHash"`
+	Nonce        string   `json:"nonce"`
+	StorageHash  string   `json:"storageHash"`
+	StorageProof []struct {
+		Key   string
+		Value string
+		Proof []string
+	} `json:"storageProof"`
+}
+
+func (l *LightLinkClient) GetProof(address common.Address, keys []string, height uint64) (*RawProof, error) {
+	proofRaw, err := l.client.Call("eth_getProof", []any{address.Hex(), keys, hexutil.EncodeUint64(height)})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get proof: %w", err)
+	}
+
+	proof := &RawProof{}
+	err = proofRaw.Bind(proof)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind proof: %w", err)
+	}
+
+	return proof, nil
+}
+
+type OutputV0 struct {
+	StateRoot                common.Hash
+	MessagePasserStorageRoot common.Hash
+	BlockHash                common.Hash
+}
+
+func (o OutputV0) Version() [32]byte {
+	return [32]byte{}
+}
+
+func (o OutputV0) Root() common.Hash {
+	var buf [128]byte
+	version := o.Version()
+	copy(buf[:32], version[:])
+	copy(buf[32:], o.StateRoot[:])
+	copy(buf[64:], o.MessagePasserStorageRoot[:])
+	copy(buf[96:], o.BlockHash[:])
+	return crypto.Keccak256Hash(buf[:])
+}
+
+func (l *LightLinkClient) GetOutputV0(last *ethtypes.Header) (OutputV0, error) {
+	withdrawalRoot, err := l.GetWithdrawalRoot(last.Number.Uint64())
+	if err != nil {
+		return OutputV0{}, err
+	}
+
+	blockHash := utils.HashHeaderWithoutExtraData(last)
+	return OutputV0{
+		StateRoot:                last.Root,
+		MessagePasserStorageRoot: withdrawalRoot,
+		BlockHash:                blockHash,
+	}, nil
+}
+
 func unmarshalJsonTx(from any) (*types.Transaction, error) {
 	b, err := json.Marshal(from)
 	if err != nil {
@@ -162,26 +257,38 @@ func unmarshalJsonTx(from any) (*types.Transaction, error) {
 
 type lightLinkMock struct {
 	Height uint64
-	Blocks []*types.Block
+	Blocks []*ethtypes.Block
 }
 
 func NewLightLinkMock() *lightLinkMock {
-	return &lightLinkMock{Height: 0, Blocks: []*types.Block{}}
+	return &lightLinkMock{Height: 0, Blocks: []*ethtypes.Block{}}
 }
 
 func (m *lightLinkMock) GetHeight() (uint64, error) {
 	return m.Height, nil
 }
 
-func (m *lightLinkMock) GetBlock(height uint64) (*types.Block, error) {
+func (m *lightLinkMock) GetBlock(height uint64) (*ethtypes.Block, error) {
 	return m.Blocks[height], nil
 }
 
-func (m *lightLinkMock) GetBlocks(start, end uint64) ([]*types.Block, error) {
+func (m *lightLinkMock) GetBlocks(start, end uint64) ([]*ethtypes.Block, error) {
 	return m.Blocks[start:end], nil
 }
 
-func (m *lightLinkMock) SimulateAddBlock(block *types.Block) {
+func (m *lightLinkMock) SimulateAddBlock(block *ethtypes.Block) {
 	m.Blocks = append(m.Blocks, block)
 	m.Height++
+}
+
+func (m *lightLinkMock) GetOutputV0(last *ethtypes.Header) (OutputV0, error) {
+	return OutputV0{}, nil
+}
+
+func (m *lightLinkMock) GetProof(address common.Address, keys []string, height uint64) (*RawProof, error) {
+	return nil, nil
+}
+
+func (m *lightLinkMock) WithdrawalAddress(height uint64) common.Address {
+	return common.Address{}
 }

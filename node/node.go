@@ -68,9 +68,10 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	}
 
 	ll, err := NewLightLinkClient(&LightLinkClientOpts{
-		Endpoint: cfg.LightLink.Endpoint,
-		Delay:    time.Duration(cfg.LightLink.Delay) * time.Millisecond,
-		Logger:   logger.With("ctx", "lightlink"),
+		Endpoint:                cfg.LightLink.Endpoint,
+		Delay:                   time.Duration(cfg.LightLink.Delay) * time.Millisecond,
+		Logger:                  logger.With("ctx", "lightlink"),
+		L2ToL1MessagePasserAddr: common.HexToAddress(cfg.LightLink.L2ToL1MessagePasser),
 	})
 	if err != nil {
 		return nil, err

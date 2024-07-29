@@ -36,7 +36,7 @@ func (r *Rollup) GetInfo() (*RollupInfo, error) {
 		return nil, fmt.Errorf("failed to get rollup head: %w", err)
 	}
 
-	r.Opts.Logger.Info("Latest Rollup Head", "head", latestRollupHead)
+	r.Opts.Logger.Info("Latest Rollup Head", "head", latestRollupHead.L2Height)
 
 	// hash latest rollup head
 	latestRollupHash, err := r.Ethereum.HashHeader(&latestRollupHead)
@@ -87,12 +87,6 @@ type RollupBlockInfo struct {
 	Hash                                                   common.Hash `pretty:"Hash"`
 	BundleSize                                             uint64      `pretty:"Bundle Size"`
 	*canonicalStateChainContract.CanonicalStateChainHeader `pretty:"Header"`
-
-	DataAvailability struct {
-		CelestiaHeight     uint64 `pretty:"Celestia Height"`
-		CelestiaShareStart uint64 `pretty:"Shares Start"`
-		CelestiaShareLen   uint64 `pretty:"Shares"`
-	} `pretty:"Data Availability"`
 
 	Distance struct {
 		FromLatestInEpochs   uint64 `pretty:"From Latest Epoch"`

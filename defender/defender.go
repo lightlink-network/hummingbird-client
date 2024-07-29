@@ -160,7 +160,29 @@ func (d *Defender) defendDAChallenge(c challengeContract.ChallengeChallengeDAUpd
 		}
 	}
 
+	_, err = d.Ethereum.Wait(tx.Hash())
+	if err != nil {
+		d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+		return err
+	}
+
 	log.Info("Pending DA challenge defended successfully", "tx", tx.Hash().Hex())
+
+	log.Info("Attempting to claim DA challenge reward")
+
+	// attempt to claim the challenge reward
+	txHash, err := d.ClaimDAChallengeReward(blockHash, uint8(c.PointerIndex.Uint64()), c.ShareIndex)
+	if err != nil {
+		return fmt.Errorf("error claiming DA challenge reward: %w", err)
+	}
+
+	_, err = d.Ethereum.Wait(*txHash)
+	if err != nil {
+		d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+		return err
+	}
+
+	log.Info("DA challenge reward claimed successfully", "tx", txHash.Hex())
 
 	return nil
 }
@@ -175,6 +197,16 @@ func (d *Defender) DefendDA(block common.Hash, pointerIndex uint8, shareIndex ui
 	}
 
 	return d.Ethereum.DefendDataRootInclusion(*key, *shareProof)
+}
+
+// Claim the data root inclusion challenge reward for the given block hash.
+func (d *Defender) ClaimDAChallengeReward(block common.Hash, pointerIndex uint8, shareIndex uint32) (*common.Hash, error) {
+	key, err := d.Ethereum.DataRootInclusionChallengeKey(nil, block, pointerIndex, shareIndex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get data root inclusion challenge key: %w", err)
+	}
+
+	return d.Ethereum.ClaimDAChallengeReward(key)
 }
 
 func (d *Defender) GetDaProof(block common.Hash, pointerIndex uint8, shareIndex uint32) (*common.Hash, *challengeContract.SharesProof, error) {
@@ -347,9 +379,36 @@ func (d *Defender) defendL2HeaderChallenge(c challengeContract.ChallengeL2Header
 		}
 	}
 
+	_, err = d.Ethereum.Wait(tx.Hash())
+	if err != nil {
+		d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+		return err
+	}
+
 	log.Info("Pending L2 header challenge defended successfully", "tx", tx.Hash().Hex())
 
+	log.Info("Attempting to claim L2 header challenge reward")
+
+	// attempt to claim the challenge reward
+	txHash, err := d.Ethereum.ClaimL2HeaderChallengeReward(c.ChallengeHash)
+	if err != nil {
+		return fmt.Errorf("error claiming L2 header challenge reward: %w", err)
+	}
+
+	_, err = d.Ethereum.Wait(*txHash)
+	if err != nil {
+		d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+		return err
+	}
+
+	log.Info("L2 header challenge reward claimed successfully", "tx", txHash.Hex())
+
 	return nil
+}
+
+// Claims the reward for the given L2 header challenge hash.
+func (d *Defender) ClaimL2HeaderChallengeReward(challengeHash common.Hash) (*common.Hash, error) {
+	return d.Ethereum.ClaimL2HeaderChallengeReward(challengeHash)
 }
 
 // Defends an L2 header challenge by attempting to submit a header proof to the Challenge.sol contract.
@@ -387,21 +446,29 @@ func (d *Defender) DefendL2Header(rblock common.Hash, l2BlockNum *big.Int) (*typ
 	if err != nil {
 		return nil, fmt.Errorf("error providing header: %w", err)
 	}
-	d.Opts.Logger.Info("Provided header", "tx", tx.Hash().Hex(), "rblock", rblock.Hex(), "header", l2BlockHash.Hex())
 
-	// TODO: remove this sleep hack and fix Ethereum.Wait
-	d.Opts.Logger.Info("Waiting for 30 seconds to ensure header is available")
-	time.Sleep(30 * time.Second)
+	if tx != nil {
+		d.Opts.Logger.Info("Provided header", "tx", tx.Hash().Hex(), "rblock", rblock.Hex(), "header", l2BlockHash.Hex())
+		_, err = d.Ethereum.Wait(tx.Hash())
+		if err != nil {
+			d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+			return nil, err
+		}
+	}
 
 	tx, err = d.ProvideL2Header(challenge.PrevHeader.Rblock, l2PrevBlockHash, false)
 	if err != nil {
 		return nil, fmt.Errorf("error providing previous header: %w", err)
 	}
-	d.Opts.Logger.Info("Provided previous header", "tx", tx.Hash().Hex(), "rblock", rblock.Hex(), "header", l2PrevBlockHash.Hex())
 
-	// TODO: remove this sleep hack and fix Ethereum.Wait
-	d.Opts.Logger.Info("Waiting for 30 seconds to ensure previous header is available")
-	time.Sleep(30 * time.Second)
+	if tx != nil {
+		d.Opts.Logger.Info("Provided previous header", "tx", tx.Hash().Hex(), "rblock", rblock.Hex(), "header", l2PrevBlockHash.Hex())
+		_, err = d.Ethereum.Wait(tx.Hash())
+		if err != nil {
+			d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+			return nil, err
+		}
+	}
 
 	// 5. Defend the challenge
 	tx, err = d.Ethereum.DefendL2Header(challengeHash, l2BlockHash, l2PrevBlockHash)
@@ -417,8 +484,8 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 	// check if the header is already provided
 	headerProvided, _ := d.Ethereum.AlreadyProvidedHeader(l2Block)
 	if headerProvided {
-		d.Opts.Logger.Info("Header already provided", "block", rblock.Hex(), "header", l2Block.Hex())
-		return types.NewTx(&types.LegacyTx{}), nil
+		d.Opts.Logger.Info("Header or previous header already provided", "block", rblock.Hex(), "header", l2Block.Hex())
+		return nil, nil
 	}
 
 	// Download the rollup block and bundle from L1 and
@@ -477,12 +544,12 @@ func (d *Defender) ProvideL2Header(rblock common.Hash, l2Block common.Hash, skip
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}
 		d.Opts.Logger.Info("Provided shares", "tx", tx.Hash().Hex(), "block", rblock.Hex(), "shares", len(shareProof.Data))
-		d.Ethereum.Wait(tx.Hash())
 
-		// TODO: remove this sleep hack and fix Ethereum.Wait
-		d.Opts.Logger.Info("Waiting for 30 seconds to ensure shares are available")
-		time.Sleep(30 * time.Second)
-		d.Ethereum.Wait(tx.Hash())
+		_, err = d.Ethereum.Wait(tx.Hash())
+		if err != nil {
+			d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+			return nil, err
+		}
 	}
 
 	ranges := make([]chainOracleContract.ChainOracleShareRange, len(sharePointer.Ranges))
@@ -553,11 +620,12 @@ func (d *Defender) ProvideL2Tx(rblock common.Hash, l2Tx common.Hash, skipShares 
 			return nil, fmt.Errorf("error providing shares: %w", err)
 		}
 		d.Opts.Logger.Info("Provided shares", "tx", tx.Hash().Hex(), "block", rblock.Hex(), "shares", len(shareProof.Data))
-		d.Ethereum.Wait(tx.Hash())
 
-		// TODO: remove this sleep hack and fix Ethereum.Wait
-		d.Opts.Logger.Info("Waiting for 30 seconds to ensure shares are available")
-		time.Sleep(30 * time.Second)
+		_, err = d.Ethereum.Wait(tx.Hash())
+		if err != nil {
+			d.Opts.Logger.Error("error waiting for tx", "tx", tx.Hash().Hex(), "error", err)
+			return nil, err
+		}
 	}
 
 	ranges := make([]chainOracleContract.ChainOracleShareRange, len(sharePointer.Ranges))

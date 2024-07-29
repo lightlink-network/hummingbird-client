@@ -25,6 +25,8 @@ type Challenge interface {
 	GetChallengeWindow() (*big.Int, error)
 	GetChallengeWindowBlockRanges() ([][]uint64, error)
 	DataRootInclusionChallengeKey(opts *bind.CallOpts, blockHash common.Hash, pointerIndex uint8, shareIndex uint32) (common.Hash, error)
+	ClaimDAChallengeReward(key common.Hash) (*common.Hash, error)
+	ClaimL2HeaderChallengeReward(key common.Hash) (*common.Hash, error)
 }
 
 var _ Challenge = &Client{} // Ensure Client implements Challenge
@@ -191,4 +193,36 @@ func (c *Client) GetChallengeWindowBlockRanges() ([][]uint64, error) {
 	blockRanges = append(blockRanges, []uint64{startBlock, currentBlock})
 
 	return blockRanges, nil
+}
+
+func (c *Client) ClaimDAChallengeReward(key common.Hash) (*common.Hash, error) {
+	transactor, err := c.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	tx, err := c.challenge.ClaimDAChallengeReward(transactor, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim DA challenge reward: %w", err)
+	}
+
+	hash := tx.Hash()
+
+	return &hash, nil
+}
+
+func (c *Client) ClaimL2HeaderChallengeReward(key common.Hash) (*common.Hash, error) {
+	transactor, err := c.transactor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+
+	tx, err := c.challenge.ClaimL2HeaderChallengeReward(transactor, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim L2 header challenge reward: %w", err)
+	}
+
+	hash := tx.Hash()
+
+	return &hash, nil
 }

@@ -5,7 +5,10 @@ celestia:
   namespace: lightlink # Celestia blob namespace
   tendermint_rpc: http://full.consensus.mocha-4.celestia-mocha.com:26657 # Tendermint RPC endpoint
   gasPrice: 0.003 # Gas price in TIA
-  retries: 0 # Number of retries when a submitBlob request fails
+  gasPriceIncreasePercent: 0 # Gas price increase percent e.g 10% increase from current gas price
+  gasAPI: # Gas API endpoint to get current gas price
+  retries: 3 # Number of retries for each request
+  retryDelay: 120000 # Delay in ms between each retry
 ethereum:
   httpEndpoint: https://ethereum-sepolia.publicnode.com # Ethereum HTTP endpoint
   canonicalStateChain: "0x18d00cfb6c7c78CAb803A225F4EE7F6307f22f4C" # Canonical state chain contract address
@@ -14,6 +17,7 @@ ethereum:
   blobstreamX: "0xc3e209eb245Fd59c8586777b499d6A665DF3ABD2"
   gasPriceIncreasePercent: 10 # Gas price increase percent e.g 10% increase from current gas price
   blockTime: 200 # block time in ms, used to calculate number of blocks to scan logs
+  timeout: 15 # Timeout in mins for each request
 lightlink:
   endpoint: https://replicator.pegasus.lightlink.io/rpc/v1 # Lightlink endpoint
   delay: 500 # Delay in ms between each request

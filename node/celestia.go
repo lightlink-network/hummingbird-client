@@ -14,9 +14,9 @@ import (
 
 	cosmosmath "cosmossdk.io/math"
 	"github.com/celestiaorg/celestia-node/api/rpc/client"
-	"github.com/celestiaorg/celestia-node/blob"
-	"github.com/celestiaorg/celestia-node/share"
+	"github.com/celestiaorg/celestia-node/state"
 	gosquare "github.com/celestiaorg/go-square/square"
+	libshare "github.com/celestiaorg/go-square/v2/share"
 	"github.com/ethereum/go-ethereum/common"
 	thttp "github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/tendermint/tendermint/types"
@@ -123,7 +123,7 @@ func (c *CelestiaClient) Namespace() string {
 
 func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64, error) {
 	// get the namespace
-	ns, err := share.NewBlobNamespaceV0([]byte(c.Namespace()))
+	ns, err := libshare.NewNamespace(0, []byte(c.Namespace()))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -135,7 +135,7 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	}
 
 	// create blob to submit
-	b, err := blob.NewBlob(0, ns, []byte(enc))
+	b, err := libshare.NewV0Blob(ns, []byte(enc))
 	if err != nil {
 		panic(err)
 	}
@@ -150,7 +150,7 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	}
 
 	// estimate gas limit (maximum gas used by the tx)
-	gasLimit := blobtypes.DefaultEstimateGas([]uint32{uint32(b.Size())})
+	gasLimit := blobtypes.DefaultEstimateGas([]uint32{uint32(b.DataLen())})
 
 	// fee is gas price * gas limit. State machine does not refund users for unused gas so all of the fee is used
 	fee := int64(gasPrice * float64(gasLimit))
@@ -160,7 +160,7 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	i := 0
 	for {
 		// post the blob
-		pointer, err = c.submitBlob(context.Background(), cosmosmath.NewInt(fee), gasLimit, []*blob.Blob{b})
+		pointer, err = c.submitBlob(context.Background(), cosmosmath.NewInt(fee), gasLimit, []*libshare.Blob{b})
 		if err == nil || i >= c.retries {
 			break
 		}
@@ -185,8 +185,16 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 }
 
 // PostData submits a new transaction with the provided data to the Celestia node.
-func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
-	response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
+func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLimit uint64, blobs []*libshare.Blob) (*CelestiaPointer, error) {
+
+	txConfig := state.NewTxConfig(
+		state.WithGasPrice(c.GasPrice()),
+		state.WithGas(gasLimit),
+		state.WithSignerAddress("celestia17l7aggfkgsc6l8urde3zrju6h0hpv8dau833kt"),
+		state.WithFeeGranterAddress("celestia17l7aggfkgsc6l8urde3zrju6h0hpv8dau833kt"),
+	)
+
+	response, err := c.client.State.SubmitPayForBlob(ctx, blobs, txConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +300,7 @@ func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]share
 	ctx := context.Background()
 
 	// 1. Namespace
-	ns, err := share.NewBlobNamespaceV0([]byte(c.Namespace()))
+	ns, err := libshare.NewNamespace(0, []byte(c.Namespace()))
 	if err != nil {
 		return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
 	}
@@ -309,7 +317,7 @@ func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]share
 		return nil, fmt.Errorf("GetShares: failed to get shares: %w", err)
 	}
 
-	return utils.NSSharesToShares(s), nil
+	return utils.NSSharesToShares(*s), nil
 }
 
 func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error) {

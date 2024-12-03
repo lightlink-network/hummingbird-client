@@ -156,8 +156,6 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 		panic(err)
 	}
 
-	b.Length()
-
 	// gas price is defined by each node operator. 0.003 is a good default to be accepted
 	gasPrice := c.GasPrice()
 
@@ -205,7 +203,7 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 // PostData submits a new transaction with the provided data to the Celestia node.
 func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
 	//response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
-	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(), state.NewTxConfig(
+	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), state.NewTxConfig(
 		state.WithGas(gasLimit),
 		state.WithGasPrice(fee.ToLegacyDec().MustFloat64()), // Maybe we leave this out idk.
 	))

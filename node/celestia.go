@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"time"
 
-	cosmosmath "cosmossdk.io/math"
 	"github.com/celestiaorg/celestia-node/api/rpc/client"
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/celestiaorg/celestia-node/state"
@@ -168,24 +167,20 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	// estimate gas limit (maximum gas used by the tx)
 	gasLimit := blobtypes.DefaultEstimateGas([]uint32{uint32(b.DataLen())})
 
-	// fee is gas price * gas limit. State machine does not refund users for unused gas so all of the fee is used
-	fee := int64(gasPrice * float64(gasLimit))
-
 	var pointer *CelestiaPointer
 
 	i := 0
 	for {
 		// post the blob
-		pointer, err = c.submitBlob(context.Background(), cosmosmath.NewInt(fee), gasLimit, []*blob.Blob{b})
+		pointer, err = c.submitBlob(context.Background(), gasPrice, gasLimit, []*blob.Blob{b})
 		if err == nil || i >= c.retries {
 			break
 		}
 
 		// Increase gas price by 20% if the transaction fails
 		gasPrice *= 1.2
-		fee = int64(gasPrice * float64(gasLimit))
 
-		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
+		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
 
 		i++
 
@@ -201,11 +196,11 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 }
 
 // PostData submits a new transaction with the provided data to the Celestia node.
-func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
+func (c *CelestiaClient) submitBlob(ctx context.Context, gasPrice float64, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
 	//response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
 	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), state.NewTxConfig(
 		state.WithGas(gasLimit),
-		state.WithGasPrice(fee.ToLegacyDec().MustFloat64()), // Maybe we leave this out idk.
+		state.WithGasPrice(gasPrice),
 	))
 	if err != nil {
 		return nil, err

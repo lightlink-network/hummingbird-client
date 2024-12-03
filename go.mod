@@ -3,6 +3,7 @@ module hummingbird
 go 1.23.3
 
 require (
+	github.com/celestiaorg/celestia-app v1.14.0
 	github.com/celestiaorg/celestia-node v0.20.4
 	github.com/celestiaorg/celestia-openrpc v0.5.0
 	github.com/celestiaorg/go-square v1.1.1
@@ -21,7 +22,8 @@ require (
 
 require (
 	cosmossdk.io/math v1.4.0
-	github.com/celestiaorg/celestia-app v1.4.0
+	// github.com/celestiaorg/celestia-app v1.14.0
+	github.com/celestiaorg/celestia-app/v3 v3.0.2 // indirect
 )
 
 require (
@@ -50,7 +52,6 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
 	github.com/celestiaorg/blobstream-contracts/v3 v3.1.0 // indirect
-	github.com/celestiaorg/celestia-app/v3 v3.0.2 // indirect
 	github.com/celestiaorg/go-fraud v0.2.1 // indirect
 	github.com/celestiaorg/go-header v0.6.3 // indirect
 	github.com/celestiaorg/go-libp2p-messenger v0.2.0 // indirect

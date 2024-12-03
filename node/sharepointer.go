@@ -3,7 +3,7 @@ package node
 import (
 	"hummingbird/utils"
 
-	"github.com/celestiaorg/celestia-app/pkg/shares"
+	"github.com/celestiaorg/go-square/shares"
 )
 
 type ShareRange struct {

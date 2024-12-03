@@ -1,12 +1,12 @@
 package utils
 
 import (
-	"github.com/celestiaorg/celestia-app/pkg/appconsts"
-	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/celestiaorg/celestia-node/blob"
+	"github.com/celestiaorg/celestia-openrpc/types/appconsts"
 	openshare "github.com/celestiaorg/celestia-openrpc/types/share"
+	squareblob "github.com/celestiaorg/go-square/blob"
+	"github.com/celestiaorg/go-square/shares"
 	"github.com/celestiaorg/go-square/v2/share"
-	coretypes "github.com/tendermint/tendermint/types"
 )
 
 func BytesToBlob(ns string, buf []byte) (*blob.Blob, error) {
@@ -20,13 +20,12 @@ func BytesToBlob(ns string, buf []byte) (*blob.Blob, error) {
 }
 
 func BlobToShares(b *blob.Blob) ([]shares.Share, error) {
-	_b := coretypes.Blob{
-		NamespaceID:      b.Namespace().ID(),
+	_b := &squareblob.Blob{
+		NamespaceId:      b.Namespace().ID(),
 		Data:             b.Data(),
-		ShareVersion:     uint8(b.ShareVersion()),
-		NamespaceVersion: uint8(b.Namespace().Version()),
+		ShareVersion:     uint32(b.ShareVersion()),
+		NamespaceVersion: uint32(b.Namespace().Version()),
 	}
-
 	return shares.SplitBlobs(_b)
 }
 

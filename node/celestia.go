@@ -27,9 +27,9 @@ import (
 	thttp "github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/tendermint/tendermint/types"
 
-	"github.com/celestiaorg/celestia-app/pkg/appconsts"
-	"github.com/celestiaorg/celestia-app/pkg/shares"
-	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
+	"github.com/celestiaorg/celestia-app/v3/pkg/appconsts"
+	blobtypes "github.com/celestiaorg/celestia-app/v3/x/blob/types"
+	"github.com/celestiaorg/go-square/shares"
 
 	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
@@ -77,6 +77,8 @@ type CelestiaClientOpts struct {
 	Retries                 int
 	RetryDelay              time.Duration
 }
+
+var _ Celestia = &CelestiaClient{}
 
 type CelestiaClient struct {
 	namespace               string

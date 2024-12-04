@@ -1,46 +1,43 @@
 package utils
 
 import (
-	"github.com/celestiaorg/celestia-app/pkg/appconsts"
-	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/celestiaorg/celestia-node/blob"
-	"github.com/celestiaorg/celestia-node/share"
-	coretypes "github.com/tendermint/tendermint/types"
+	"github.com/celestiaorg/celestia-openrpc/types/appconsts"
+	squareblob "github.com/celestiaorg/go-square/blob"
+	"github.com/celestiaorg/go-square/shares"
+	"github.com/celestiaorg/go-square/v2/share"
 )
 
 func BytesToBlob(ns string, buf []byte) (*blob.Blob, error) {
 	// get the namespace
-	_ns, err := share.NewBlobNamespaceV0([]byte(ns))
+	_ns, err := share.NewV0Namespace([]byte(ns))
 	if err != nil {
 		return nil, err
 	}
 
-	return blob.NewBlob(0, _ns, buf)
+	return blob.NewBlobV0(_ns, buf)
 }
 
 func BlobToShares(b *blob.Blob) ([]shares.Share, error) {
-	_b := coretypes.Blob{
-		NamespaceID:      b.NamespaceId,
-		Data:             b.Data,
-		ShareVersion:     uint8(b.ShareVersion),
-		NamespaceVersion: uint8(b.NamespaceVersion),
+	_b := &squareblob.Blob{
+		NamespaceId:      b.Namespace().ID(),
+		Data:             b.Data(),
+		ShareVersion:     uint32(b.ShareVersion()),
+		NamespaceVersion: uint32(b.Namespace().Version()),
 	}
-
 	return shares.SplitBlobs(_b)
 }
 
-func NSSharesToShares(ns share.NamespacedShares) []shares.Share {
+func NSSharesToShares(ns []share.Share) []shares.Share {
 	s := []shares.Share{}
 
-	for _, row := range ns {
-		for _, _nsShare := range row.Shares {
-			_share, err := shares.NewShare(_nsShare)
-			if err != nil {
-				panic(err)
-			}
-
-			s = append(s, *_share)
+	for _, _nsShare := range ns {
+		_share, err := shares.NewShare(_nsShare.ToBytes())
+		if err != nil {
+			panic(err)
 		}
+
+		s = append(s, *_share)
 	}
 
 	return s

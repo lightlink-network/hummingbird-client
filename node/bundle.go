@@ -6,8 +6,8 @@ import (
 	"hummingbird/node/lightlink/types"
 	"hummingbird/utils"
 
-	"github.com/celestiaorg/celestia-app/pkg/shares"
 	"github.com/celestiaorg/celestia-node/blob"
+	"github.com/celestiaorg/go-square/shares"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"

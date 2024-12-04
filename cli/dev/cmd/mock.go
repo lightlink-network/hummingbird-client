@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/celestiaorg/celestia-app/pkg/shares"
+	"github.com/celestiaorg/go-square/shares"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
 )

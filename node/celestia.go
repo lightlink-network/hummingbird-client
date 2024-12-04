@@ -12,18 +12,22 @@ import (
 	"strconv"
 	"time"
 
-	cosmosmath "cosmossdk.io/math"
 	"github.com/celestiaorg/celestia-node/api/rpc/client"
 	"github.com/celestiaorg/celestia-node/blob"
-	"github.com/celestiaorg/celestia-node/share"
+	"github.com/celestiaorg/celestia-node/state"
+
+	// "github.com/celestiaorg/celestia-node/share"
+	// "github.com/celestiaorg/celestia-openrpc/types/share"
+	openclient "github.com/celestiaorg/celestia-openrpc"
 	gosquare "github.com/celestiaorg/go-square/square"
+	"github.com/celestiaorg/go-square/v2/share"
 	"github.com/ethereum/go-ethereum/common"
 	thttp "github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/tendermint/tendermint/types"
 
-	"github.com/celestiaorg/celestia-app/pkg/appconsts"
-	"github.com/celestiaorg/celestia-app/pkg/shares"
-	blobtypes "github.com/celestiaorg/celestia-app/x/blob/types"
+	"github.com/celestiaorg/celestia-app/v3/pkg/appconsts"
+	blobtypes "github.com/celestiaorg/celestia-app/v3/x/blob/types"
+	"github.com/celestiaorg/go-square/shares"
 
 	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
@@ -72,9 +76,12 @@ type CelestiaClientOpts struct {
 	RetryDelay              time.Duration
 }
 
+var _ Celestia = &CelestiaClient{}
+
 type CelestiaClient struct {
 	namespace               string
 	client                  *client.Client
+	openrpcClient           *openclient.Client
 	trpc                    *thttp.HTTP
 	logger                  *slog.Logger
 	gasPrice                float64
@@ -94,6 +101,11 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		return nil, fmt.Errorf("failed to connect to Celestia: %w", err)
 	}
 
+	openrpcClient, err := openclient.NewClient(context.Background(), opts.Endpoint, opts.Token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to Celestia OpenRPC: %w", err)
+	}
+
 	trpc, err := thttp.New(opts.TendermintRPC, "/websocket")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Tendermint RPC: %w", err)
@@ -107,6 +119,7 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	return &CelestiaClient{
 		namespace:               opts.Namespace,
 		client:                  c,
+		openrpcClient:           openrpcClient,
 		trpc:                    trpc,
 		logger:                  opts.Logger,
 		gasPrice:                opts.GasPrice,
@@ -123,7 +136,7 @@ func (c *CelestiaClient) Namespace() string {
 
 func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64, error) {
 	// get the namespace
-	ns, err := share.NewBlobNamespaceV0([]byte(c.Namespace()))
+	ns, err := share.NewV0Namespace([]byte(c.Namespace()))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -135,7 +148,8 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	}
 
 	// create blob to submit
-	b, err := blob.NewBlob(0, ns, []byte(enc))
+	//b, err := blob.NewBlob(0, ns, []byte(enc))
+	b, err := blob.NewBlobV0(ns, []byte(enc))
 	if err != nil {
 		panic(err)
 	}
@@ -150,26 +164,22 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	}
 
 	// estimate gas limit (maximum gas used by the tx)
-	gasLimit := blobtypes.DefaultEstimateGas([]uint32{uint32(b.Size())})
-
-	// fee is gas price * gas limit. State machine does not refund users for unused gas so all of the fee is used
-	fee := int64(gasPrice * float64(gasLimit))
+	gasLimit := blobtypes.DefaultEstimateGas([]uint32{uint32(b.DataLen())})
 
 	var pointer *CelestiaPointer
 
 	i := 0
 	for {
 		// post the blob
-		pointer, err = c.submitBlob(context.Background(), cosmosmath.NewInt(fee), gasLimit, []*blob.Blob{b})
+		pointer, err = c.submitBlob(context.Background(), gasPrice, gasLimit, []*blob.Blob{b})
 		if err == nil || i >= c.retries {
 			break
 		}
 
 		// Increase gas price by 20% if the transaction fails
 		gasPrice *= 1.2
-		fee = int64(gasPrice * float64(gasLimit))
 
-		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "fee", fee, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
+		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
 
 		i++
 
@@ -185,8 +195,12 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 }
 
 // PostData submits a new transaction with the provided data to the Celestia node.
-func (c *CelestiaClient) submitBlob(ctx context.Context, fee cosmosmath.Int, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
-	response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
+func (c *CelestiaClient) submitBlob(ctx context.Context, gasPrice float64, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
+	//response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
+	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), state.NewTxConfig(
+		state.WithGas(gasLimit),
+		state.WithGasPrice(gasPrice),
+	))
 	if err != nil {
 		return nil, err
 	}
@@ -292,24 +306,28 @@ func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]share
 	ctx := context.Background()
 
 	// 1. Namespace
-	ns, err := share.NewBlobNamespaceV0([]byte(c.Namespace()))
+	// ns, err := openshare.NewBlobNamespaceV0([]byte(c.Namespace()))
+	// if err != nil {
+	// 	return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
+	// }
+	ns, err := share.NewV0Namespace([]byte(c.Namespace()))
 	if err != nil {
 		return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
 	}
 
-	// 0. Get the header
-	h, err := c.client.Header.GetByHeight(ctx, pointer.Height)
-	if err != nil {
-		return nil, fmt.Errorf("GetShares: failed to get header: %d %w", pointer.Height, err)
-	}
-
 	// 3. Get the shares
-	s, err := c.client.Share.GetSharesByNamespace(ctx, h, ns)
+	//s, err := c.client.Share.GetSharesByNamespace(ctx, h, ns)
+	nsData, err := c.client.Share.GetNamespaceData(ctx, pointer.Height, ns)
 	if err != nil {
-		return nil, fmt.Errorf("GetShares: failed to get shares: %w", err)
+		return nil, fmt.Errorf("GetShares: failed to get namespace data: %w", err)
 	}
 
-	return utils.NSSharesToShares(s), nil
+	// s, err := c.openrpcClient.Share.GetSharesByNamespace(ctx, h, ns)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("GetShares: failed to get shares: %w", err)
+	// }
+
+	return utils.NSSharesToShares(nsData.Flatten()), nil
 }
 
 func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error) {
@@ -373,7 +391,7 @@ func (c *CelestiaClient) GasPrice() float64 {
 	// Make HTTP GET request
 	resp, err := http.Get(c.gasAPI)
 	if err != nil {
-		c.logger.Error("Error making HTTP request:", err)
+		c.logger.Error("Error making HTTP request", "error", err)
 		return c.gasPrice
 	}
 	defer resp.Body.Close()
@@ -381,7 +399,7 @@ func (c *CelestiaClient) GasPrice() float64 {
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.logger.Error("Error reading response body:", err)
+		c.logger.Error("Error reading response body", "error", err)
 		return c.gasPrice
 	}
 
@@ -389,14 +407,14 @@ func (c *CelestiaClient) GasPrice() float64 {
 	var gasPrice GasPrice
 	err = json.Unmarshal(body, &gasPrice)
 	if err != nil {
-		c.logger.Error("Error parsing JSON response:", err)
+		c.logger.Error("Error parsing JSON response", "error", err)
 		return c.gasPrice
 	}
 
 	// Convert fast gas price to float64
 	fast, err := strconv.ParseFloat(gasPrice.Fast, 64)
 	if err != nil {
-		c.logger.Error("Error converting fast gas price to float64:", err)
+		c.logger.Error("Error converting fast gas price to float64", "error", err)
 		return c.gasPrice
 	}
 

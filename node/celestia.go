@@ -391,7 +391,7 @@ func (c *CelestiaClient) GasPrice() float64 {
 	// Make HTTP GET request
 	resp, err := http.Get(c.gasAPI)
 	if err != nil {
-		c.logger.Error("Error making HTTP request:", err)
+		c.logger.Error("Error making HTTP request", "error", err)
 		return c.gasPrice
 	}
 	defer resp.Body.Close()
@@ -399,7 +399,7 @@ func (c *CelestiaClient) GasPrice() float64 {
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		c.logger.Error("Error reading response body:", err)
+		c.logger.Error("Error reading response body", "error", err)
 		return c.gasPrice
 	}
 
@@ -407,14 +407,14 @@ func (c *CelestiaClient) GasPrice() float64 {
 	var gasPrice GasPrice
 	err = json.Unmarshal(body, &gasPrice)
 	if err != nil {
-		c.logger.Error("Error parsing JSON response:", err)
+		c.logger.Error("Error parsing JSON response", "error", err)
 		return c.gasPrice
 	}
 
 	// Convert fast gas price to float64
 	fast, err := strconv.ParseFloat(gasPrice.Fast, 64)
 	if err != nil {
-		c.logger.Error("Error converting fast gas price to float64:", err)
+		c.logger.Error("Error converting fast gas price to float64", "error", err)
 		return c.gasPrice
 	}
 

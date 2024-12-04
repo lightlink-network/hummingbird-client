@@ -3,7 +3,6 @@ package utils
 import (
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/celestiaorg/celestia-openrpc/types/appconsts"
-	openshare "github.com/celestiaorg/celestia-openrpc/types/share"
 	squareblob "github.com/celestiaorg/go-square/blob"
 	"github.com/celestiaorg/go-square/shares"
 	"github.com/celestiaorg/go-square/v2/share"
@@ -29,18 +28,16 @@ func BlobToShares(b *blob.Blob) ([]shares.Share, error) {
 	return shares.SplitBlobs(_b)
 }
 
-func NSSharesToShares(ns openshare.NamespacedShares) []shares.Share {
+func NSSharesToShares(ns []share.Share) []shares.Share {
 	s := []shares.Share{}
 
-	for _, row := range ns {
-		for _, _nsShare := range row.Shares {
-			_share, err := shares.NewShare(_nsShare)
-			if err != nil {
-				panic(err)
-			}
-
-			s = append(s, *_share)
+	for _, _nsShare := range ns {
+		_share, err := shares.NewShare(_nsShare.ToBytes())
+		if err != nil {
+			panic(err)
 		}
+
+		s = append(s, *_share)
 	}
 
 	return s

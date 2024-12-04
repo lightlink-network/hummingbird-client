@@ -19,7 +19,6 @@ import (
 	// "github.com/celestiaorg/celestia-node/share"
 	// "github.com/celestiaorg/celestia-openrpc/types/share"
 	openclient "github.com/celestiaorg/celestia-openrpc"
-	openshare "github.com/celestiaorg/celestia-openrpc/types/share"
 	gosquare "github.com/celestiaorg/go-square/square"
 	"github.com/celestiaorg/go-square/v2/share"
 	"github.com/ethereum/go-ethereum/common"
@@ -200,6 +199,7 @@ func (c *CelestiaClient) submitBlob(ctx context.Context, gasPrice float64, gasLi
 	//response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
 	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), state.NewTxConfig(
 		state.WithGas(gasLimit),
+		state.WithGasPrice(gasPrice), // Maybe we leave this out idk.
 		state.WithGasPrice(gasPrice),
 	))
 	if err != nil {
@@ -307,25 +307,28 @@ func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]share
 	ctx := context.Background()
 
 	// 1. Namespace
-	ns, err := openshare.NewBlobNamespaceV0([]byte(c.Namespace()))
+	// ns, err := openshare.NewBlobNamespaceV0([]byte(c.Namespace()))
+	// if err != nil {
+	// 	return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
+	// }
+	ns, err := share.NewV0Namespace([]byte(c.Namespace()))
 	if err != nil {
 		return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
 	}
 
-	// 0. Get the header
-	h, err := c.openrpcClient.Header.GetByHeight(ctx, pointer.Height)
-	if err != nil {
-		return nil, fmt.Errorf("GetShares: failed to get header: %d %w", pointer.Height, err)
-	}
-
 	// 3. Get the shares
 	//s, err := c.client.Share.GetSharesByNamespace(ctx, h, ns)
-	s, err := c.openrpcClient.Share.GetSharesByNamespace(ctx, h, ns)
+	nsData, err := c.client.Share.GetNamespaceData(ctx, pointer.Height, ns)
 	if err != nil {
-		return nil, fmt.Errorf("GetShares: failed to get shares: %w", err)
+		return nil, fmt.Errorf("GetShares: failed to get namespace data: %w", err)
 	}
 
-	return utils.NSSharesToShares(*s), nil
+	// s, err := c.openrpcClient.Share.GetSharesByNamespace(ctx, h, ns)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("GetShares: failed to get shares: %w", err)
+	// }
+
+	return utils.NSSharesToShares(nsData.Flatten()), nil
 }
 
 func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error) {

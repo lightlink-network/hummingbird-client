@@ -199,7 +199,6 @@ func (c *CelestiaClient) submitBlob(ctx context.Context, gasPrice float64, gasLi
 	//response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
 	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), state.NewTxConfig(
 		state.WithGas(gasLimit),
-		state.WithGasPrice(gasPrice), // Maybe we leave this out idk.
 		state.WithGasPrice(gasPrice),
 	))
 	if err != nil {

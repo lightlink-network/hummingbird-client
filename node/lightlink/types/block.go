@@ -36,64 +36,6 @@ type extblock struct {
 	Withdrawals []*ethtypes.Withdrawal `rlp:"optional"`
 }
 
-// NewBlock creates a new block. The input data is copied, changes to header and to the
-// field values will not affect the block.
-//
-// The values of TxHash, UncleHash, ReceiptHash and Bloom in header
-// are ignored and set to values derived from the given txs, uncles
-// and receipts.
-func NewBlock(header *ethtypes.Header, txs []*Transaction, uncles []*ethtypes.Header, receipts []*ethtypes.Receipt, hasher TrieHasher) *Block {
-	b := &Block{header: CopyHeader(header)}
-
-	// TODO: panic if len(txs) != len(receipts)
-	if len(txs) == 0 {
-		b.header.TxHash = ethtypes.EmptyTxsHash
-	} else {
-		b.header.TxHash = DeriveSha(Transactions(txs), hasher)
-		b.transactions = make(Transactions, len(txs))
-		copy(b.transactions, txs)
-	}
-
-	if len(receipts) == 0 {
-		b.header.ReceiptHash = ethtypes.EmptyReceiptsHash
-	} else {
-		b.header.ReceiptHash = DeriveSha(ethtypes.Receipts(receipts), hasher)
-		b.header.Bloom = ethtypes.CreateBloom(receipts)
-	}
-
-	if len(uncles) == 0 {
-		b.header.UncleHash = ethtypes.EmptyUncleHash
-	} else {
-		b.header.UncleHash = CalcUncleHash(uncles)
-		b.uncles = make([]*ethtypes.Header, len(uncles))
-		for i := range uncles {
-			b.uncles[i] = CopyHeader(uncles[i])
-		}
-	}
-
-	return b
-}
-
-// NewBlockWithWithdrawals creates a new block with withdrawals. The input data is copied,
-// changes to header and to the field values will not affect the block.
-//
-// The values of TxHash, UncleHash, ReceiptHash and Bloom in header are ignored and set to
-// values derived from the given txs, uncles and receipts.
-func NewBlockWithWithdrawals(header *ethtypes.Header, txs []*Transaction, uncles []*ethtypes.Header, receipts []*ethtypes.Receipt, withdrawals []*ethtypes.Withdrawal, hasher TrieHasher) *Block {
-	b := NewBlock(header, txs, uncles, receipts, hasher)
-
-	if withdrawals == nil {
-		b.header.WithdrawalsHash = nil
-	} else if len(withdrawals) == 0 {
-		b.header.WithdrawalsHash = &ethtypes.EmptyWithdrawalsHash
-	} else {
-		h := DeriveSha(ethtypes.Withdrawals(withdrawals), hasher)
-		b.header.WithdrawalsHash = &h
-	}
-
-	return b.WithWithdrawals(withdrawals)
-}
-
 // CopyHeader creates a deep copy of a block header.
 func CopyHeader(h *ethtypes.Header) *ethtypes.Header {
 	cpy := *h

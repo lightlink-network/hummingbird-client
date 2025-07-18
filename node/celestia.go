@@ -25,8 +25,8 @@ import (
 	thttp "github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/tendermint/tendermint/types"
 
-	"github.com/celestiaorg/celestia-app/v3/pkg/appconsts"
-	blobtypes "github.com/celestiaorg/celestia-app/v3/x/blob/types"
+	"github.com/celestiaorg/celestia-app/v4/pkg/appconsts"
+	blobtypes "github.com/celestiaorg/celestia-app/v4/x/blob/types"
 	"github.com/celestiaorg/go-square/shares"
 
 	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
@@ -286,9 +286,9 @@ func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error
 		return nil, err
 	}
 	// Get the blob share range inside the block, using square instead
-	version := blockRes.Block.Header.Version.App
-	maxSquareSize := appconsts.SquareSizeUpperBound(version)
-	subtreeRootThreshold := appconsts.SubtreeRootThreshold(version)
+
+	maxSquareSize := appconsts.SquareSizeUpperBound
+	subtreeRootThreshold := appconsts.SubtreeRootThreshold
 	blobShareRange, err := gosquare.BlobShareRange(blockRes.Block.Txs.ToSliceOfBytes(), int(tx.Index), int(0), maxSquareSize, subtreeRootThreshold)
 	if err != nil {
 		return nil, err

@@ -375,6 +375,8 @@ github.com/celestiaorg/celestia-app/v4 v4.0.10 h1:iLWYlHfWXziJFgVXt5XDv2eLBaNm8A
 github.com/celestiaorg/celestia-app/v4 v4.0.10/go.mod h1:DipLUWCa4WXwmaqLKfWQpXilO5XgbLaYtbB+v75MUYk=
 github.com/celestiaorg/celestia-core v1.52.0-tm-v0.34.35 h1:iU2igosCxYKzEUi85u3YqNslIO+rCXtx4GKAHUzxrDQ=
 github.com/celestiaorg/celestia-core v1.52.0-tm-v0.34.35/go.mod h1:SI38xqZZ4ccoAxszUJqsJ/a5rOkzQRijzHQQlLKkyUc=
+github.com/celestiaorg/celestia-core v1.55.0-tm-v0.34.35 h1:FREwqZwPvYsodr1AqqEIyW+VsBnwTzJNtC6NFdZX8rs=
+github.com/celestiaorg/celestia-core v1.55.0-tm-v0.34.35/go.mod h1:SI38xqZZ4ccoAxszUJqsJ/a5rOkzQRijzHQQlLKkyUc=
 github.com/celestiaorg/celestia-core v1.57.0-tm-v0.38.17 h1:S+U7kcbiBzuORL/r5ueNj+umPtAA2qUe1AOKlzIFr2A=
 github.com/celestiaorg/celestia-core v1.57.0-tm-v0.38.17/go.mod h1:jDJU+alpN4/MzC5Lz6+IsAYmvy8SrkD+jplk+C3W0Yo=
 github.com/celestiaorg/celestia-node v0.23.5 h1:amCFCTjGO3tkZHdQraUpN8az+lKWVhDlnd1m94Csv78=

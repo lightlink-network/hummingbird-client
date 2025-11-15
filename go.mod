@@ -5,7 +5,7 @@ go 1.24.6
 toolchain go1.24.10
 
 require (
-	github.com/celestiaorg/celestia-app/v6 v6.2.5
+	github.com/celestiaorg/celestia-app/v5 v5.0.10
 	github.com/celestiaorg/celestia-node v0.26.4
 	github.com/celestiaorg/celestia-openrpc v0.5.0
 	github.com/celestiaorg/go-square v1.1.1
@@ -87,12 +87,10 @@ require (
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.14.1 // indirect
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
-	github.com/celestiaorg/celestia-app/v5 v5.0.10 // indirect
 	github.com/celestiaorg/go-fraud v0.2.3 // indirect
 	github.com/celestiaorg/go-header v0.7.3 // indirect
 	github.com/celestiaorg/go-libp2p-messenger v0.2.2 // indirect
 	github.com/celestiaorg/go-square/merkle v0.0.0-20240429192549-dea967e1533b // indirect
-	github.com/celestiaorg/go-square/v3 v3.0.2 // indirect
 	github.com/celestiaorg/merkletree v0.0.0-20230308153949-c33506a7aa26 // indirect
 	github.com/celestiaorg/nmt v0.24.2 // indirect
 	github.com/celestiaorg/rsmt2d v0.15.1 // indirect

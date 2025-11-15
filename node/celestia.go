@@ -25,8 +25,8 @@ import (
 	thttp "github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/tendermint/tendermint/types"
 
-	"github.com/celestiaorg/celestia-app/v6/pkg/appconsts"
-	blobtypes "github.com/celestiaorg/celestia-app/v6/x/blob/types"
+	"github.com/celestiaorg/celestia-app/v5/pkg/appconsts"
+	blobtypes "github.com/celestiaorg/celestia-app/v5/x/blob/types"
 	"github.com/celestiaorg/go-square/shares"
 
 	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
@@ -168,7 +168,7 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	msgPayForBlobs := &blobtypes.MsgPayForBlobs{
 		BlobSizes: []uint32{uint32(b.DataLen())},
 	}
-	gasLimit := blobtypes.DefaultEstimateGas(msgPayForBlobs)
+	gasLimit := blobtypes.DefaultEstimateGas(msgPayForBlobs.BlobSizes)
 
 	var pointer *CelestiaPointer
 

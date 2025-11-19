@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/celestiaorg/go-square/shares"
+	"github.com/celestiaorg/go-square/v3/share"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -204,7 +204,7 @@ type Output[T any] struct {
 	Proof  *chainoracleContract.SharesProof            `json:"proof,omitempty"`
 }
 
-func sharesToHeader(s []shares.Share, ranges []node.ShareRange) (*types.Header, error) {
+func sharesToHeader(s []share.Share, ranges []node.ShareRange) (*types.Header, error) {
 	data := []byte{}
 	for i, r := range ranges {
 		data = append(data, s[i].ToBytes()[r.Start:r.End]...)

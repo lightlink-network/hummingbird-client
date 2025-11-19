@@ -5,9 +5,9 @@ import (
 	challenge "hummingbird/node/contracts/Challenge.sol"
 	"math/big"
 
+	"github.com/cometbft/cometbft/crypto/merkle"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/tendermint/tendermint/crypto/merkle"
 )
 
 func CalculateMerkleRoot(leafs ...common.Hash) common.Hash {

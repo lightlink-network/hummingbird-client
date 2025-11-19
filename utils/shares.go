@@ -3,8 +3,6 @@ package utils
 import (
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/celestiaorg/celestia-openrpc/types/appconsts"
-	squareblob "github.com/celestiaorg/go-square/blob"
-	"github.com/celestiaorg/go-square/shares"
 	"github.com/celestiaorg/go-square/v3/share"
 )
 
@@ -18,36 +16,20 @@ func BytesToBlob(ns string, buf []byte) (*blob.Blob, error) {
 	return blob.NewBlobV0(_ns, buf)
 }
 
-func BlobToShares(b *blob.Blob) ([]shares.Share, error) {
-	_b := &squareblob.Blob{
-		NamespaceId:      b.Namespace().ID(),
-		Data:             b.Data(),
-		ShareVersion:     uint32(b.ShareVersion()),
-		NamespaceVersion: uint32(b.Namespace().Version()),
-	}
-	return shares.SplitBlobs(_b)
+func BlobToShares(b *blob.Blob) ([]share.Share, error) {
+	return b.Blob.ToShares()
 }
 
-func NSSharesToShares(ns []share.Share) []shares.Share {
-	s := []shares.Share{}
-
-	for _, _nsShare := range ns {
-		_share, err := shares.NewShare(_nsShare.ToBytes())
-		if err != nil {
-			panic(err)
-		}
-
-		s = append(s, *_share)
-	}
-
-	return s
+func NSSharesToShares(ns []share.Share) []share.Share {
+	// Already v3 shares, just return them
+	return ns
 }
 
 // ShareDataStart returns the index of the first byte of the shares raw data.
 // It is after the namespace, share info byte, sequence number (if present).
-func ShareDataStart(s shares.Share) int {
-	isStart, _ := s.IsSequenceStart()
-	isCompact, _ := s.IsCompactShare()
+func ShareDataStart(s share.Share) int {
+	isStart := s.IsSequenceStart()
+	isCompact := s.IsCompactShare()
 
 	index := appconsts.NamespaceSize + appconsts.ShareInfoBytes
 	if isStart {
@@ -61,13 +43,13 @@ func ShareDataStart(s shares.Share) int {
 
 // RawIndexToSharesIndex converts a raw index to a shares index, and a share index.
 // Taking into account the namespace, share info byte, sequence number (if present).
-func RawIndexToSharesIndex(rawIndex int, s []shares.Share) (share int, shareIndex int) {
+func RawIndexToSharesIndex(rawIndex int, s []share.Share) (shareIdx int, shareIndex int) {
 	dataRead := 0
 
 	for i := 0; i < len(s); i++ {
-		rawData, _ := s[i].RawData()
+		rawData := s[i].RawData()
 		if rawIndex < dataRead+len(rawData) {
-			share = i
+			shareIdx = i
 			shareIndex = rawIndex - dataRead
 			return
 		}
@@ -77,14 +59,11 @@ func RawIndexToSharesIndex(rawIndex int, s []shares.Share) (share int, shareInde
 	return
 }
 
-func ExtractDataFromShares(s []shares.Share) []byte {
+func ExtractDataFromShares(s []share.Share) []byte {
 	data := []byte{}
 
-	for _, share := range s {
-		d, err := share.RawData()
-		if err != nil {
-			panic(err)
-		}
+	for _, sh := range s {
+		d := sh.RawData()
 
 		data = append(data, d...)
 	}
@@ -92,15 +71,15 @@ func ExtractDataFromShares(s []shares.Share) []byte {
 	return data
 }
 
-func BytesToShares(buf [][]byte) ([]shares.Share, error) {
-	s := []shares.Share{}
+func BytesToShares(buf [][]byte) ([]share.Share, error) {
+	s := []share.Share{}
 	for _, b := range buf {
-		share, err := shares.NewShare(b)
+		sh, err := share.NewShare(b)
 		if err != nil {
 			return nil, err
 		}
 
-		s = append(s, *share)
+		s = append(s, *sh)
 	}
 
 	return s, nil

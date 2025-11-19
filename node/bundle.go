@@ -7,11 +7,11 @@ import (
 	"hummingbird/utils"
 
 	"github.com/celestiaorg/celestia-node/blob"
-	"github.com/celestiaorg/go-square/shares"
+	"github.com/celestiaorg/go-square/v3/share"
+	"github.com/cometbft/cometbft/crypto/merkle"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/tendermint/tendermint/crypto/merkle"
 )
 
 // TxSizeLimit is the maximum size of a Celestia tx in bytes
@@ -23,15 +23,11 @@ type Bundle struct {
 	Blocks []*types.Block
 }
 
-func NewBundleFromShares(s []shares.Share) (*Bundle, error) {
+func NewBundleFromShares(s []share.Share) (*Bundle, error) {
 	// 1. extract the raw data from the shares
 	data := []byte{}
 	for _, share := range s {
-		d, err := share.RawData()
-		if err != nil {
-			return nil, err
-		}
-
+		d := share.RawData()
 		data = append(data, d...)
 	}
 	// 2. decode the bundle from RLP
@@ -119,7 +115,7 @@ func (b *Bundle) Blob(namespace string) (*blob.Blob, error) {
 	return utils.BytesToBlob(namespace, bundleRLP)
 }
 
-func (b *Bundle) Shares(namespace string) ([]shares.Share, error) {
+func (b *Bundle) Shares(namespace string) ([]share.Share, error) {
 	// 1. get the blob
 	blob, err := b.Blob(namespace)
 	if err != nil {
@@ -285,8 +281,8 @@ func FindTxSharesInBundles(bundles []*Bundle, hash common.Hash, namespace string
 	return nil, 0, fmt.Errorf("tx not found in any bundle")
 }
 
-func BundlesToShares(bundles []*Bundle, namespace string) []shares.Share {
-	ss := []shares.Share{}
+func BundlesToShares(bundles []*Bundle, namespace string) []share.Share {
+	ss := []share.Share{}
 	for _, bundle := range bundles {
 		s, _ := bundle.Shares(namespace)
 		ss = append(ss, s...)
@@ -296,12 +292,12 @@ func BundlesToShares(bundles []*Bundle, namespace string) []shares.Share {
 
 func GetSharesRoot(bundles []*Bundle, namespace string) []byte {
 	ss := BundlesToShares(bundles, namespace)
-	return merkle.HashFromByteSlices(shares.ToBytes(ss))
+	return merkle.HashFromByteSlices(share.ToBytes(ss))
 }
 
 func GetSharesProofs(sp *SharePointer, bundles []*Bundle, bundleNum int, ns string) []*merkle.Proof {
 	offset := 0
-	ss := []shares.Share{}
+	ss := []share.Share{}
 
 	for i := 0; i < len(bundles); i++ {
 		s, _ := bundles[i].Shares(ns)
@@ -311,7 +307,7 @@ func GetSharesProofs(sp *SharePointer, bundles []*Bundle, bundleNum int, ns stri
 			offset = len(ss)
 		}
 	}
-	_, proofs := merkle.ProofsFromByteSlices(shares.ToBytes(ss))
+	_, proofs := merkle.ProofsFromByteSlices(share.ToBytes(ss))
 
 	// adjust the index of the proof
 	startProof := offset + sp.StartShare

@@ -5,11 +5,11 @@ go 1.24.6
 toolchain go1.24.10
 
 require (
-	github.com/celestiaorg/celestia-app/v5 v5.0.10
-	github.com/celestiaorg/celestia-node v0.26.4
+	github.com/celestiaorg/celestia-app/v6 v6.2.5
+	github.com/celestiaorg/celestia-node v0.28.2
 	github.com/celestiaorg/celestia-openrpc v0.5.0
 	github.com/celestiaorg/go-square v1.1.1
-	github.com/celestiaorg/go-square/v2 v2.3.3
+	github.com/celestiaorg/go-square/v3 v3.0.2
 	github.com/ethereum/go-ethereum v1.15.8
 	github.com/google/uuid v1.6.0
 	github.com/holiman/uint256 v1.3.2
@@ -91,6 +91,7 @@ require (
 	github.com/celestiaorg/go-header v0.7.3 // indirect
 	github.com/celestiaorg/go-libp2p-messenger v0.2.2 // indirect
 	github.com/celestiaorg/go-square/merkle v0.0.0-20240429192549-dea967e1533b // indirect
+	github.com/celestiaorg/go-square/v2 v2.3.3 // indirect
 	github.com/celestiaorg/merkletree v0.0.0-20230308153949-c33506a7aa26 // indirect
 	github.com/celestiaorg/nmt v0.24.2 // indirect
 	github.com/celestiaorg/rsmt2d v0.15.1 // indirect
@@ -400,11 +401,13 @@ require (
 
 replace (
 	cosmossdk.io/x/upgrade => github.com/celestiaorg/cosmos-sdk/x/upgrade v0.2.0
-	github.com/cometbft/cometbft => github.com/celestiaorg/celestia-core v1.57.2-tm-v0.38.17
-	github.com/cosmos/cosmos-sdk => github.com/celestiaorg/cosmos-sdk v1.29.4-sdk-v0.50.14
+	github.com/cometbft/cometbft => github.com/celestiaorg/celestia-core v0.39.15
+	github.com/cosmos/cosmos-sdk => github.com/celestiaorg/cosmos-sdk v0.51.6
+	github.com/cosmos/ibc-go/v8 => github.com/celestiaorg/ibc-go/v8 v8.7.2
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	// broken goleveldb needs to be replaced for the cosmos-sdk and celestia-app
 	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
+	// celestia-core(v0.34.x): used for multiplexing abci v1 requests
 	github.com/tendermint/tendermint => github.com/celestiaorg/celestia-core v1.55.0-tm-v0.34.35
 )
 

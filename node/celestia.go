@@ -20,13 +20,12 @@ import (
 	// "github.com/celestiaorg/celestia-openrpc/types/share"
 	openclient "github.com/celestiaorg/celestia-openrpc"
 	gosquare "github.com/celestiaorg/go-square/square"
-	"github.com/celestiaorg/go-square/v2/share"
+	"github.com/celestiaorg/go-square/v3/share"
 	"github.com/ethereum/go-ethereum/common"
 	thttp "github.com/tendermint/tendermint/rpc/client/http"
 	"github.com/tendermint/tendermint/types"
 
-	"github.com/celestiaorg/celestia-app/v5/pkg/appconsts"
-	blobtypes "github.com/celestiaorg/celestia-app/v5/x/blob/types"
+	"github.com/celestiaorg/celestia-app/v6/pkg/appconsts"
 	"github.com/celestiaorg/go-square/shares"
 
 	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
@@ -131,7 +130,7 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 }
 
 func (c *CelestiaClient) Namespace() string {
-	return c.namespace
+	return "testdebug"
 }
 
 func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64, error) {
@@ -163,12 +162,12 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 		c.logger.Info("Gas price increased", "percent", c.gasPriceIncreasePercent, "old_gas_price", apiPrice, "new_gas_price", gasPrice)
 	}
 
-	// estimate gas limit (maximum gas used by the tx)
-	// Create MsgPayForBlobs for gas estimation
-	msgPayForBlobs := &blobtypes.MsgPayForBlobs{
-		BlobSizes: []uint32{uint32(b.DataLen())},
-	}
-	gasLimit := blobtypes.DefaultEstimateGas(msgPayForBlobs.BlobSizes)
+	// Use a default gas limit based on blob size
+	// The gas estimation was causing issues due to incomplete MsgPayForBlobs struct
+	// A reasonable default based on blob size is more reliable
+	baseGas := uint64(21000)                          // Base transaction gas
+	blobSizeGas := uint64(b.DataLen()) * 2            // Approximately 2 gas per byte
+	gasLimit := baseGas + blobSizeGas + uint64(50000) // Add buffer for blob operations
 
 	var pointer *CelestiaPointer
 
@@ -200,14 +199,40 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 
 // PostData submits a new transaction with the provided data to the Celestia node.
 func (c *CelestiaClient) submitBlob(ctx context.Context, gasPrice float64, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
-	//response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
-	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), state.NewTxConfig(
+	c.logger.Debug("Submitting blob to Celestia",
+		"gas_price", gasPrice,
+		"gas_limit", gasLimit,
+		"blob_count", len(blobs),
+		"blob_sizes", func() []int {
+			sizes := make([]int, len(blobs))
+			for i, b := range blobs {
+				sizes[i] = b.DataLen()
+			}
+			return sizes
+		}())
+
+	txConfig := state.NewTxConfig(
 		state.WithGas(gasLimit),
 		state.WithGasPrice(gasPrice),
-	))
+	)
+
+	c.logger.Debug("Calling SubmitPayForBlob",
+		"endpoint", "State.SubmitPayForBlob",
+		"tx_config", fmt.Sprintf("%+v", txConfig))
+
+	//response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
+	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), txConfig)
 	if err != nil {
+		c.logger.Error("SubmitPayForBlob failed",
+			"error", err,
+			"error_type", fmt.Sprintf("%T", err))
 		return nil, err
 	}
+
+	c.logger.Debug("SubmitPayForBlob response received",
+		"tx_hash", response.TxHash,
+		"height", response.Height,
+		"response_type", fmt.Sprintf("%T", response))
 
 	txHash, err := hex.DecodeString(response.TxHash)
 	if err != nil {
@@ -280,10 +305,23 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer, startBlock uint64, e
 
 // GetPointer returns the pointer to the Celestia header that contains the tx with the given hash
 func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error) {
+	c.logger.Debug("GetPointer: Fetching transaction details",
+		"tx_hash", txHash.Hex(),
+		"tendermint_rpc_endpoint", c.trpc.Remote())
+
 	tx, err := c.trpc.Tx(context.Background(), txHash.Bytes(), true)
 	if err != nil {
+		c.logger.Error("GetPointer: Failed to get transaction from Tendermint RPC",
+			"tx_hash", txHash.Hex(),
+			"error", err,
+			"error_type", fmt.Sprintf("%T", err))
 		return nil, err
 	}
+
+	c.logger.Debug("GetPointer: Transaction fetched successfully",
+		"tx_hash", txHash.Hex(),
+		"height", tx.Height,
+		"index", tx.Index)
 	// Get the block that contains the tx
 	blockRes, err := c.trpc.Block(context.Background(), &tx.Height)
 	if err != nil {

@@ -5,7 +5,7 @@ import (
 	"github.com/celestiaorg/celestia-openrpc/types/appconsts"
 	squareblob "github.com/celestiaorg/go-square/blob"
 	"github.com/celestiaorg/go-square/shares"
-	"github.com/celestiaorg/go-square/v2/share"
+	"github.com/celestiaorg/go-square/v3/share"
 )
 
 func BytesToBlob(ns string, buf []byte) (*blob.Blob, error) {

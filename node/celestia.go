@@ -19,7 +19,7 @@ import (
 	// "github.com/celestiaorg/celestia-node/share"
 	// "github.com/celestiaorg/celestia-openrpc/types/share"
 	openclient "github.com/celestiaorg/celestia-openrpc"
-	gosquare "github.com/celestiaorg/go-square/square"
+	gosquare "github.com/celestiaorg/go-square/v3"
 	"github.com/celestiaorg/go-square/v3/share"
 	thttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cometbft/cometbft/types"
@@ -332,6 +332,9 @@ func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error
 	subtreeRootThreshold := appconsts.SubtreeRootThreshold
 	blobShareRange, err := gosquare.BlobShareRange(blockRes.Block.Txs.ToSliceOfBytes(), int(tx.Index), int(0), maxSquareSize, subtreeRootThreshold)
 	if err != nil {
+		c.logger.Error("GetPointer: Failed to get blob share range",
+			"error", err,
+			"error_type", fmt.Sprintf("%T", err))
 		return nil, err
 	}
 	return &CelestiaPointer{

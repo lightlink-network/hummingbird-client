@@ -8,7 +8,6 @@ require (
 	github.com/celestiaorg/celestia-app/v6 v6.2.5
 	github.com/celestiaorg/celestia-node v0.28.2
 	github.com/celestiaorg/celestia-openrpc v0.5.0
-	github.com/celestiaorg/go-square v1.1.1
 	github.com/celestiaorg/go-square/v3 v3.0.2
 	github.com/cometbft/cometbft v0.38.17
 	github.com/ethereum/go-ethereum v1.15.8
@@ -88,6 +87,7 @@ require (
 	github.com/celestiaorg/go-fraud v0.2.3 // indirect
 	github.com/celestiaorg/go-header v0.7.3 // indirect
 	github.com/celestiaorg/go-libp2p-messenger v0.2.2 // indirect
+	github.com/celestiaorg/go-square v1.0.1 // indirect
 	github.com/celestiaorg/go-square/merkle v0.0.0-20240429192549-dea967e1533b // indirect
 	github.com/celestiaorg/go-square/v2 v2.3.3 // indirect
 	github.com/celestiaorg/merkletree v0.0.0-20230308153949-c33506a7aa26 // indirect

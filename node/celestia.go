@@ -3,13 +3,9 @@ package node
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"math/big"
-	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/celestiaorg/celestia-node/api/rpc/client"
@@ -146,42 +142,22 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	}
 
 	// create blob to submit
-	//b, err := blob.NewBlob(0, ns, []byte(enc))
 	b, err := blob.NewBlobV0(ns, []byte(enc))
 	if err != nil {
 		panic(err)
 	}
-
-	// gas price is defined by each node operator. 0.003 is a good default to be accepted
-	gasPrice := c.GasPrice()
-
-	if c.gasPriceIncreasePercent != nil {
-		apiPrice := gasPrice
-		gasPrice *= 1 + float64(c.gasPriceIncreasePercent.Int64())/100
-		c.logger.Info("Gas price increased", "percent", c.gasPriceIncreasePercent, "old_gas_price", apiPrice, "new_gas_price", gasPrice)
-	}
-
-	// Use a default gas limit based on blob size
-	// The gas estimation was causing issues due to incomplete MsgPayForBlobs struct
-	// A reasonable default based on blob size is more reliable
-	baseGas := uint64(21000)                          // Base transaction gas
-	blobSizeGas := uint64(b.DataLen()) * 2            // Approximately 2 gas per byte
-	gasLimit := baseGas + blobSizeGas + uint64(50000) // Add buffer for blob operations
 
 	var pointer *CelestiaPointer
 
 	i := 0
 	for {
 		// post the blob
-		pointer, err = c.submitBlob(context.Background(), gasPrice, gasLimit, []*blob.Blob{b})
+		pointer, err = c.submitBlob(context.Background(), []*blob.Blob{b})
 		if err == nil || i >= c.retries {
 			break
 		}
 
-		// Increase gas price by 20% if the transaction fails
-		gasPrice *= 1.2
-
-		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
+		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "error", err)
 
 		i++
 
@@ -190,17 +166,15 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	}
 
 	if err != nil {
-		return nil, gasPrice, err
+		return nil, 0, err
 	}
 
-	return pointer, gasPrice, nil
+	return pointer, 0, nil
 }
 
 // PostData submits a new transaction with the provided data to the Celestia node.
-func (c *CelestiaClient) submitBlob(ctx context.Context, gasPrice float64, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
+func (c *CelestiaClient) submitBlob(ctx context.Context, blobs []*blob.Blob) (*CelestiaPointer, error) {
 	c.logger.Debug("Submitting blob to Celestia",
-		"gas_price", gasPrice,
-		"gas_limit", gasLimit,
 		"blob_count", len(blobs),
 		"blob_sizes", func() []int {
 			sizes := make([]int, len(blobs))
@@ -210,16 +184,12 @@ func (c *CelestiaClient) submitBlob(ctx context.Context, gasPrice float64, gasLi
 			return sizes
 		}())
 
-	txConfig := state.NewTxConfig(
-		state.WithGas(gasLimit),
-		state.WithGasPrice(gasPrice),
-	)
+	txConfig := state.NewTxConfig()
 
 	c.logger.Debug("Calling SubmitPayForBlob",
 		"endpoint", "State.SubmitPayForBlob",
 		"tx_config", fmt.Sprintf("%+v", txConfig))
 
-	//response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
 	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), txConfig)
 	if err != nil {
 		c.logger.Error("SubmitPayForBlob failed",
@@ -423,46 +393,6 @@ func (c *CelestiaClient) GetSharesProof(celPointer *CelestiaPointer, sharePointe
 	}
 
 	return &sharesProofs, nil
-}
-
-type GasPrice struct {
-	Slow   string `json:"slow"`
-	Median string `json:"median"`
-	Fast   string `json:"fast"`
-}
-
-func (c *CelestiaClient) GasPrice() float64 {
-	// Make HTTP GET request
-	resp, err := http.Get(c.gasAPI)
-	if err != nil {
-		c.logger.Error("Error making HTTP request", "error", err)
-		return c.gasPrice
-	}
-	defer resp.Body.Close()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		c.logger.Error("Error reading response body", "error", err)
-		return c.gasPrice
-	}
-
-	// Parse JSON response
-	var gasPrice GasPrice
-	err = json.Unmarshal(body, &gasPrice)
-	if err != nil {
-		c.logger.Error("Error parsing JSON response", "error", err)
-		return c.gasPrice
-	}
-
-	// Convert fast gas price to float64
-	fast, err := strconv.ParseFloat(gasPrice.Fast, 64)
-	if err != nil {
-		c.logger.Error("Error converting fast gas price to float64", "error", err)
-		return c.gasPrice
-	}
-
-	return fast
 }
 
 // MOCK CLINT FOR TESTING

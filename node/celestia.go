@@ -125,7 +125,7 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 }
 
 func (c *CelestiaClient) Namespace() string {
-	return "testdebug"
+	return c.namespace
 }
 
 func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64, error) {

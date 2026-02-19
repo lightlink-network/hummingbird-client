@@ -10,7 +10,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/celestiaorg/go-square/shares"
+	"github.com/celestiaorg/go-square/v3/share"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -150,7 +150,7 @@ func TestBundle_FindTxShares(t *testing.T) {
 	}
 }
 
-func sharesPointerToTx(pointer *SharePointer, s []shares.Share) (*ethtypes.Transaction, error) {
+func sharesPointerToTx(pointer *SharePointer, s []share.Share) (*ethtypes.Transaction, error) {
 	data := []byte{}
 	for i, r := range pointer.Ranges {
 		data = append(data, s[i+pointer.StartShare].ToBytes()[r.Start:r.End]...)

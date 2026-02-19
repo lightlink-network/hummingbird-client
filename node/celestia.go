@@ -3,13 +3,9 @@ package node
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"math/big"
-	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/celestiaorg/celestia-node/api/rpc/client"
@@ -19,15 +15,13 @@ import (
 	// "github.com/celestiaorg/celestia-node/share"
 	// "github.com/celestiaorg/celestia-openrpc/types/share"
 	openclient "github.com/celestiaorg/celestia-openrpc"
-	gosquare "github.com/celestiaorg/go-square/square"
-	"github.com/celestiaorg/go-square/v2/share"
+	gosquare "github.com/celestiaorg/go-square/v3"
+	"github.com/celestiaorg/go-square/v3/share"
+	thttp "github.com/cometbft/cometbft/rpc/client/http"
+	"github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
-	thttp "github.com/tendermint/tendermint/rpc/client/http"
-	"github.com/tendermint/tendermint/types"
 
-	"github.com/celestiaorg/celestia-app/v4/pkg/appconsts"
-	blobtypes "github.com/celestiaorg/celestia-app/v4/x/blob/types"
-	"github.com/celestiaorg/go-square/shares"
+	"github.com/celestiaorg/celestia-app/v6/pkg/appconsts"
 
 	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
 	challengeContract "hummingbird/node/contracts/Challenge.sol"
@@ -56,8 +50,8 @@ type Celestia interface {
 	Namespace() string
 	PublishBundle(blocks Bundle) (*CelestiaPointer, float64, error)
 	GetProof(pointer *CelestiaPointer, startBlock uint64, endBlock uint64, proofNonce big.Int) (*CelestiaProof, error)
-	GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error)
-	GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error)
+	GetSharesByNamespace(pointer *CelestiaPointer) ([]share.Share, error)
+	GetSharesByPointer(pointer *CelestiaPointer) ([]share.Share, error)
 	GetShareProof(celestiaPointer *CelestiaPointer, shareIndex uint32) (*types.ShareProof, error)
 	GetSharesProof(celestiaPointer *CelestiaPointer, sharePointer *SharePointer) (*types.ShareProof, error)
 	GetPointer(txHash common.Hash) (*CelestiaPointer, error)
@@ -148,38 +142,22 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	}
 
 	// create blob to submit
-	//b, err := blob.NewBlob(0, ns, []byte(enc))
 	b, err := blob.NewBlobV0(ns, []byte(enc))
 	if err != nil {
 		panic(err)
 	}
-
-	// gas price is defined by each node operator. 0.003 is a good default to be accepted
-	gasPrice := c.GasPrice()
-
-	if c.gasPriceIncreasePercent != nil {
-		apiPrice := gasPrice
-		gasPrice *= 1 + float64(c.gasPriceIncreasePercent.Int64())/100
-		c.logger.Info("Gas price increased", "percent", c.gasPriceIncreasePercent, "old_gas_price", apiPrice, "new_gas_price", gasPrice)
-	}
-
-	// estimate gas limit (maximum gas used by the tx)
-	gasLimit := blobtypes.DefaultEstimateGas([]uint32{uint32(b.DataLen())})
 
 	var pointer *CelestiaPointer
 
 	i := 0
 	for {
 		// post the blob
-		pointer, err = c.submitBlob(context.Background(), gasPrice, gasLimit, []*blob.Blob{b})
+		pointer, err = c.submitBlob(context.Background(), []*blob.Blob{b})
 		if err == nil || i >= c.retries {
 			break
 		}
 
-		// Increase gas price by 20% if the transaction fails
-		gasPrice *= 1.2
-
-		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "gas_limit", gasLimit, "gas_price", gasPrice, "error", err)
+		c.logger.Warn("Failed to submit blob, retrying after delay", "delay", c.retryDelay, "attempt", i+1, "error", err)
 
 		i++
 
@@ -188,22 +166,42 @@ func (c *CelestiaClient) PublishBundle(blocks Bundle) (*CelestiaPointer, float64
 	}
 
 	if err != nil {
-		return nil, gasPrice, err
+		return nil, 0, err
 	}
 
-	return pointer, gasPrice, nil
+	return pointer, 0, nil
 }
 
 // PostData submits a new transaction with the provided data to the Celestia node.
-func (c *CelestiaClient) submitBlob(ctx context.Context, gasPrice float64, gasLimit uint64, blobs []*blob.Blob) (*CelestiaPointer, error) {
-	//response, err := c.client.State.SubmitPayForBlob(ctx, fee, gasLimit, blobs)
-	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), state.NewTxConfig(
-		state.WithGas(gasLimit),
-		state.WithGasPrice(gasPrice),
-	))
+func (c *CelestiaClient) submitBlob(ctx context.Context, blobs []*blob.Blob) (*CelestiaPointer, error) {
+	c.logger.Debug("Submitting blob to Celestia",
+		"blob_count", len(blobs),
+		"blob_sizes", func() []int {
+			sizes := make([]int, len(blobs))
+			for i, b := range blobs {
+				sizes[i] = b.DataLen()
+			}
+			return sizes
+		}())
+
+	txConfig := state.NewTxConfig()
+
+	c.logger.Debug("Calling SubmitPayForBlob",
+		"endpoint", "State.SubmitPayForBlob",
+		"tx_config", fmt.Sprintf("%+v", txConfig))
+
+	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), txConfig)
 	if err != nil {
+		c.logger.Error("SubmitPayForBlob failed",
+			"error", err,
+			"error_type", fmt.Sprintf("%T", err))
 		return nil, err
 	}
+
+	c.logger.Debug("SubmitPayForBlob response received",
+		"tx_hash", response.TxHash,
+		"height", response.Height,
+		"response_type", fmt.Sprintf("%T", response))
 
 	txHash, err := hex.DecodeString(response.TxHash)
 	if err != nil {
@@ -276,10 +274,23 @@ func (c *CelestiaClient) GetProof(pointer *CelestiaPointer, startBlock uint64, e
 
 // GetPointer returns the pointer to the Celestia header that contains the tx with the given hash
 func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error) {
+	c.logger.Debug("GetPointer: Fetching transaction details",
+		"tx_hash", txHash.Hex(),
+		"tendermint_rpc_endpoint", c.trpc.Remote())
+
 	tx, err := c.trpc.Tx(context.Background(), txHash.Bytes(), true)
 	if err != nil {
+		c.logger.Error("GetPointer: Failed to get transaction from Tendermint RPC",
+			"tx_hash", txHash.Hex(),
+			"error", err,
+			"error_type", fmt.Sprintf("%T", err))
 		return nil, err
 	}
+
+	c.logger.Debug("GetPointer: Transaction fetched successfully",
+		"tx_hash", txHash.Hex(),
+		"height", tx.Height,
+		"index", tx.Index)
 	// Get the block that contains the tx
 	blockRes, err := c.trpc.Block(context.Background(), &tx.Height)
 	if err != nil {
@@ -291,6 +302,9 @@ func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error
 	subtreeRootThreshold := appconsts.SubtreeRootThreshold
 	blobShareRange, err := gosquare.BlobShareRange(blockRes.Block.Txs.ToSliceOfBytes(), int(tx.Index), int(0), maxSquareSize, subtreeRootThreshold)
 	if err != nil {
+		c.logger.Error("GetPointer: Failed to get blob share range",
+			"error", err,
+			"error_type", fmt.Sprintf("%T", err))
 		return nil, err
 	}
 	return &CelestiaPointer{
@@ -302,7 +316,7 @@ func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error
 	}, nil
 }
 
-func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error) {
+func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]share.Share, error) {
 	ctx := context.Background()
 
 	// 1. Namespace
@@ -330,7 +344,7 @@ func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]share
 	return utils.NSSharesToShares(nsData.Flatten()), nil
 }
 
-func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error) {
+func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]share.Share, error) {
 	ctx := context.Background()
 
 	proof, err := c.trpc.ProveShares(ctx, pointer.Height, pointer.ShareStart, pointer.ShareStart+pointer.ShareLen)
@@ -379,46 +393,6 @@ func (c *CelestiaClient) GetSharesProof(celPointer *CelestiaPointer, sharePointe
 	}
 
 	return &sharesProofs, nil
-}
-
-type GasPrice struct {
-	Slow   string `json:"slow"`
-	Median string `json:"median"`
-	Fast   string `json:"fast"`
-}
-
-func (c *CelestiaClient) GasPrice() float64 {
-	// Make HTTP GET request
-	resp, err := http.Get(c.gasAPI)
-	if err != nil {
-		c.logger.Error("Error making HTTP request", "error", err)
-		return c.gasPrice
-	}
-	defer resp.Body.Close()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		c.logger.Error("Error reading response body", "error", err)
-		return c.gasPrice
-	}
-
-	// Parse JSON response
-	var gasPrice GasPrice
-	err = json.Unmarshal(body, &gasPrice)
-	if err != nil {
-		c.logger.Error("Error parsing JSON response", "error", err)
-		return c.gasPrice
-	}
-
-	// Convert fast gas price to float64
-	fast, err := strconv.ParseFloat(gasPrice.Fast, 64)
-	if err != nil {
-		c.logger.Error("Error converting fast gas price to float64", "error", err)
-		return c.gasPrice
-	}
-
-	return fast
 }
 
 // MOCK CLINT FOR TESTING
@@ -486,7 +460,7 @@ func (c *celestiaMock) GetProof(pointer *CelestiaPointer, startBlock uint64, end
 	}, nil
 }
 
-func (c *celestiaMock) GetSharesByNamespace(pointer *CelestiaPointer) ([]shares.Share, error) {
+func (c *celestiaMock) GetSharesByNamespace(pointer *CelestiaPointer) ([]share.Share, error) {
 	return nil, nil
 }
 
@@ -502,6 +476,6 @@ func (c *celestiaMock) GetPointer(txHash common.Hash) (*CelestiaPointer, error) 
 	return c.pointers[txHash], nil
 }
 
-func (c *celestiaMock) GetSharesByPointer(pointer *CelestiaPointer) ([]shares.Share, error) {
+func (c *celestiaMock) GetSharesByPointer(pointer *CelestiaPointer) ([]share.Share, error) {
 	return nil, nil
 }

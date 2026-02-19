@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/celestiaorg/go-square/shares"
+	"github.com/celestiaorg/go-square/v3/share"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
 )
@@ -130,7 +130,7 @@ func getHeaderData(r *rollup.Rollup, rblock *rollup.Block, pointerIndex int, blo
 		Header:      utils.ToL2HeaderJson(header),
 		HeaderHash:  headerHash,
 		ShareProofs: *shareProofs,
-		Shares:      shares.ToBytes(sharePointer.Shares()),
+		Shares:      share.ToBytes(sharePointer.Shares()),
 		ShareRanges: formatRanges(sharePointer),
 	}
 }
@@ -155,7 +155,7 @@ func getTransactionData(r *rollup.Rollup, rblock *rollup.Block, pointerIndex int
 		Transaction: utils.ToTxJson(tx),
 		Hash:        tx.Hash(),
 		ShareProofs: *shareProofs,
-		Shares:      shares.ToBytes(sharePointer.Shares()),
+		Shares:      share.ToBytes(sharePointer.Shares()),
 		ShareRanges: formatRanges(sharePointer),
 	}
 }

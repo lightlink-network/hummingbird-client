@@ -3,7 +3,7 @@ package node
 import (
 	"hummingbird/utils"
 
-	"github.com/celestiaorg/go-square/shares"
+	"github.com/celestiaorg/go-square/v3/share"
 )
 
 type ShareRange struct {
@@ -13,17 +13,17 @@ type ShareRange struct {
 
 // SharePointer is a pointer to some data inside a group of shares.
 type SharePointer struct {
-	shares     []shares.Share
+	shares     []share.Share
 	StartShare int
 	Ranges     []ShareRange
 }
 
-func NewSharePointer(_shares []shares.Share, startShare int, startIndex int, endShare int, endIndex int) *SharePointer {
+func NewSharePointer(_shares []share.Share, startShare int, startIndex int, endShare int, endIndex int) *SharePointer {
 	// 1. add the start range
 	ranges := []ShareRange{
 		{
 			Start: uint64(startIndex) + uint64(utils.ShareDataStart(_shares[startShare])),
-			End:   uint64(_shares[startShare].Len()),
+			End:   uint64(len(_shares[startShare].ToBytes())),
 		},
 	}
 
@@ -31,7 +31,7 @@ func NewSharePointer(_shares []shares.Share, startShare int, startIndex int, end
 	for i := startShare + 1; i < endShare; i++ {
 		r := ShareRange{
 			Start: uint64(utils.ShareDataStart(_shares[i])),
-			End:   uint64(_shares[i].Len()),
+			End:   uint64(len(_shares[i].ToBytes())),
 		}
 
 		ranges = append(ranges, r)
@@ -65,10 +65,10 @@ func (s *SharePointer) Bytes() []byte {
 	return data
 }
 
-func (s *SharePointer) Shares() []shares.Share {
+func (s *SharePointer) Shares() []share.Share {
 	return s.shares[s.StartShare : s.EndShare()+1]
 }
 
-func (s *SharePointer) AllShares() []shares.Share {
+func (s *SharePointer) AllShares() []share.Share {
 	return s.shares
 }

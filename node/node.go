@@ -62,6 +62,10 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 		GasAPI:                  cfg.Celestia.GasAPI,
 		Retries:                 cfg.Celestia.Retries,
 		RetryDelay:              time.Duration(cfg.Celestia.RetryDelay) * time.Millisecond,
+		Mnemonic:                cfg.Celestia.Mnemonic,
+		CoreGRPC:                cfg.Celestia.CoreGRPC,
+		CoreTLS:                 cfg.Celestia.CoreTLS,
+		Network:                 cfg.Celestia.Network,
 	})
 	if err != nil {
 		return nil, err

@@ -16,6 +16,10 @@ type Config struct {
 		GasAPI                  string  `mapstructure:"gasAPI"`
 		Retries                 int     `mapstructure:"retries"`
 		RetryDelay              int     `mapstructure:"retryDelay"`
+		Mnemonic                string  `mapstructure:"mnemonic"`
+		CoreGRPC                string  `mapstructure:"coreGRPC"`
+		CoreTLS                 bool    `mapstructure:"coreTLS"`
+		Network                 string  `mapstructure:"network"`
 	} `mapstructure:"celestia"`
 	Ethereum struct {
 		HTTPEndpoint            string `mapstructure:"httpEndpoint"`

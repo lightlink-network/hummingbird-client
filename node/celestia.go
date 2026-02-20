@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
@@ -11,16 +12,21 @@ import (
 	"github.com/celestiaorg/celestia-node/api/rpc/client"
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/celestiaorg/celestia-node/state"
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
-	// "github.com/celestiaorg/celestia-node/share"
-	// "github.com/celestiaorg/celestia-openrpc/types/share"
-	openclient "github.com/celestiaorg/celestia-openrpc"
 	gosquare "github.com/celestiaorg/go-square/v3"
 	"github.com/celestiaorg/go-square/v3/share"
 	thttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/celestiaorg/celestia-app/v6/app"
+	"github.com/celestiaorg/celestia-app/v6/app/encoding"
 	"github.com/celestiaorg/celestia-app/v6/pkg/appconsts"
 
 	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
@@ -68,14 +74,20 @@ type CelestiaClientOpts struct {
 	GasAPI                  string
 	Retries                 int
 	RetryDelay              time.Duration
+	Mnemonic                string
+	CoreGRPC                string
+	CoreTLS                 bool
+	Network                 string
 }
+
+const celestiaKeyName = "hummingbird"
 
 var _ Celestia = &CelestiaClient{}
 
 type CelestiaClient struct {
 	namespace               string
 	client                  *client.Client
-	openrpcClient           *openclient.Client
+	coreAccess              *state.CoreAccessor
 	trpc                    *thttp.HTTP
 	logger                  *slog.Logger
 	gasPrice                float64
@@ -95,11 +107,6 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		return nil, fmt.Errorf("failed to connect to Celestia: %w", err)
 	}
 
-	openrpcClient, err := openclient.NewClient(context.Background(), opts.Endpoint, opts.Token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Celestia OpenRPC: %w", err)
-	}
-
 	trpc, err := thttp.New(opts.TendermintRPC, "/websocket")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Tendermint RPC: %w", err)
@@ -109,11 +116,58 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		return nil, fmt.Errorf("failed to start Tendermint RPC: %w", err)
 	}
 
-	opts.Logger.Info("Connected to Celestia")
+	encCfg := encoding.MakeConfig(app.ModuleEncodingRegisters...)
+	kr := keyring.NewInMemory(encCfg.Codec)
+
+	_, err = kr.NewAccount(
+		celestiaKeyName,
+		opts.Mnemonic,
+		keyring.DefaultBIP39Passphrase,
+		sdk.GetConfig().GetFullBIP44Path(),
+		hd.Secp256k1,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to import celestia key from mnemonic: %w", err)
+	}
+
+	rec, err := kr.Key(celestiaKeyName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get celestia key: %w", err)
+	}
+	addr, err := rec.GetAddress()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get celestia address: %w", err)
+	}
+	opts.Logger.Info("Celestia signer address", "address", addr.String())
+
+	var grpcOpts []grpc.DialOption
+	if opts.CoreTLS {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(
+			credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})))
+	} else {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+
+	grpcConn, err := grpc.NewClient(opts.CoreGRPC, grpcOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to celestia gRPC at %s: %w", opts.CoreGRPC, err)
+	}
+
+	ctx := context.Background()
+	coreAccessor, err := state.NewCoreAccessor(kr, celestiaKeyName, nil, grpcConn, opts.Network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create celestia core accessor: %w", err)
+	}
+
+	if err := coreAccessor.Start(ctx); err != nil {
+		return nil, fmt.Errorf("failed to start celestia core accessor: %w", err)
+	}
+
+	opts.Logger.Info("Connected to Celestia", "grpc", opts.CoreGRPC, "network", opts.Network)
 	return &CelestiaClient{
 		namespace:               opts.Namespace,
 		client:                  c,
-		openrpcClient:           openrpcClient,
+		coreAccess:              coreAccessor,
 		trpc:                    trpc,
 		logger:                  opts.Logger,
 		gasPrice:                opts.GasPrice,
@@ -190,7 +244,7 @@ func (c *CelestiaClient) submitBlob(ctx context.Context, blobs []*blob.Blob) (*C
 		"endpoint", "State.SubmitPayForBlob",
 		"tx_config", fmt.Sprintf("%+v", txConfig))
 
-	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), txConfig)
+	response, err := c.coreAccess.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), txConfig)
 	if err != nil {
 		c.logger.Error("SubmitPayForBlob failed",
 			"error", err,

@@ -107,7 +107,7 @@ func (r *Rollup) CreateNextBlock() (*Block, error) {
 	}
 
 	// 7. upload the bundle to celestia
-	r.Opts.Logger.Info("Publishing bundles to Celestia", "bundles", len(bundles), "bundles_size", fetchStart-head.L2Height-1, "ll_height", llHeight, "ll_epoch", epoch)
+	r.Opts.Logger.Info("Publishing bundles to Celestia", "bundles", len(bundles), "blocks", blocksToFetch, "ll_height", llHeight, "ll_epoch", epoch)
 	pointers := make([]canonicalStateChainContract.CanonicalStateChainCelestiaPointer, 0)
 	for i, bundle := range bundles {
 		pointer, gasPrice, err := r.Celestia.PublishBundle(*bundle)

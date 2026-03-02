@@ -1,15 +1,18 @@
 storePath: "./store" # Path to store data locally
 celestia:
-  endpoint: http://127.0.0.1:26658 # Celestia node endpoint (light node or bridge node provider)
-  token: "" # Celestia node auth token
+  # DA Node (bridge/full) — for namespace reads
+  daNodeRPC: http://127.0.0.1:26658 # Celestia DA node endpoint (bridge node or provider like QuickNode)
+  daNodeToken: "" # DA node auth token
+  # Consensus Node — for proofs, tx lookups, and broadcasting
+  consensusRPC: http://full.consensus.mocha-4.celestia-mocha.com:26657 # Consensus node CometBFT RPC
+  consensusGRPC: "celestia-testnet-consensus.itrocket.net:9090" # Consensus node gRPC
+  consensusTLS: false # Enable TLS for gRPC connection
+  # Wallet & Network
   namespace: lightlink # Celestia blob namespace
-  tendermint_rpc: http://full.consensus.mocha-4.celestia-mocha.com:26657 # CometBFT RPC endpoint
   gasPrice: 0.003 # Gas price in TIA
   retries: 3 # Number of retries for each request
   retryDelay: 120000 # Delay in ms between each retry
   mnemonic: "" # Celestia wallet mnemonic for signing transactions
-  coreGRPC: "celestia-testnet-consensus.itrocket.net:9090" # Celestia consensus gRPC endpoint
-  coreTLS: false # Enable TLS for gRPC connection
   network: "mocha-4" # Celestia network name ("celestia" for mainnet, "mocha-4" for testnet)
 ethereum:
   httpEndpoint: https://ethereum-sepolia.publicnode.com # Ethereum HTTP endpoint

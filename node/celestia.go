@@ -64,20 +64,18 @@ type Celestia interface {
 }
 
 type CelestiaClientOpts struct {
-	Endpoint                string
-	Token                   string
-	TendermintRPC           string
-	Namespace               string
-	Logger                  *slog.Logger
-	GasPrice                float64
-	GasPriceIncreasePercent *big.Int
-	GasAPI                  string
-	Retries                 int
-	RetryDelay              time.Duration
-	Mnemonic                string
-	CoreGRPC                string
-	CoreTLS                 bool
-	Network                 string
+	DANodeRPC     string
+	DANodeToken   string
+	ConsensusRPC  string
+	Namespace     string
+	Logger        *slog.Logger
+	GasPrice      float64
+	Retries       int
+	RetryDelay    time.Duration
+	Mnemonic      string
+	ConsensusGRPC string
+	ConsensusTLS  bool
+	Network       string
 }
 
 const celestiaKeyName = "hummingbird"
@@ -85,16 +83,14 @@ const celestiaKeyName = "hummingbird"
 var _ Celestia = &CelestiaClient{}
 
 type CelestiaClient struct {
-	namespace               string
-	client                  *client.Client
-	coreAccess              *state.CoreAccessor
-	trpc                    *thttp.HTTP
-	logger                  *slog.Logger
-	gasPrice                float64
-	gasPriceIncreasePercent *big.Int
-	gasAPI                  string
-	retries                 int
-	retryDelay              time.Duration
+	namespace  string
+	client     *client.Client
+	coreAccess *state.CoreAccessor
+	trpc       *thttp.HTTP
+	logger     *slog.Logger
+	gasPrice   float64
+	retries    int
+	retryDelay time.Duration
 }
 
 func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
@@ -102,18 +98,18 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		opts.Logger = slog.Default()
 	}
 
-	c, err := client.NewClient(context.Background(), opts.Endpoint, opts.Token)
+	c, err := client.NewClient(context.Background(), opts.DANodeRPC, opts.DANodeToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Celestia: %w", err)
 	}
 
-	trpc, err := thttp.New(opts.TendermintRPC, "/websocket")
+	trpc, err := thttp.New(opts.ConsensusRPC, "/websocket")
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Tendermint RPC: %w", err)
+		return nil, fmt.Errorf("failed to connect to consensus RPC: %w", err)
 	}
 
 	if err := trpc.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start Tendermint RPC: %w", err)
+		return nil, fmt.Errorf("failed to start consensus RPC: %w", err)
 	}
 
 	encCfg := encoding.MakeConfig(app.ModuleEncodingRegisters...)
@@ -141,16 +137,16 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	opts.Logger.Info("Celestia signer address", "address", addr.String())
 
 	var grpcOpts []grpc.DialOption
-	if opts.CoreTLS {
+	if opts.ConsensusTLS {
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(
 			credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})))
 	} else {
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
-	grpcConn, err := grpc.NewClient(opts.CoreGRPC, grpcOpts...)
+	grpcConn, err := grpc.NewClient(opts.ConsensusGRPC, grpcOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to celestia gRPC at %s: %w", opts.CoreGRPC, err)
+		return nil, fmt.Errorf("failed to connect to celestia gRPC at %s: %w", opts.ConsensusGRPC, err)
 	}
 
 	ctx := context.Background()
@@ -163,18 +159,16 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		return nil, fmt.Errorf("failed to start celestia core accessor: %w", err)
 	}
 
-	opts.Logger.Info("Connected to Celestia", "grpc", opts.CoreGRPC, "network", opts.Network)
+	opts.Logger.Info("Connected to Celestia", "grpc", opts.ConsensusGRPC, "network", opts.Network)
 	return &CelestiaClient{
-		namespace:               opts.Namespace,
-		client:                  c,
-		coreAccess:              coreAccessor,
-		trpc:                    trpc,
-		logger:                  opts.Logger,
-		gasPrice:                opts.GasPrice,
-		gasPriceIncreasePercent: opts.GasPriceIncreasePercent,
-		gasAPI:                  opts.GasAPI,
-		retries:                 opts.Retries,
-		retryDelay:              opts.RetryDelay,
+		namespace:  opts.Namespace,
+		client:     c,
+		coreAccess: coreAccessor,
+		trpc:       trpc,
+		logger:     opts.Logger,
+		gasPrice:   opts.GasPrice,
+		retries:    opts.Retries,
+		retryDelay: opts.RetryDelay,
 	}, nil
 }
 

@@ -2,25 +2,30 @@ package node
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"math/big"
 	"time"
 
-	"github.com/celestiaorg/celestia-node/api/rpc/client"
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/celestiaorg/celestia-node/state"
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
-	// "github.com/celestiaorg/celestia-node/share"
-	// "github.com/celestiaorg/celestia-openrpc/types/share"
-	openclient "github.com/celestiaorg/celestia-openrpc"
 	gosquare "github.com/celestiaorg/go-square/v3"
 	"github.com/celestiaorg/go-square/v3/share"
 	thttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/celestiaorg/celestia-app/v6/app"
+	"github.com/celestiaorg/celestia-app/v6/app/encoding"
 	"github.com/celestiaorg/celestia-app/v6/pkg/appconsts"
 
 	blobstreamXContract "hummingbird/node/contracts/BlobstreamX.sol"
@@ -58,31 +63,30 @@ type Celestia interface {
 }
 
 type CelestiaClientOpts struct {
-	Endpoint                string
-	Token                   string
-	TendermintRPC           string
-	Namespace               string
-	Logger                  *slog.Logger
-	GasPrice                float64
-	GasPriceIncreasePercent *big.Int
-	GasAPI                  string
-	Retries                 int
-	RetryDelay              time.Duration
+	ConsensusRPC  string
+	Namespace     string
+	Logger        *slog.Logger
+	GasPrice      float64
+	Retries       int
+	RetryDelay    time.Duration
+	Mnemonic      string
+	ConsensusGRPC string
+	ConsensusTLS  bool
+	Network       string
 }
+
+const celestiaKeyName = "hummingbird"
 
 var _ Celestia = &CelestiaClient{}
 
 type CelestiaClient struct {
-	namespace               string
-	client                  *client.Client
-	openrpcClient           *openclient.Client
-	trpc                    *thttp.HTTP
-	logger                  *slog.Logger
-	gasPrice                float64
-	gasPriceIncreasePercent *big.Int
-	gasAPI                  string
-	retries                 int
-	retryDelay              time.Duration
+	namespace  string
+	coreAccess *state.CoreAccessor
+	trpc       *thttp.HTTP
+	logger     *slog.Logger
+	gasPrice   float64
+	retries    int
+	retryDelay time.Duration
 }
 
 func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
@@ -90,37 +94,71 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 		opts.Logger = slog.Default()
 	}
 
-	c, err := client.NewClient(context.Background(), opts.Endpoint, opts.Token)
+	trpc, err := thttp.New(opts.ConsensusRPC, "/websocket")
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Celestia: %w", err)
-	}
-
-	openrpcClient, err := openclient.NewClient(context.Background(), opts.Endpoint, opts.Token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Celestia OpenRPC: %w", err)
-	}
-
-	trpc, err := thttp.New(opts.TendermintRPC, "/websocket")
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Tendermint RPC: %w", err)
+		return nil, fmt.Errorf("failed to connect to consensus RPC: %w", err)
 	}
 
 	if err := trpc.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start Tendermint RPC: %w", err)
+		return nil, fmt.Errorf("failed to start consensus RPC: %w", err)
 	}
 
-	opts.Logger.Info("Connected to Celestia")
+	encCfg := encoding.MakeConfig(app.ModuleEncodingRegisters...)
+	kr := keyring.NewInMemory(encCfg.Codec)
+
+	_, err = kr.NewAccount(
+		celestiaKeyName,
+		opts.Mnemonic,
+		keyring.DefaultBIP39Passphrase,
+		sdk.GetConfig().GetFullBIP44Path(),
+		hd.Secp256k1,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to import celestia key from mnemonic: %w", err)
+	}
+
+	rec, err := kr.Key(celestiaKeyName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get celestia key: %w", err)
+	}
+	addr, err := rec.GetAddress()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get celestia address: %w", err)
+	}
+	opts.Logger.Info("Celestia signer address", "address", addr.String())
+
+	var grpcOpts []grpc.DialOption
+	if opts.ConsensusTLS {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(
+			credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})))
+	} else {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+
+	grpcConn, err := grpc.NewClient(opts.ConsensusGRPC, grpcOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to celestia gRPC at %s: %w", opts.ConsensusGRPC, err)
+	}
+
+	ctx := context.Background()
+	coreAccessor, err := state.NewCoreAccessor(kr, celestiaKeyName, nil, grpcConn, opts.Network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create celestia core accessor: %w", err)
+	}
+
+	if err := coreAccessor.Start(ctx); err != nil {
+		return nil, fmt.Errorf("failed to start celestia core accessor: %w", err)
+	}
+
+	opts.Logger.Info("Connected to Celestia", "grpc", opts.ConsensusGRPC, "network", opts.Network)
 	return &CelestiaClient{
-		namespace:               opts.Namespace,
-		client:                  c,
-		openrpcClient:           openrpcClient,
-		trpc:                    trpc,
-		logger:                  opts.Logger,
-		gasPrice:                opts.GasPrice,
-		gasPriceIncreasePercent: opts.GasPriceIncreasePercent,
-		gasAPI:                  opts.GasAPI,
-		retries:                 opts.Retries,
-		retryDelay:              opts.RetryDelay,
+		namespace:  opts.Namespace,
+		coreAccess: coreAccessor,
+		trpc:       trpc,
+		logger:     opts.Logger,
+		gasPrice:   opts.GasPrice,
+		retries:    opts.Retries,
+		retryDelay: opts.RetryDelay,
 	}, nil
 }
 
@@ -190,7 +228,7 @@ func (c *CelestiaClient) submitBlob(ctx context.Context, blobs []*blob.Blob) (*C
 		"endpoint", "State.SubmitPayForBlob",
 		"tx_config", fmt.Sprintf("%+v", txConfig))
 
-	response, err := c.client.State.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), txConfig)
+	response, err := c.coreAccess.SubmitPayForBlob(ctx, blob.ToLibBlobs(blobs...), txConfig)
 	if err != nil {
 		c.logger.Error("SubmitPayForBlob failed",
 			"error", err,
@@ -317,31 +355,7 @@ func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error
 }
 
 func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]share.Share, error) {
-	ctx := context.Background()
-
-	// 1. Namespace
-	// ns, err := openshare.NewBlobNamespaceV0([]byte(c.Namespace()))
-	// if err != nil {
-	// 	return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
-	// }
-	ns, err := share.NewV0Namespace([]byte(c.Namespace()))
-	if err != nil {
-		return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
-	}
-
-	// 3. Get the shares
-	//s, err := c.client.Share.GetSharesByNamespace(ctx, h, ns)
-	nsData, err := c.client.Share.GetNamespaceData(ctx, pointer.Height, ns)
-	if err != nil {
-		return nil, fmt.Errorf("GetShares: failed to get namespace data: %w", err)
-	}
-
-	// s, err := c.openrpcClient.Share.GetSharesByNamespace(ctx, h, ns)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("GetShares: failed to get shares: %w", err)
-	// }
-
-	return utils.NSSharesToShares(nsData.Flatten()), nil
+	return c.GetSharesByPointer(pointer)
 }
 
 func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]share.Share, error) {

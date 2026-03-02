@@ -52,16 +52,16 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	}
 
 	cel, err := NewCelestiaClient(CelestiaClientOpts{
-		Endpoint:                cfg.Celestia.Endpoint,
-		Token:                   cfg.Celestia.Token,
-		TendermintRPC:           cfg.Celestia.TendermintRPC,
-		Namespace:               cfg.Celestia.Namespace,
-		Logger:                  logger.With("ctx", "celestia"),
-		GasPrice:                cfg.Celestia.GasPrice,
-		GasPriceIncreasePercent: big.NewInt(int64(cfg.Celestia.GasPriceIncreasePercent)),
-		GasAPI:                  cfg.Celestia.GasAPI,
-		Retries:                 cfg.Celestia.Retries,
-		RetryDelay:              time.Duration(cfg.Celestia.RetryDelay) * time.Millisecond,
+		ConsensusRPC:  cfg.Celestia.ConsensusRPC,
+		Namespace:     cfg.Celestia.Namespace,
+		Logger:        logger.With("ctx", "celestia"),
+		GasPrice:      cfg.Celestia.GasPrice,
+		Retries:       cfg.Celestia.Retries,
+		RetryDelay:    time.Duration(cfg.Celestia.RetryDelay) * time.Millisecond,
+		Mnemonic:      cfg.Celestia.Mnemonic,
+		ConsensusGRPC: cfg.Celestia.ConsensusGRPC,
+		ConsensusTLS:  cfg.Celestia.ConsensusTLS,
+		Network:       cfg.Celestia.Network,
 	})
 	if err != nil {
 		return nil, err

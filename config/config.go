@@ -6,16 +6,16 @@ import (
 
 type Config struct {
 	StorePath string `mapstructure:"storePath"`
-	Celestia  struct {
-		Token                   string  `mapstructure:"token"`
-		Endpoint                string  `mapstructure:"endpoint"`
-		Namespace               string  `mapstructure:"namespace"`
-		TendermintRPC           string  `mapstructure:"tendermint_rpc"`
-		GasPrice                float64 `mapstructure:"gasPrice"`
-		GasPriceIncreasePercent int     `mapstructure:"gasPriceIncreasePercent"`
-		GasAPI                  string  `mapstructure:"gasAPI"`
-		Retries                 int     `mapstructure:"retries"`
-		RetryDelay              int     `mapstructure:"retryDelay"`
+	Celestia struct {
+		Namespace    string  `mapstructure:"namespace"`
+		ConsensusRPC string  `mapstructure:"consensusRPC"`
+		GasPrice     float64 `mapstructure:"gasPrice"`
+		Retries      int     `mapstructure:"retries"`
+		RetryDelay   int     `mapstructure:"retryDelay"`
+		Mnemonic     string  `mapstructure:"mnemonic"`
+		ConsensusGRPC string `mapstructure:"consensusGRPC"`
+		ConsensusTLS  bool   `mapstructure:"consensusTLS"`
+		Network       string `mapstructure:"network"`
 	} `mapstructure:"celestia"`
 	Ethereum struct {
 		HTTPEndpoint            string `mapstructure:"httpEndpoint"`

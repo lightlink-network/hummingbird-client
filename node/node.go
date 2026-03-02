@@ -52,8 +52,6 @@ func NewFromConfig(cfg *config.Config, logger *slog.Logger, ethKey *ecdsa.Privat
 	}
 
 	cel, err := NewCelestiaClient(CelestiaClientOpts{
-		DANodeRPC:     cfg.Celestia.DANodeRPC,
-		DANodeToken:   cfg.Celestia.DANodeToken,
 		ConsensusRPC:  cfg.Celestia.ConsensusRPC,
 		Namespace:     cfg.Celestia.Namespace,
 		Logger:        logger.With("ctx", "celestia"),

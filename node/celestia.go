@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/celestiaorg/celestia-node/api/rpc/client"
 	"github.com/celestiaorg/celestia-node/blob"
 	"github.com/celestiaorg/celestia-node/state"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
@@ -64,8 +63,6 @@ type Celestia interface {
 }
 
 type CelestiaClientOpts struct {
-	DANodeRPC     string
-	DANodeToken   string
 	ConsensusRPC  string
 	Namespace     string
 	Logger        *slog.Logger
@@ -84,7 +81,6 @@ var _ Celestia = &CelestiaClient{}
 
 type CelestiaClient struct {
 	namespace  string
-	client     *client.Client
 	coreAccess *state.CoreAccessor
 	trpc       *thttp.HTTP
 	logger     *slog.Logger
@@ -96,11 +92,6 @@ type CelestiaClient struct {
 func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
-	}
-
-	c, err := client.NewClient(context.Background(), opts.DANodeRPC, opts.DANodeToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Celestia: %w", err)
 	}
 
 	trpc, err := thttp.New(opts.ConsensusRPC, "/websocket")
@@ -162,7 +153,6 @@ func NewCelestiaClient(opts CelestiaClientOpts) (*CelestiaClient, error) {
 	opts.Logger.Info("Connected to Celestia", "grpc", opts.ConsensusGRPC, "network", opts.Network)
 	return &CelestiaClient{
 		namespace:  opts.Namespace,
-		client:     c,
 		coreAccess: coreAccessor,
 		trpc:       trpc,
 		logger:     opts.Logger,
@@ -365,31 +355,7 @@ func (c *CelestiaClient) GetPointer(txHash common.Hash) (*CelestiaPointer, error
 }
 
 func (c *CelestiaClient) GetSharesByNamespace(pointer *CelestiaPointer) ([]share.Share, error) {
-	ctx := context.Background()
-
-	// 1. Namespace
-	// ns, err := openshare.NewBlobNamespaceV0([]byte(c.Namespace()))
-	// if err != nil {
-	// 	return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
-	// }
-	ns, err := share.NewV0Namespace([]byte(c.Namespace()))
-	if err != nil {
-		return nil, fmt.Errorf("GetShares: failed to get namespace: %w", err)
-	}
-
-	// 3. Get the shares
-	//s, err := c.client.Share.GetSharesByNamespace(ctx, h, ns)
-	nsData, err := c.client.Share.GetNamespaceData(ctx, pointer.Height, ns)
-	if err != nil {
-		return nil, fmt.Errorf("GetShares: failed to get namespace data: %w", err)
-	}
-
-	// s, err := c.openrpcClient.Share.GetSharesByNamespace(ctx, h, ns)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("GetShares: failed to get shares: %w", err)
-	// }
-
-	return utils.NSSharesToShares(nsData.Flatten()), nil
+	return c.GetSharesByPointer(pointer)
 }
 
 func (c *CelestiaClient) GetSharesByPointer(pointer *CelestiaPointer) ([]share.Share, error) {

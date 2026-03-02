@@ -1,9 +1,6 @@
 storePath: "./store" # Path to store data locally
 celestia:
-  # DA Node (bridge/full) — for namespace reads
-  daNodeRPC: http://127.0.0.1:26658 # Celestia DA node endpoint (bridge node or provider like QuickNode)
-  daNodeToken: "" # DA node auth token
-  # Consensus Node — for proofs, tx lookups, and broadcasting
+  # Consensus Node — for proofs, tx lookups, reads, and broadcasting
   consensusRPC: http://full.consensus.mocha-4.celestia-mocha.com:26657 # Consensus node CometBFT RPC
   consensusGRPC: "celestia-testnet-consensus.itrocket.net:9090" # Consensus node gRPC
   consensusTLS: false # Enable TLS for gRPC connection

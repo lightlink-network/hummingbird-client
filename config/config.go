@@ -7,8 +7,6 @@ import (
 type Config struct {
 	StorePath string `mapstructure:"storePath"`
 	Celestia struct {
-		DANodeRPC    string  `mapstructure:"daNodeRPC"`
-		DANodeToken  string  `mapstructure:"daNodeToken"`
 		Namespace    string  `mapstructure:"namespace"`
 		ConsensusRPC string  `mapstructure:"consensusRPC"`
 		GasPrice     float64 `mapstructure:"gasPrice"`
